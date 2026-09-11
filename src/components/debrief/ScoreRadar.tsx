@@ -9,15 +9,17 @@ import {
   Tooltip,
   type TooltipProps,
 } from 'recharts'
-import type { ScoreReport } from '../../engine/types'
+import type { ScoreDimension, ScoreReport } from '../../engine/types'
 import { SCORE_DIMENSIONS } from '../../engine/types/common'
 import { formatNumber } from '../../lib/format'
-import { DIMENSION_LABELS } from '../../lib/labels'
+import { DIMENSION_HELP, DIMENSION_LABELS, DIMENSION_LABELS_SHORT } from '../../lib/labels'
 import { Button } from '../ui'
+import { InfoTip } from '../ui/InfoTip'
 
 interface Row {
-  dim: string
+  dim: ScoreDimension
   label: string
+  short: string
   score: number
   weight: number
   explanation: string[]
@@ -27,7 +29,7 @@ function RadarTooltip({ active, payload }: TooltipProps<number, string>) {
   const row = payload?.[0]?.payload as Row | undefined
   if (!active || !row) return null
   return (
-    <div className="max-w-xs rounded-md border border-border bg-surface p-2 text-[12px] shadow-lg">
+    <div className="max-w-xs rounded-md border border-border bg-surface p-2 text-sm shadow-lg">
       <div className="font-semibold">
         {row.label} <span className="text-muted font-normal num">가중치 {row.weight}%</span>
       </div>
@@ -43,11 +45,20 @@ function RadarTooltip({ active, payload }: TooltipProps<number, string>) {
   )
 }
 
-export function ScoreRadar({ report }: { report: ScoreReport }) {
+export function ScoreRadar({
+  report,
+  forceTable,
+}: {
+  report: ScoreReport
+  /** Printing: render the table so the chart is never measured at zero width. */
+  forceTable?: boolean
+}) {
   const [table, setTable] = useState(false)
+  const showTable = forceTable || table
   const rows: Row[] = SCORE_DIMENSIONS.map((d) => ({
     dim: d,
     label: DIMENSION_LABELS[d],
+    short: DIMENSION_LABELS_SHORT[d],
     score: Math.round(report.dimensions[d].score),
     weight: report.dimensions[d].weight,
     explanation: report.dimensions[d].explanation,
@@ -56,14 +67,21 @@ export function ScoreRadar({ report }: { report: ScoreReport }) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h3 className="text-[13px] font-semibold">7차원 점수</h3>
-        <Button size="sm" variant="ghost" aria-pressed={table} onClick={() => setTable((v) => !v)}>
-          {table ? '차트로 보기' : '표로 보기'}
-        </Button>
+        <h3 className="text-base font-semibold">7차원 점수</h3>
+        {!forceTable && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={table}
+            onClick={() => setTable((v) => !v)}
+          >
+            {table ? '차트로 보기' : '표로 보기'}
+          </Button>
+        )}
       </div>
-      {table ? (
+      {showTable ? (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-sm">
             <caption className="sr-only">차원별 점수</caption>
             <thead>
               <tr className="text-left text-muted border-b border-border">
@@ -76,7 +94,12 @@ export function ScoreRadar({ report }: { report: ScoreReport }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.dim} className="border-b border-border/60 last:border-0 align-top">
-                  <td className="py-1 pr-2">{r.label}</td>
+                  <td className="py-1 pr-2">
+                    <span className="inline-flex items-center gap-1">
+                      {r.label}
+                      <InfoTip label={`${r.label} 설명`}>{DIMENSION_HELP[r.dim]}</InfoTip>
+                    </span>
+                  </td>
                   <td className="py-1 pr-2 num">{r.score}</td>
                   <td className="py-1 pr-2 num">{r.weight}%</td>
                   <td className="py-1 text-muted">
@@ -94,7 +117,7 @@ export function ScoreRadar({ report }: { report: ScoreReport }) {
           <ResponsiveContainer width="100%" height={320}>
             <RadarChart data={rows} outerRadius="70%">
               <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+              <PolarAngleAxis dataKey="short" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
               <PolarRadiusAxis
                 domain={[0, 100]}
                 tickCount={5}

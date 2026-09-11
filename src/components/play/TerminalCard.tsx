@@ -40,29 +40,29 @@ export function TerminalCard({ onDebrief }: { onDebrief: () => void }) {
         ) : (
           <Badge tone="positive">● 완료</Badge>
         )}
-        <span className="num text-[12px] text-muted">
+        <span className="num text-sm text-muted">
           T+{turnIndex}/{Math.max(0, scenario.meta.durationTurns - 1)}
           {turn ? ` · ${turn.timeLabel}` : ''}
         </span>
       </div>
-      <h2 id="terminal-title" className="text-[18px] font-semibold leading-tight">
+      <h2 id="terminal-title" className="text-lg font-semibold leading-tight">
         {title}
       </h2>
-      {narrative && <Markdown className="text-[13px] leading-relaxed">{narrative}</Markdown>}
+      {narrative && <Markdown className="text-base leading-relaxed">{narrative}</Markdown>}
       {ruleText && (
-        <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-[12px]">
+        <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
           <span className="font-semibold text-muted">발동 규칙</span>
           <p className="mt-0.5">{ruleText}</p>
         </div>
       )}
       {primary.length > 0 && (
-        <dl className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
           {primary.map((k) => {
             const mv = snap.metrics[k.metric]
             return (
               <div key={k.metric} className="rounded-md border border-border px-2 py-1.5">
                 <dt className="text-muted">{k.label}</dt>
-                <dd className="num mt-0.5 flex items-center justify-between gap-1 text-[13px]">
+                <dd className="num mt-0.5 flex items-center justify-between gap-1 text-base">
                   {mv ? formatMetric(mv.value, k.unit, scenario.units, k.decimals) : '—'}
                   {mv && <StatusBadge status={mv.status} />}
                 </dd>
@@ -71,7 +71,7 @@ export function TerminalCard({ onDebrief }: { onDebrief: () => void }) {
           })}
         </dl>
       )}
-      <p className="text-[12px] text-muted">
+      <p className="text-sm text-muted">
         이 시점부터는 결정을 내릴 수 없습니다. 디브리핑에서 경로 비교와 점수를 확인하실 수 있습니다.
       </p>
       <div className="flex justify-end">

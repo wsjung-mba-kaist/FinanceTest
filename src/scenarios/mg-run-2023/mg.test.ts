@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
+  advanceTick,
   advanceTurn,
   applyDecision,
   autoplay,
+  canAdvanceTick,
   computeScore,
   createGame,
+  fastForwardTicks,
+  latestSnapshot,
+  replay,
   validateScenario,
   type BankState,
   type GameState,
+  type ScenarioDefinition,
 } from '../../engine'
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import { cardIds, sourceIds } from '../../content'
+import { mgFx } from './fx'
 import scenario from './scenario'
+import { T1_QUEUE_PROFILE, T2_QUEUE_PROFILE } from './turnsA'
+import { T4_QUEUE_PROFILE } from './turnsB'
 
 type State = GameState<BankState>
 
@@ -26,13 +35,29 @@ function metricAt(state: State, turnIndex: number, key: string): number {
   return snap?.metrics[key]?.value ?? NaN
 }
 
-/** Drives a hand-picked path: { turnIndex: [[decisionId, optionIds], ...] }. Stops when the game ends. */
+/**
+ * Drives a hand-picked path: { turnIndex: [[decisionId, optionIds], ...] }. Stops when the game
+ * ends. On a ticked turn each decision is answered at the first tick it is available, advancing the
+ * clock in between — the same order a player would meet them.
+ */
 function drive(perTurn: Record<number, [string, string[]][]>): State {
   let s = createGame(scenario, 1)
   while (s.phase !== 'ended') {
-    for (const [decisionId, optionIds] of perTurn[s.turnIndex] ?? []) {
+    const queue = [...(perTurn[s.turnIndex] ?? [])]
+    let guard = 0
+    while (queue.length > 0 && s.phase !== 'ended' && guard++ < 64) {
+      const turn = scenario.turns[s.turnIndex]!
+      const i = queue.findIndex(([id]) => {
+        const d = turn.decisions.find((x) => x.id === id)
+        return d !== undefined && (d.availableFrom ?? 0) <= s.tick
+      })
+      if (i < 0) {
+        if (!canAdvanceTick(s, scenario)) break
+        s = advanceTick(s, scenario)
+        continue
+      }
+      const [decisionId, optionIds] = queue.splice(i, 1)[0]!
       s = applyDecision(s, scenario, decisionId, optionIds)
-      if (s.phase === 'ended') break
     }
     if (s.phase === 'ended') break
     s = advanceTurn(s, scenario)
@@ -350,6 +375,126 @@ describe('mg-run-2023 scenario', () => {
     // 6조 buys time but cannot stop a collapse-state run on its own
     const cashMin = (st: State) => Math.min(...st.metricsHistory.map((m) => m.metrics.cash!.value))
     expect(cashMin(withLine)).toBeGreaterThan(cashMin(bare))
+  })
+
+  // ------------------------------------------------------------------ L2: 틱 · 인터럽트 · 대화
+
+  /** 같은 시나리오의 T1을 틱 이전 형태(하루치 단일 `runoffDays`)로 되돌린 변형. */
+  function untickedT1(): ScenarioDefinition<BankState> {
+    return {
+      ...scenario,
+      turns: scenario.turns.map((t) => {
+        if (t.id !== 't1') return t
+        const { ticks, tickLabels, eachTick, ticker, interrupts, ...rest } = t
+        void ticks
+        void tickLabels
+        void eachTick
+        void ticker
+        void interrupts
+        return {
+          ...rest,
+          entryEffects: [
+            ...(t.entryEffects ?? []),
+            {
+              id: 't1-runoff-single',
+              description: '7/5 당일 인출 (틱 이전 단일 호출)',
+              effects: [mgFx.runoffDays({ days: 1, label: '7/5 인출' })],
+            },
+          ],
+          decisions: t.decisions.map((d) => {
+            const { availableFrom, deadlineTick, ...rd } = d
+            void availableFrom
+            void deadlineTick
+            return rd
+          }),
+        }
+      }),
+    }
+  }
+
+  it('T1 tick slices sum exactly to the un-ticked single-day run-off at variance 0', () => {
+    const ticked = autoplay(scenario, 'historical', { seed: 1, variance: 0 }).state
+    const single = autoplay(untickedT1(), 'historical', { seed: 1, variance: 0 }).state
+    const a = metricAt(ticked, 1, 'dailyOutflow')
+    const b = metricAt(single, 1, 'dailyOutflow')
+    console.log('[ticks] T1 daily outflow sliced', a, 'single', b)
+    expect(Math.abs(a - b)).toBeLessThan(1e-9)
+    expect(
+      Math.abs(metricAt(ticked, 1, 'cumulativeOutflow') - metricAt(single, 1, 'cumulativeOutflow')),
+    ).toBeLessThan(1e-9)
+    expect(Math.abs(metricAt(ticked, 1, 'cash') - metricAt(single, 1, 'cash'))).toBeLessThan(1e-9)
+    // 프로필 합은 정확히 1이어야 한다 (린트가 길이만 검사하므로 저자 책임).
+    const sum = (p: number[]) => p.reduce((x, y) => x + y, 0)
+    expect(sum(T1_QUEUE_PROFILE)).toBeCloseTo(1, 12)
+    expect(sum(T2_QUEUE_PROFILE)).toBeCloseTo(1, 12)
+    expect(sum(T4_QUEUE_PROFILE)).toBeCloseTo(1, 12)
+    expect(T1_QUEUE_PROFILE).toHaveLength(4)
+    expect(T2_QUEUE_PROFILE).toHaveLength(4)
+    expect(T4_QUEUE_PROFILE).toHaveLength(4)
+  })
+
+  it('an unanswered interrupt times out to its default option (historical choice)', () => {
+    let s = createGame(scenario, 1)
+    s = applyDecision(s, scenario, 't0-d1', ['t0-d1-a'])
+    s = applyDecision(s, scenario, 't0-d2', ['t0-d2-a'])
+    s = advanceTurn(s, scenario)
+    expect(s.turnIndex).toBe(1)
+    s = applyDecision(s, scenario, 't1-d1', ['t1-d1-a'])
+    s = advanceTick(s, scenario) // 11:00 — 이사장 전화가 도착한다
+    expect(s.openInterrupts).toContain('t1-i1-branch')
+    s = advanceTick(s, scenario) // 14:00 — 마감 스윕이 기본 옵션으로 확정한다
+    expect(s.openInterrupts).not.toContain('t1-i1-branch')
+    const rec = s.decisions.find((d) => d.decisionId === 't1-i1-branch')
+    expect(rec).toBeDefined()
+    expect(rec!.optionIds).toEqual(['t1-i1-a'])
+    expect(rec!.timedOut).toBe(true)
+    expect(rec!.interrupt).toBe(true)
+    expect(s.counters.timeouts).toBe(1)
+    // 기본 옵션 = 역사 선택이므로 무응답 플레이는 역사 경로로 수렴한다.
+    const it1 = scenario.turns[1]!.interrupts!.find((i) => i.id === 't1-i1-branch')!
+    expect(it1.options.find((o) => o.id === it1.defaultOptionId)?.historical).toBe(true)
+  })
+
+  it('the T2 briefing dialogue walks and replays exactly (pledgedSupport is committed)', () => {
+    const r = autoplay(scenario, 'historical', { seed: 1 })
+    const rec = r.decisions.find((d) => d.decisionId === 't2-d1')
+    expect(rec).toBeDefined()
+    expect(rec!.optionIds).toEqual(['t2-d1-a'])
+    expect(rec!.path).toEqual(['forum-joint', 'pledgedSupport-30', 'promise-legal'])
+    expect(rec!.tick).toBe(3)
+    expect(r.state.counters.pledgedSupport).toBe(30)
+    // 30조는 담보차입 여력 없이도 설명되는 값이므로 다음 턴 판정(≥70조)이 걸리지 않는다.
+    expect(r.state.flags.figures_disclosed).toBe(true)
+    const back = replay(scenario, { seed: 1, decisions: r.decisions })
+    expect(back.state.counters.pledgedSupport).toBe(30)
+    expect(latestSnapshot(back.state).metrics).toEqual(latestSnapshot(r.state).metrics)
+    expect(back.state.decisions.find((d) => d.decisionId === 't2-d1')!.path).toEqual(rec!.path)
+  })
+
+  it('promising the full 77조 without a drawable line is judged at T3 (ΔCI −5, amplifier ×1.15)', () => {
+    let s = createGame(scenario, 1)
+    s = applyDecision(s, scenario, 't0-d1', ['t0-d1-a'])
+    s = applyDecision(s, scenario, 't0-d2', ['t0-d2-a'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't1-d1', ['t1-d1-a'])
+    s = advanceTick(s, scenario)
+    s = advanceTick(s, scenario) // 14:00 — 대응 체계 결정이 열린다
+    s = applyDecision(s, scenario, 't1-d2', ['t1-d2-a'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't2-d2', ['t2-d2-a'])
+    s = fastForwardTicks(s, scenario)
+    s = applyDecision(s, scenario, 't2-d1', ['t2-d1-a'], {
+      path: ['forum-joint', 'pledgedSupport-77', 'promise-legal'],
+    })
+    expect(s.counters.pledgedSupport).toBe(77)
+    s = advanceTurn(s, scenario)
+    expect(s.turnIndex).toBe(3)
+    // 지연효과는 T3 진입 시 발화하고, 증폭 ×1.15는 그날의 인출에 쓰인 뒤 창이 끝나며 1로 리셋된다.
+    expect(s.log.some((l) => l.includes('즉시 가용성 미입증'))).toBe(true)
+    expect(s.log.some((l) => l.includes('공표 규모와 당일 가용액의 괴리'))).toBe(true)
+    const hist = autoplay(scenario, 'historical', { seed: 1 }).state
+    expect(metricAt(s, 3, 'dailyOutflow')).toBeGreaterThan(metricAt(hist, 3, 'dailyOutflow'))
+    expect(metricAt(s, 3, 'confidence')).toBeLessThan(metricAt(hist, 3, 'confidence'))
   })
 
   it('worst and random policies complete without NaN', () => {

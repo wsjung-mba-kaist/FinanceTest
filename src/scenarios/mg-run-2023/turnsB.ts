@@ -1,10 +1,99 @@
-import type { BankState, Turn } from '../../engine/types'
+import type { BankState, Interrupt, Turn } from '../../engine/types'
 import { bankFx } from '../../engine/fx/bank'
-import { confidence, flag } from '../../engine/fx/common'
+import { confidence, flag, op } from '../../engine/fx/common'
 import { mgFx } from './fx'
-import { S } from './turnsA'
+import { QUEUE_TICK_LABELS, S } from './turnsA'
 
 type T = Turn<BankState>
+
+/** 7/10 월요일: 다시 줄이 섰으나 하루 종일 고르게 분산 — 가장 완만한 프로필 [STYLIZED]. */
+export const T4_QUEUE_PROFILE = [0.28, 0.26, 0.24, 0.22]
+
+/**
+ * 10:30 행안부 담당 국장 전화. 대사는 7/10 실무지원단 발표의 공개 기록을 바탕으로 한 **재구성**이며
+ * 속기록이 아니다.
+ */
+const t4MoisCall: Interrupt<BankState> = {
+  id: 't4-i1-mois',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't4-i1-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '행안부 담당 국장 전화',
+  prompt: '오후 발표문의 보장 문구를 지금 확정해야 합니다. 어떻게 쓰시겠습니까?',
+  dimensions: ['communication', 'policy'],
+  source: {
+    kind: 'regulator',
+    caller: '행정안전부 지역경제지원관',
+    agency: '행정안전부',
+    tone: 'urgent',
+  },
+  lines: [
+    {
+      speaker: '지역경제지원관',
+      text: '실무지원단 발표문 초안이 왔는데 보장 문구가 두 갈래입니다. "정부가 보장한다"로 쓸지, 계약이전 근거를 적고 "전액 지급된다"로 쓸지. 법제처 검토를 받으면 내일로 넘어갑니다.',
+    },
+  ],
+  options: [
+    {
+      id: 't4-i1-a',
+      label: '계약이전 근거를 명시하고 "전액 지급"으로 오늘 발표',
+      description:
+        '새마을금고법상 합병·계약이전 시 예금이 승계된다는 근거를 문장에 넣고, 재원(예금자보호준비금·필요 시 정부 차입)까지 함께 적는다. 법제처 검토 없이도 근거가 조문이므로 오늘 나갈 수 있다.',
+      effects: [flag('pna_wording_legal')],
+      expert: {
+        rating: 85,
+        rationale:
+          '방법(P&A)과 재원을 함께 말해야 약속이 검증 가능해진다. 근거가 조문이면 이후 어떤 검사 결과가 나와도 발표가 뒤집히지 않는다.',
+        sourceRefs: [S.support, S.kfccAct],
+      },
+      consequences: '발표문이 확정되었습니다. "P&A 시 전액 지급"이 저녁 뉴스 자막으로 나갑니다.',
+      historical: true,
+      preview: [{ metric: 'confidence', direction: 'up', magnitude: 1, note: '근거 있는 보장' }],
+    },
+    {
+      id: 't4-i1-b',
+      label: '"정부가 보장한다"로 단순화해 강하게 쓴다',
+      description: '한 문장으로 읽히게 만든다. 법적 근거는 적지 않는다.',
+      effects: [flag('pna_wording_broad')],
+      delayedEffects: [
+        {
+          afterTurns: 1,
+          description: '"정부 보증의 법적 근거를 밝히라"는 국회 요구 — 신뢰지수 −4',
+          effects: [confidence(-4, '포괄 보증 표현의 근거 논란')],
+        },
+      ],
+      expert: {
+        rating: 25,
+        rationale:
+          '새마을금고법상 보호 한도는 5천만원이고 정부 보증에는 국회 동의가 필요하다. 근거 없는 강한 문장은 며칠 안에 검증되고, 검증에 실패하면 이전 약속까지 의심받는다.',
+        sourceRefs: [S.kfccAct, S.sb2011],
+      },
+      consequences: '발표문이 나갔습니다. 야당이 "근거 법령을 밝히라"고 요구했습니다.',
+      trap: true,
+      trapExplanation:
+        '더 강한 말이 더 안전해 보이지만, 근거가 없는 보장은 한 번의 질의로 무너진다. 약속의 힘은 세기가 아니라 검증 가능성에서 나온다.',
+      preview: [{ metric: 'confidence', direction: 'down', magnitude: 2, note: '다음 턴 판정' }],
+    },
+    {
+      id: 't4-i1-c',
+      label: '법제처 검토 후 내일 발표',
+      description: '문구를 다듬어 확실하게 간다. 오늘 오후는 원칙 없이 지나간다.',
+      effects: [bankFx.addAmplifier(1.05, '처리 원칙 공백(하루)')],
+      expert: {
+        rating: 35,
+        rationale:
+          '신중함의 비용이 하루치 줄이다. "부실이 나오면 어떻게 되나"에 답이 없으면 예금자는 최악(청산)을 가정한다.',
+        sourceRefs: [S.fsb],
+      },
+      consequences: '발표가 내일로 미뤄졌습니다. 기자들이 "그러면 청산이냐"고 묻고 있습니다.',
+      preview: [{ metric: 'dailyOutflow', direction: 'up', magnitude: 1, note: '증폭 ×1.05' }],
+    },
+  ],
+}
 
 // ---------------------------------------------------------------------------------------------
 // T4 — 2023-07-10 (월) "실무지원단·은행 RP"
@@ -15,6 +104,8 @@ export const t4: T = {
   timeLabel: '2023년 7월 10일 (월) 09:00 KST',
   title: '실무지원단과 은행 RP',
   time: '2023-07-10T09:00:00+09:00',
+  ticks: 4,
+  tickLabels: QUEUE_TICK_LABELS,
   entryEffects: [
     {
       id: 't4-settle',
@@ -27,11 +118,32 @@ export const t4: T = {
       effects: [confidence(-3, '주말 언론: 부동산 대출 집중·감독체계 논란(외생)')],
     },
     {
-      id: 't4-runoff',
-      description: '7/10 당일 인출',
-      effects: [mgFx.runoffDays({ days: 1, label: '7/10 인출' })],
+      id: 't4-market',
+      description: '개장 앵커: 원/달러 1,299.0원, 국고 2년 3.780%, 국고 3년 3.735% (7/7 종가)',
+      effects: [
+        op('market.fxUsdLocal', 'set', 1299, '7/10 시가'),
+        op('market.govt2yBp', 'set', 378, '국고 2년 7/7 종가 3.780%'),
+        op('market.custom.govt3y', 'set', 374, '국고 3년 7/7 종가 3.735%'),
+      ],
     },
   ],
+  eachTick: [
+    {
+      id: 't4-runoff-tick',
+      description: '7/10 창구 인출 (월요일 개점 — 하루 종일 고르게)',
+      effects: [mgFx.runoffTicks({ profile: T4_QUEUE_PROFILE, label: '7/10 인출' })],
+    },
+  ],
+  ticker: {
+    series: [
+      // 원/달러 시가 1,299.0 · 저가 1,298.8 · 고가 1,307.2 · 종가 1,306.5 [ecos-731Y003]
+      { path: 'market.fxUsdLocal', mode: 'absolute', values: [1299, 1298.8, 1307.2, 1306.5] },
+      // 국고채 2년 3.780% → 3.839% (7/10 종가) [ecos-817Y002]
+      { path: 'market.govt2yBp', mode: 'absolute', values: [378, 380, 382, 384] },
+      // 국고채 3년 3.735% → 3.795% (7/10 종가) [ecos-817Y002]
+      { path: 'market.custom.govt3y', mode: 'absolute', values: [374, 376, 378, 380] },
+    ],
+  },
   events: [
     {
       id: 't4-news-weekend',
@@ -110,9 +222,12 @@ export const t4: T = {
       title: '부실 우려 금고 처리 원칙',
       prompt: '특별검사에서 부실이 확인되는 금고를 어떻게 처리한다고 발표하시겠습니까?',
       context:
-        '"부실 금고가 더 나오면 어떻게 되나"가 이번 주 질문입니다. 답의 형식이 인출을 결정합니다.',
+        '"부실 금고가 더 나오면 어떻게 되나"가 이번 주 질문입니다. 답의 형식이 인출을 결정합니다. 실무지원단 발표는 창구 마감 뒤 저녁 뉴스에 맞춰 나갑니다 — 오늘이 아니라 내일 줄의 길이를 정합니다.',
       requiredConcepts: ['mutual-credit-deposit-protection', 'fdic-resolution-weekend'],
       dimensions: ['policy', 'communication'],
+      availableFrom: 3,
+      defaultOptionId: 't4-d1-a',
+      timeLimitSec: 120,
       options: [
         {
           id: 't4-d1-a',
@@ -181,8 +296,12 @@ export const t4: T = {
       id: 't4-d2',
       title: '은행권 RP',
       prompt: '은행권 RP 매입을 어떻게 하시겠습니까?',
+      context: '당일 결제를 받으려면 오전 중에 담보 목록과 체결 의사가 은행 자금부로 가야 합니다.',
       requiredConcepts: ['korea-crisis-toolkit'],
       dimensions: ['liquidity', 'policy'],
+      availableFrom: 0,
+      deadlineTick: 1,
+      defaultOptionId: 't4-d2-a',
       options: [
         {
           id: 't4-d2-a',
@@ -256,6 +375,7 @@ export const t4: T = {
       ],
     },
   ],
+  interrupts: [t4MoisCall],
   advisorHints: [
     {
       level: 1,
@@ -528,7 +648,7 @@ export const t6: T = {
     {
       id: 't6-press',
       description:
-        '언론(외생): 건설·부동산 대출 56.4조(연체 9.23%)·관리형토지신탁 15.5조 보도 → 신뢰지수 −2',
+        '언론(외생): 건설·부동산 대출 56.4조(연체 9.23%)·관리형토지신탁 15.8조 보도 → 신뢰지수 −2',
       effects: [confidence(-2, '건설·부동산 대출 집중 보도(외생)')],
     },
     {
@@ -557,8 +677,8 @@ export const t6: T = {
       kind: 'newswire',
       outlet: '연합뉴스 (국회 제출 자료)',
       time: '08:00',
-      headline: '새마을금고 건설·부동산 대출 56.4조, 연체율 9.23% — 관리형토지신탁 15.5조',
-      body: '국회에 제출된 자료에 따르면 건설·부동산업 대출이 56.4조원으로 연체율은 9.23%에 이른다. 관리형토지신탁 사업비 대출은 15.5조원이다. 신용공여한도는 건설·부동산 각 30%, 합산 50%다.',
+      headline: '새마을금고 건설·부동산 대출 56.4조, 연체율 9.23% — 관리형토지신탁 15.8조',
+      body: '행정안전부가 국회에 제출한 자료(1월말 기준)에 따르면 건설·부동산업 대출이 56.4조원으로 연체율은 9.23%, 연체액은 5.2조원이다. 관리형토지신탁 사업비 대출은 15조 7,527억원으로 2021년말 9조원에서 73% 늘었다. 신협·농협에는 지난해 1월부터 건설·부동산 각 30%, 합산 50%의 업종별 대출 한도가 적용되고 있지만, 새마을금고에는 같은 한도가 없다.',
       severity: 'warning',
       sourceRefs: [S.outflow, S.kfccStd],
     },

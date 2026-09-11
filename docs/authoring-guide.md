@@ -475,3 +475,226 @@ CDS 프록시: CI→CDS 매핑표(CS 5y 250bp 2022.9 → >1,000bp 2023.3.15). �
 **역사·전문가 경로**: 모든 시나리오는 `paths.historical`(실제 선택 시퀀스; 재현 시 실제 결과 도달해야 함 — autoplay 테스트)과 `paths.expert`(사후평가 기준 최선; 생존 불확실성은 디브리핑에 솔직히 명시)를 가진다.
 
 **함정 옵션**: 시나리오마다 ≥1개, 매력적으로 보이지만 역사적으로 틀린 선택(예: 레고랜드의 콜옵션 미행사, 저축은행 "추가 없다" 발언, 아케고스 마진 인하 수용)과 그 설명.
+
+---
+
+## 11. 틱·인터럽트 저작 (L2)
+
+턴을 서브턴 **틱**으로 쪼개면 한 턴 안에서 시계가 흐르고, 전화가 끼어들고, 결정에 마감 시각이 생긴다. 모든 필드는 선택적이다 — `ticks`를 쓰지 않은 턴은 종전과 완전히 동일하게 동작한다(틱 0이 곧 첫 틱이자 마지막 틱). 워크드 예제는 `tests/fixtures/miniTicks.ts`, 실제 적용 사례는 `src/scenarios/svb-2023`의 T3·T4·T5와 그 `calibration.md` §7이다.
+
+### 11.1 틱 파이프라인 (저작 시 반드시 외울 순서)
+
+```
+지연효과(due) → eachTick → tickEffects(atTick) → 예정 이벤트(atTick) → 티커 → 인터럽트 개시
+              → 지표 스냅샷 → 게임오버 → 마감 스윕(기한 지난 결정·인터럽트를 defaultOptionId로 확정)
+```
+
+이 순서가 곧 보정이다. 예: 같은 틱에서 `eachTick`의 유출이 `tickEffects`의 ΔCI보다 **먼저** 계산되므로, 마지막 틱에 ΔCI를 걸어도 그날의 유출률은 바뀌지 않는다. 반대로 **직전 틱에** 확정된 결정의 ΔCI는 다음 틱의 유출률을 바꾼다(런 상태 경계를 넘으면 크게).
+
+틱 0은 `startTurn`이 `entryEffects` **뒤에** 실행한다. 따라서 턴 진입 효과 → 틱 0 파이프라인 → 틱 1… 이다.
+
+### 11.2 필드 요약
+
+| 필드 | 용도 | 린트 |
+|---|---|---|
+| `Turn.ticks` | 서브턴 틱 수 | 1 이상의 정수 |
+| `Turn.tickLabels` | 틱별 시계 라벨(`['07:00', …]`) | 길이 = `ticks` |
+| `Turn.eachTick` | 매 틱 적용(유출 슬라이스 자리) | `ConditionalEffects` |
+| `Turn.tickEffects` | 특정 틱 적용(`atTick` 필수) | `atTick ∈ 0..ticks−1` |
+| `Turn.ticker` | 일중 시계열 | `values` 길이 = `ticks`, `confidence` 경로 금지 |
+| `GameEvent.atTick` / `jitter` | 이벤트 발화 틱 | `atTick ∈ 0..ticks−1` |
+| `Decision.availableFrom` / `deadlineTick` | 결정 창 | 범위 검사 + `availableFrom ≤ deadlineTick` + 마감 있으면 `defaultOptionId` 필수 |
+| `Decision.scoreWeight` | 점수 가중(인터럽트는 0.5) | ≥ 0 |
+| `Turn.interrupts` | 중간 도착 결정 | 2~4 옵션, `lines` ≥ 1, `defaultOptionId` 필수, `timeoutSec > 0` |
+| `DelayedEffectSpec.afterTicks` | 지연효과의 틱 정밀도 | 대상 턴이 틱 턴이어야 함 |
+
+### 11.3 유출을 틱으로 나누기
+
+틱 턴에서 `bankFx.runoffStep`은 **`entryEffects`가 아니라 `eachTick`** 에 둔다(엔트리에 두면 한 슬라이스만 실행되고 린트가 경고한다).
+
+```ts
+eachTick: [
+  {
+    id: 't3-runoff-tick',
+    effects: [bankFx.runoffStep({ windowFraction: 0.55, profile: [0.35, 0.25, 0.2, 0.12, 0.08] })],
+  },
+]
+```
+
+- `profile` 길이 = `ticks`이고 **합이 1**이어야 한다(린트는 길이만 검사한다 — 합은 저자 책임).
+- 각 슬라이스는 **턴 시작 잔액(`windowBase`)** 에 몫을 곱한다. 줄어드는 잔액이 아니다. 그래서 variance 0에서 슬라이스 합계가 종전 단일 호출과 **정확히** 일치한다 → 기존 체크포인트가 그대로 산다.
+- 반면 **비율 입력(CI·증폭·완화)은 매 틱 실시간으로** 읽고, 증폭기는 **마지막 틱에서만** 리셋된다. 틱 중간에 걸린 증폭기는 남은 슬라이스에만 적용된다.
+- 프로필 모양은 서사가 아니라 **근거**로 정한다: 전방 집중(개장 대기열), 중반 가속(소식 확산), 후방 감쇠(컷오프). 근거가 없으면 `[STYLIZED]`로 선언한다.
+
+### 11.4 티커
+
+```ts
+ticker: {
+  series: [
+    { path: 'market.ownStock', mode: 'relative', values: [100, 97, 95, 93, 92] },
+    { path: 'market.govt2yBp', mode: 'absolute', values: [507, 504, 501, 498, 495] },
+  ],
+}
+```
+
+- `values[0]`은 **틱 0 앵커**다. 틱 0에서는 아무것도 움직이지 않는다.
+- `relative`는 `values[k]/values[k−1]` 비율을, `absolute`는 차분을 **현재 경로 값**에 적용한다. 즉 시리즈는 "수준"이 아니라 "궤적"이다 — 경로의 실제 시작값이 앵커와 다르면 궤적만 따라간다. 실제 수준을 맞추려면 `entryEffects`에서 `op(path, 'set', anchor)`로 먼저 앵커를 세운다.
+- **티커는 `confidence`를 움직이지 않는다**(린트 오류). 가격 반응의 신뢰 효과는 ΔCI 이벤트가 이미 가격에 반영하고 있다.
+- 이산 충격(개장 갭, 마감 급락)과 연속 궤적을 섞을 때는 **곱이 보존되도록** 재배분하고 보정 노트에 표로 남긴다. 기존 보정을 깨지 않는 유일한 방법이다.
+- 장 마감 이후의 틱에서는 시리즈를 보합으로 둔다(같은 값 반복). 없는 시세를 만들지 않는다.
+
+### 11.5 인터럽트
+
+```ts
+const call: Interrupt<BankState> = {
+  id: 't3-i1-founders',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 30,
+  defaultOptionId: 't3-i1-defer',
+  scoreWeight: 0.5,
+  required: false,
+  title: '…', prompt: '…',
+  source: { kind: 'call', caller: 'Founders Fund 파트너', tone: 'urgent' },
+  lines: [{ speaker: 'Founders Fund 파트너', text: '…' }],
+  options: [ /* 2~4개 */ ],
+}
+```
+
+- `Interrupt extends Decision`이므로 검증·효과·지연효과·점수·경로 비교가 **전부 재사용**된다. 점수 과대 반영을 막기 위해 `scoreWeight: 0.5`로 저작한다.
+- `defaultOptionId`는 **필수**다. 무응답(마감 스윕·UI 타임아웃) 시 적용되므로 **역사 경로가 실제로 한 선택**을 기본값으로 둔다. 자동플레이의 `historical` 정책도 `historical: true` 옵션(또는 `paths.historical`)을 따라가므로 둘을 일치시킨다.
+- `deadlineTick`은 **생략을 권장**한다. 생략하면 마감이 "실제로 열린 틱"(지터 반영)이 되어 어떤 variance에서도 정확히 한 틱의 응답 시간이 보장된다. 고정 값을 쓰면 지터가 마감보다 늦게 열리는 경우가 생긴다.
+- `when`으로 조건부 인터럽트를 만들 수 있다(예: 사전 접촉이 없으면 감독관 전화가 오지 않는다). 조건이 거짓이면 아예 열리지 않는다.
+- 옵션은 2~4개, 라벨은 한 줄에 읽히는 길이로. 한 옵션 안에서 상태에 따라 결과가 갈려야 한다면 **옵션을 둘로 나누지 말고** `fnEffect` 안에서 분기한다(플레이어가 아직 모르는 사실로 선택지를 늘리지 않는다).
+
+### 11.6 결정 창(`availableFrom` / `deadlineTick`)
+
+- **라이브 시계는 마감 틱에서만 멈춘다**(그 밖에는 인터럽트 도착·릴 재생·도움 시트·탭 비활성·턴 마지막 틱). 즉 `deadlineTick`이 없는 결정은 틱 턴에서 시간 압박을 전혀 만들지 않고, 하루가 마지막 틱까지 흐른 뒤 거기서 기다린다. **틱 턴의 모든 결정에 창을 명시하라.**
+- `availableFrom`은 **보정 장치이기도 하다.** 결정의 효과가 같은 턴의 유출률에 영향을 준다면, 그 결정이 열리는 틱이 곧 "그날의 결과"를 바꾼다. 역사 경로가 재현해야 할 값이 있다면 **역사적 시각 순서**를 그대로 옮겨라(예: 오후 유출이 끝난 뒤에 있었던 콜은 마지막 틱에 연다).
+- 마감 스윕은 **마감 다음 틱**에 돈다. 따라서 마지막 틱에 건 `deadlineTick`은 자동 확정을 일으키지 않는다(린트 경고 `deadline-last-tick`). 그 경우 무응답 처리는 UI 타이머(`timeLimitSec` + `defaultOptionId`)가 담당한다.
+- `advanceTurn`은 남은 틱을 모두 소화한 뒤 **미확정 필수 결정이 있으면 예외**를 던진다. 필수 결정에는 반드시 `defaultOptionId`를 준다.
+
+### 11.7 변동성(`scenario.noise`)
+
+```ts
+noise: { runoffSigma: 0.15, runoffCap: 0.3, tickerSigma: 0.01, tickerSigmaBp: 2, eventJitter: 1 }
+```
+
+크기(magnitude) 노이즈와 틱 지터만 있고 **분기는 만들지 않는다**. `variance: 0`에서는 엔진이 RNG를 아예 당기지 않으므로 기존 난수 스트림과 체크포인트가 불변이다. 테스트·체크포인트는 항상 variance 0(정본)으로 돌린다.
+
+### 11.8 틱 전환 체크리스트
+
+1. 전환 **전** 체크포인트 값을 소수점 셋째 자리까지 기록한다.
+2. `runoffStep`을 `entryEffects` → `eachTick(profile)`로 옮긴다. 프로필 합 = 1, 길이 = `ticks`.
+3. 이벤트·ΔCI·주가 충격에 `atTick`을 배분한다. 유출률에 영향을 주는 ΔCI는 파이프라인 순서를 따져 배치한다.
+4. 티커 앵커를 `facts.ts`에 출처와 함께 넣는다. 미확인이면 `[VERIFY]`, 일중 분포는 `[STYLIZED]`.
+5. 인터럽트의 `defaultOptionId` = 역사 선택. `scoreWeight: 0.5`.
+6. 결정에 `availableFrom` / `deadlineTick`을 준다 — **보정을 먼저, UX는 그 다음**.
+7. 전환 **후** 체크포인트를 다시 측정한다. 값이 움직였다면 `tolerance`를 넓히기 전에 **틱 배치를 먼저 고친다**. 그래도 안 되면 `absTolerance`(0 근처 목표값에만)를 쓰고 보정 노트에 이유를 남긴다.
+8. `calibration.md`에 프로필·앵커·계수·체크포인트 재검증 표를 남긴다.
+
+---
+
+## 12. 대화·협상 저작 (D3)
+
+결정 하나를 **여러 단계로 주고받는 대화**로 저작할 수 있다. 감독관에게 무엇을 얼마나 공개할지, 인수후보에게 할인율을 어디까지 약속할지를 한 번의 클릭이 아니라 대화로 고르게 하는 장치다. 모든 필드는 선택적이다 — `steps`가 없는 결정은 종전과 **완전히 동일하게** 동작한다. 워크드 예제는 `tests/fixtures/miniDialogue.ts`다.
+
+### 12.1 핵심 계약: 대화는 언제나 기존 옵션으로 귀결한다
+
+```
+steps[0] ──reply.next──▶ steps[k] ──reply.next──▶ … ──reply.resolvesTo──▶ decision.options[i]
+```
+
+응답(`DialogueReply`)은 **`next`(다음 단계) 또는 `resolvesTo`(귀결 옵션) 중 정확히 하나**를 가진다. 대화가 무엇을 하든 마지막에는 그 결정이 원래 가지고 있던 옵션 하나를 고른다.
+
+이것이 전부의 열쇠다. 로그에 남는 것은 여전히 `{ decisionId, optionIds }`이고, **응답 경로가 `DecisionRecord.path`로 나란히 기록될 뿐**이다. 그래서 검증·효과·지연효과·점수·경로 비교·디브리핑·결과 릴이 하나도 바뀌지 않는다. 리플레이는 경로를 **다시 걸어서 검증**한다 — 시나리오가 더 이상 허용하지 않는 경로는 조용히 통과하지 않고 `DecisionError('invalid-path')`를 던진다.
+
+### 12.2 필드 요약
+
+| 필드 | 용도 | 린트 |
+|---|---|---|
+| `Decision.steps` | 대화 단계 배열. `steps[0]`이 진입점 | `select`는 1~1이어야 함 |
+| `DialogueStep.lines` | 상대 대사(`{ speaker, text }`) | ≥ 1 |
+| `DialogueStep.replies` | 응답 2~4개 | 2~4개, id 중복 금지 |
+| `DialogueStep.note` | 응답 위에 뜨는 안내(예: '약속한 ETA는 이후 이행 여부로 평가됩니다') | — |
+| `DialogueReply.next` / `resolvesTo` | 다음 단계 / 귀결 옵션 | **정확히 하나**, 대상 존재 필수 |
+| `DialogueReply.when` | 응답 노출 조건 | 조건 경로 검사 |
+| `DialogueReply.effects` / `setFlags` | 응답 즉시 효과(보통 카운터·플래그) | op 경로 검사 |
+| `DialogueReply.expert` | `{ rating, rationale }` — 자동플레이 walker가 읽는다 | — |
+| `DialogueReply.trap` / `trapExplanation` | 함정 응답 | 함정에는 설명 필수 |
+| `DecisionRecord.path` | 걸어간 응답 id 배열 | 0에서 생략(기존 로그 형태 보존) |
+
+### 12.3 숫자 약속은 이산 선택지 + 카운터
+
+자유 입력도 슬라이더도 없다. **재현 가능한 것만 기록한다.** 숫자 약속은 `commitReplies`로 이산 응답을 만들고, 이행 여부는 **나중에** 지연효과의 `when: { counter }`가 판정한다.
+
+```ts
+import { commitReplies } from '@/engine'
+
+const haircutStep: DialogueStep<BankState> = {
+  id: 'sale-haircut',
+  lines: [{ speaker: '인수후보 CFO', text: '장부가 대비 할인율은 어디까지 받아들일 수 있습니까?' }],
+  note: '여기서 약속한 할인율은 주말 실사에서 그대로 검증됩니다.',
+  replies: commitReplies<BankState>('saleHaircutPct', [10, 25, 40], {
+    unit: '%',
+    next: (v) => (v >= 25 ? 'sale-regulator' : 'sale-walkaway'),
+    expert: (v) => ({ rating: v >= 25 ? 75 : 30, rationale: '…' }),
+  }),
+}
+```
+
+- 생성되는 응답 id는 `saleHaircutPct-10` 같은 형태이고, 효과는 카운터를 **`set`** 한다(누적이 아니다 — 같은 대화를 다시 걸어도 두 배가 되지 않는다).
+- 판정은 옵션의 `delayedEffects`에서 한다:
+
+```ts
+delayedEffects: [
+  {
+    afterTurns: 1,
+    when: { counter: 'saleHaircutPct', lt: 25 },
+    description: '약속한 할인율이 인수자 최소선에 못 미쳐 실사가 중단됨',
+    effects: [confidence(-10, '매각 협상 결렬')],
+  },
+]
+```
+
+### 12.4 반드시 지킬 규칙 다섯
+
+1. **`when`은 "이 결정을 요청받은 시점의 상태"를 본다.** `Option.when`과 같은 맥락이다. 따라서 **같은 대화 안에서 앞선 응답이 만든 카운터·플래그로 뒤 응답을 분기할 수 없다.** 대화 내부 분기는 `when`이 아니라 **`next`로** 한다(위 예시처럼 값에 따라 다음 단계를 바꾼다). `when`은 대화 이전부터 참인 사실(사전 접촉 플래그, 지표 수준)에만 쓴다. 이 규칙 덕분에 패널이 보여주는 응답과 엔진이 받아들이는 응답이 절대 어긋나지 않는다.
+2. **응답 효과는 작게.** 카운터와 플래그 정도로 둔다. 상태를 실제로 움직이는 것은 귀결 옵션의 `effects`다. 응답 효과는 옵션 효과보다 **먼저**, 경로 순서대로 적용된다.
+3. **응답 효과로 귀결 옵션의 `requires`를 만족시키려 하지 말 것.** 옵션 가용성은 대화 시작 시점 상태로 검증된다.
+4. **모든 옵션이 어떤 경로로든 도달 가능해야 한다**(도달 불가는 경고). `when` 뒤에만 열리는 옵션이라면 경고를 감수하고 보정 노트에 적는다.
+5. **`defaultOptionId`를 둔다.** 마감 스윕·UI 타임아웃은 대화를 건너뛰고 기본 옵션을 바로 확정한다(경로 없이). 인터럽트 대화라면 필수다.
+
+### 12.5 무결성 린트 (`dialogue-*`)
+
+| 규칙 | 수준 | 내용 |
+|---|---|---|
+| `dialogue-reply-target` | 오류 | `next`·`resolvesTo`가 둘 다 없거나 둘 다 있음 |
+| `dialogue-next` | 오류 | `next`가 가리키는 단계 없음 |
+| `dialogue-resolves-to` | 오류 | `resolvesTo`가 이 결정의 옵션이 아님 |
+| `dialogue-unreachable-step` | 오류 | `steps[0]`에서 도달할 수 없는 단계 |
+| `dialogue-cycle` | 오류 | `resolvesTo`에 닿지 못하고 영원히 순환할 수 있는 단계 |
+| `dialogue-reply-count` | 오류 | 한 단계의 응답이 2개 미만 또는 4개 초과 |
+| `dialogue-lines` | 오류 | 상대 대사 없음 |
+| `dialogue-select` | 오류 | 대화 결정의 `select`가 1~1이 아님 |
+| `dialogue-unique-ids` | 오류 | 단계 id 또는 한 단계 안의 응답 id 중복 |
+| `dialogue-trap-explanation` | 오류 | 함정 응답에 `trapExplanation` 없음 |
+| `dialogue-option-unreachable` | 경고 | 어떤 대화 경로로도 닿지 않는 옵션 |
+
+### 12.6 자동플레이가 대화를 걷는 규칙
+
+- `historical` / `expert`: 정책이 이미 고른 **목표 옵션**을 향해, `resolvesTo`가 (간접적으로라도) 그 옵션에 닿는 응답만 후보로 두고 그중 `expert.rating`이 **가장 높은** 것을 고른다.
+- `worst`: 목표 없이 자유롭게 걷되 **`trap` 응답을 먼저**, 없으면 `expert.rating`이 가장 낮은 것을 고른다.
+- `random`: 시드 RNG로 뽑는다.
+- 어느 정책이든 **확정 가능한 옵션에 닿지 못하는 응답은 고르지 않는다.** 걸어간 경로는 `DecisionRecord.path`에 기록되므로 자동플레이 로그도 그대로 리플레이된다.
+- `expert.rating`이 없는 응답은 50으로 취급한다. 역사·전문가 경로를 의도대로 걷게 하려면 **모든 응답에 rating을 붙여라.**
+
+### 12.7 저작 체크리스트
+
+1. 결정의 옵션을 **먼저** 확정한다. 대화는 그 옵션들로 가는 길일 뿐이다.
+2. 단계는 3개 안팎, 단계당 응답 2~4개. 5단계를 넘으면 결정을 둘로 나누는 편이 낫다.
+3. 각 단계의 `lines`는 **상대가 실제로 물어봤을 법한 한두 문장**으로. 배경 설명은 `Decision.context`에 남긴다.
+4. 숫자 약속은 `commitReplies` + 지연효과 판정. `note`에 "이후 이행 여부로 평가됩니다"를 명시한다.
+5. `pnpm test`로 `dialogue-*` 린트 0건을 확인하고, `autoplay`의 `historical`/`expert` 경로가 의도한 옵션에 도달하는지 확인한다.
+6. `calibration.md`에 경로별 카운터 값과 그것을 판정하는 지연효과를 표로 남긴다.

@@ -1,70 +1,45 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import type { GameState, ScenarioDefinition } from '../engine'
-import { Dashboard, KpiStrip } from '../components/dashboard/Dashboard'
-import { AdvisorDrawer, type DrawerTab } from '../components/drawer/AdvisorDrawer'
-import { DecisionPanel } from '../components/play/DecisionPanel'
-import { PlayLayout, type MobileTab } from '../components/play/PlayLayout'
-import { ScenarioClock } from '../components/play/ScenarioClock'
+import { BalanceSheetMini } from '../components/dashboard/BalanceSheetMini'
+import { Dashboard } from '../components/dashboard/Dashboard'
+import { DecisionDock } from '../components/play/DecisionDock'
+import { InterruptOverlay } from '../components/play/InterruptOverlay'
+import { LiquidityStrip } from '../components/play/LiquidityStrip'
+import { LogPanel } from '../components/play/LogPanel'
+import { PlayLayout, type InfoTab, type MobileTab } from '../components/play/PlayLayout'
+import { ShortcutsSheet } from '../components/play/ShortcutsSheet'
+import { SituationPanel } from '../components/play/SituationPanel'
+import { StatusBar } from '../components/play/StatusBar'
 import { TerminalCard } from '../components/play/TerminalCard'
+import { TurnIntroCard } from '../components/play/TurnIntroCard'
+import { UndoToast } from '../components/play/UndoToast'
 import { WireFeed } from '../components/play/WireFeed'
 import { PlayContext, type PlayContextValue } from '../components/play/playContext'
-import { MODE_LABELS, safeTurnView, type PreviewState } from '../components/play/playHelpers'
-import { Badge, Button, ConfirmDialog } from '../components/ui'
-import { focusZone, SHORTCUTS, useKeyboardShortcuts, type Zone } from '../lib/keyboard'
+import {
+  safeTurnView,
+  tickLabelOf,
+  turnEntries,
+  type PreviewState,
+} from '../components/play/playHelpers'
+import { ConfirmDialog, LiveRegion } from '../components/ui'
+import { useHelp } from '../components/help/helpContext'
+import { HelpProvider } from '../components/help'
+import { focusZone, useKeyboardShortcuts, type Zone } from '../lib/keyboard'
+import { useSimulationClock } from '../lib/useSimulationClock'
 import { useBreakpoint } from '../lib/useMediaQuery'
 import { loadScenario } from '../scenarios'
-import { useGameStore, type RunInfo } from '../store/gameStore'
+import { useGameStore, type ClockSpeed, type RunInfo } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 
-function ShortcutsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const first = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (!open) return
-    first.current?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-  if (!open) return null
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="shortcuts-title"
-        className="w-full max-w-md rounded-lg border border-border bg-surface p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="shortcuts-title" className="mb-2 text-[15px] font-semibold">
-          키보드 단축키
-        </h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
-          {SHORTCUTS.map((s) => (
-            <div key={s.keys} className="contents">
-              <dt className="num whitespace-nowrap text-muted">{s.keys}</dt>
-              <dd className="m-0">{s.label}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="mt-3 flex justify-end">
-          <button
-            ref={first}
-            type="button"
-            className="rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] hover:bg-surface-2"
-            onClick={onClose}
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+const SPEED_STEPS: ClockSpeed[] = [1, 2, 4]
+
+const ZONE_TO_TAB: Record<Zone, InfoTab | 'decide'> = {
+  1: 'situation',
+  2: 'decide',
+  3: 'dashboard',
+  4: 'feed',
+  5: 'log',
 }
 
 function PlayView({
@@ -82,9 +57,18 @@ function PlayView({
   const bp = useBreakpoint()
   const mobile = bp === 'mobile'
   const mode = run.mode
+  const help = useHelp()
   const rewindTo = useGameStore((s) => s.rewindTo)
   const abandon = useGameStore((s) => s.abandon)
   const finish = useGameStore((s) => s.finish)
+  const nextTurn = useGameStore((s) => s.next)
+  const undoable = useGameStore((s) => s.undoable)
+  const undoChoice = useGameStore((s) => s.undoChoice)
+  const clearUndo = useGameStore((s) => s.clearUndo)
+  const playedReelId = useGameStore((s) => s.playedReelId)
+  const markReelPlayed = useGameStore((s) => s.markReelPlayed)
+  const resume = useGameStore((s) => s.resume)
+  const pauseClock = useGameStore((s) => s.pause)
 
   const view = useMemo(() => safeTurnView(state, scenario, mode), [state, scenario, mode])
   const ctx = useMemo<PlayContextValue | null>(
@@ -92,82 +76,148 @@ function PlayView({
     [scenario, state, history, run, mode, view],
   )
 
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>('advisor')
-  const [mobileTab, setMobileTab] = useState<MobileTab>('decide')
-  const [dashboardExpanded, setDashboardExpanded] = useState(false)
+  const [infoTab, setInfoTab] = useState<InfoTab>('situation')
+  const [mobileTab, setMobileTab] = useState<MobileTab>('situation')
   const [preview, setPreview] = useState<PreviewState | null>(null)
-  const [unread, setUnread] = useState(0)
-  const [help, setHelp] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [feedUnread, setFeedUnread] = useState(0)
+  const [shortcuts, setShortcuts] = useState(false)
   const [rewindTarget, setRewindTarget] = useState<number | null>(null)
   const [abandonOpen, setAbandonOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [skipSignal, setSkipSignal] = useState(0)
+  const [announce, setAnnounce] = useState('')
+  const [undoLabel, setUndoLabel] = useState('')
+  /** Turn index whose intro card the player has already dismissed with 시작 ▶. */
+  const [startedTurn, setStartedTurn] = useState<number | null>(null)
 
   const ended = state.phase === 'ended'
-  const canRewind = !ended && mode !== 'expert' && state.turnIndex > 0
+  const ticked = (view?.ticks ?? 1) > 1
+  // The intro gate only exists on a ticked turn: an un-ticked scenario behaves exactly as before.
+  const introPending = Boolean(view) && ticked && !ended && startedTurn !== state.turnIndex
+  // A reel the engine produced and the dock has not finished playing yet (turn reels never play).
+  const reelPending = Boolean(
+    state.lastReel &&
+      state.lastReel.cause.kind !== 'turn' &&
+      state.lastReel.steps.length > 0 &&
+      state.lastReel.id !== playedReelId,
+  )
+  const clock = useSimulationClock({ helpOpen: help.isOpen, introPending })
+  const interrupt = view?.interrupts[0]
 
-  // Move focus to the new turn header after the turn advances (or after a rewind).
+  // A turn-start reel duplicates the situation panel, so it is retired without being played.
+  useEffect(() => {
+    const last = state.lastReel
+    if (!last || last.id === playedReelId) return
+    if (last.cause.kind === 'turn' || last.steps.length === 0) markReelPlayed(last.id)
+  }, [state.lastReel, playedReelId, markReelPlayed])
+
+  // 자동 일시정지는 조용히 일어나면 안 된다 — 왜 멈췄는지 스크린리더에도 알린다.
+  const prevHold = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (clock.holdReason && clock.holdReason !== prevHold.current) setAnnounce(clock.holdReason)
+    prevHold.current = clock.holdReason
+  }, [clock.holdReason])
+  const pendingCount = view
+    ? view.decisions.filter((d) => !d.resolved && (d.decision.required ?? true)).length
+    : 0
+  const entryCount = view ? turnEntries(view).length : 0
+  const unreadCount =
+    infoTab === 'feed' && (!mobile || mobileTab === 'more')
+      ? feedUnread
+      : Math.max(0, entryCount - 4)
+
+  // On a turn change (or rewind): clear the transient state, move focus to the new turn header.
+  // `scrollResetKey` sends every zone back to the top inside PlayLayout.
   const prevTurn = useRef(state.turnIndex)
   useEffect(() => {
     if (prevTurn.current === state.turnIndex) return
     prevTurn.current = state.turnIndex
     setPreview(null)
-    if (mobile) setMobileTab('feed')
-    const t = window.setTimeout(() => document.getElementById('turn-header-current')?.focus(), 60)
+    setStartedTurn(null)
+    setInfoTab('situation')
+    // The mobile tab only moves when something is actually being asked of the player.
+    if (mobile && pendingCount > 0) setMobileTab('decide')
+    const t = window.setTimeout(() => {
+      const header = document.getElementById('turn-header-current')
+      if (header) header.focus()
+      else focusZone(2)
+    }, 60)
     return () => window.clearTimeout(t)
-  }, [state.turnIndex, mobile])
-
-  // Close the menu on outside click.
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
-
-  const openDrawer = (tab: DrawerTab) => {
-    setDrawerTab(tab)
-    setDrawerOpen(true)
-  }
-  const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+  }, [state.turnIndex, mobile, pendingCount])
 
   const goZone = useCallback(
     (zone: Zone) => {
-      if (bp === 'mobile') {
-        setMobileTab(zone === 1 ? 'feed' : zone === 2 ? 'decide' : 'metrics')
-        window.setTimeout(() => focusZone(zone), 30)
+      const target = ZONE_TO_TAB[zone]
+      if (target === 'decide') {
+        if (mobile) setMobileTab('decide')
+        window.setTimeout(() => focusZone(2), 30)
         return
       }
-      if (bp === 'tablet' && zone === 3) {
-        setDashboardExpanded(true)
-        window.setTimeout(() => focusZone(zone), 30)
-        return
-      }
-      focusZone(zone)
+      setInfoTab(target)
+      if (mobile)
+        setMobileTab(
+          target === 'situation' ? 'situation' : target === 'dashboard' ? 'metrics' : 'more',
+        )
+      window.setTimeout(() => focusZone(zone), 30)
     },
-    [bp],
+    [mobile],
   )
+
+  const onNext = useCallback(() => {
+    const isLast = state.turnIndex >= scenario.turns.length - 1
+    const ok = nextTurn()
+    if (ok) setAnnounce(isLast ? '시나리오가 종료되었습니다' : '다음 턴으로 이동했습니다')
+    return ok
+  }, [nextTurn, state.turnIndex, scenario.turns.length])
+
+  const onUndo = useCallback(() => {
+    if (!undoChoice()) return
+    setPreview(null)
+    setAnnounce('직전 결정을 실행 취소했습니다')
+  }, [undoChoice])
+
+  const onStartTurn = useCallback(() => {
+    setStartedTurn(state.turnIndex)
+    resume()
+    setAnnounce('시계가 흐르기 시작했습니다')
+  }, [state.turnIndex, resume])
+
   useKeyboardShortcuts(
     {
       onZone: goZone,
-      onToggleHelp: () => setHelp((h) => !h),
-      onToggleAdvisor: () => {
-        if (drawerOpen && drawerTab === 'advisor') setDrawerOpen(false)
-        else openDrawer('advisor')
+      onToggleHelp: () => (help.isOpen ? help.close() : help.open()),
+      onNextTurn: () => {
+        if (!ended && view?.allResolved) onNext()
       },
+      onUndo: () => {
+        if (undoable) onUndo()
+      },
+      onSkipReel: reelPending ? () => setSkipSignal((s) => s + 1) : undefined,
+      onToggleClock: !ticked
+        ? undefined
+        : introPending
+          ? onStartTurn
+          : () => {
+              clock.toggle()
+              setAnnounce(clock.running ? '시계를 멈췄습니다' : '시계를 재개했습니다')
+            },
+      onSpeedStep: !ticked
+        ? undefined
+        : (delta) => {
+            const i = SPEED_STEPS.indexOf(clock.speed)
+            const next = SPEED_STEPS[Math.min(SPEED_STEPS.length - 1, Math.max(0, i + delta))]
+            if (next === undefined) return
+            clock.setSpeed(next)
+            setAnnounce(`시계 속도 ×${next}`)
+          },
     },
-    !ended,
+    !ended && !interrupt,
   )
+
+  const onCommitted = useCallback((message: string) => {
+    setSkipSignal(0)
+    setAnnounce(message)
+    setUndoLabel(message)
+  }, [])
 
   const onDebrief = () => {
     const attempts = useProgressStore.getState().getScenario(scenario.meta.id).attempts
@@ -180,180 +230,9 @@ function PlayView({
     navigate('/')
   }
 
-  const turn = scenario.turns[state.turnIndex]
-  const pendingCount = view
-    ? view.decisions.filter((d) => !d.resolved && (d.decision.required ?? true)).length
-    : 0
-
-  const topBar = (
-    <header className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 text-[13px]">
-      <Link
-        to="/"
-        className="shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-muted hover:bg-surface-2 hover:text-text"
-      >
-        ◀ 카탈로그
-      </Link>
-      <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
-        <span className="truncate font-semibold">{scenario.meta.title}</span>
-        {!mobile && <span className="truncate text-muted">· {scenario.meta.roleTitle}</span>}
-        <Badge tone={mode === 'expert' ? 'warning' : mode === 'guided' ? 'info' : 'neutral'}>
-          {MODE_LABELS[mode]} 모드
-        </Badge>
-      </div>
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        {turn && (
-          <ScenarioClock
-            timeLabel={turn.timeLabel}
-            turnIndex={state.turnIndex}
-            durationTurns={scenario.meta.durationTurns}
-            turnLabel={turn.label}
-            compact={mobile}
-          />
-        )}
-        {!ended && (
-          <Button
-            size="sm"
-            variant={drawerOpen && drawerTab === 'advisor' ? 'primary' : 'secondary'}
-            onClick={() => openDrawer('advisor')}
-            aria-keyshortcuts="A"
-            title="조언자 (A)"
-          >
-            조언자{mobile ? '' : ' (A)'}
-          </Button>
-        )}
-        {!mobile && (
-          <>
-            <Button size="sm" onClick={() => openDrawer('cards')}>
-              지식카드
-            </Button>
-            <Button size="sm" onClick={() => openDrawer('glossary')}>
-              용어집
-            </Button>
-          </>
-        )}
-        <div className="relative" ref={menuRef}>
-          <Button
-            size="sm"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            메뉴 ▾
-          </Button>
-          {menuOpen && (
-            <div
-              role="menu"
-              aria-label="플레이 메뉴"
-              className="absolute right-0 top-full z-30 mt-1 w-64 rounded-md border border-border bg-surface p-1 shadow-lg"
-            >
-              {mobile && (
-                <>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      openDrawer('cards')
-                    }}
-                  >
-                    지식카드
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      openDrawer('glossary')
-                    }}
-                  >
-                    용어집
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      openDrawer('memos')
-                    }}
-                  >
-                    메모
-                  </button>
-                  <div className="my-1 h-px bg-border" role="separator" />
-                </>
-              )}
-              {canRewind && (
-                <>
-                  <div className="px-2 py-1 text-[11px] text-muted">되감기 (기록에 남습니다)</div>
-                  {history.slice(0, state.turnIndex).map((_, i) => {
-                    const t = scenario.turns[i]
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        role="menuitem"
-                        className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setRewindTarget(i)
-                        }}
-                      >
-                        <span className="num">T+{i}</span> {t?.label} ·{' '}
-                        <span className="text-muted">{t?.timeLabel}</span>
-                      </button>
-                    )
-                  })}
-                  <div className="my-1 h-px bg-border" role="separator" />
-                </>
-              )}
-              {!ended && mode === 'expert' && (
-                <div className="px-2 py-1 text-[11px] text-muted">
-                  전문가 모드에서는 되감기를 사용할 수 없습니다
-                </div>
-              )}
-              <button
-                type="button"
-                role="menuitem"
-                className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setHelp(true)
-                }}
-              >
-                키보드 단축키 (?)
-              </button>
-              <Link
-                role="menuitem"
-                to="/settings"
-                className="block w-full rounded px-2 py-1.5 text-left text-text no-underline hover:bg-surface-2"
-              >
-                설정
-              </Link>
-              <div className="my-1 h-px bg-border" role="separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className="block w-full rounded px-2 py-1.5 text-left text-critical hover:bg-surface-2"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setAbandonOpen(true)
-                }}
-              >
-                시나리오 포기
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
-  )
-
   if (!ctx || !view) {
     return (
       <div className="flex h-full flex-col">
-        {topBar}
         <p className="p-6 text-muted" role="alert">
           턴 정보를 불러올 수 없습니다. 카탈로그로 돌아가 다시 시작해 주세요.
         </p>
@@ -363,60 +242,113 @@ function PlayView({
 
   return (
     <PlayContext.Provider value={ctx}>
-      <div className="flex h-full flex-col">
-        {topBar}
-        {ended ? (
-          <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <TerminalCard onDebrief={onDebrief} />
-          </div>
-        ) : (
-          <PlayLayout
-            bp={bp}
-            feed={<WireFeed onUnreadChange={setUnread} />}
-            decisions={<DecisionPanel onPreview={setPreview} sticky={mobile} />}
-            dashboard={<Dashboard preview={preview} />}
-            kpiStrip={
-              <KpiStrip
-                onSelect={mobile ? () => setMobileTab('metrics') : () => setDashboardExpanded(true)}
-              />
+      <HelpProvider context={{ page: 'play', scenario, state, view }} shortcuts={false}>
+        <div className="flex h-full flex-col">
+          <LiveRegion message={announce} />
+          <StatusBar
+            compact={bp !== 'desktop'}
+            onShortcuts={() => setShortcuts(true)}
+            onRewind={setRewindTarget}
+            onAbandon={() => setAbandonOpen(true)}
+            clock={
+              ticked && !ended
+                ? {
+                    running: clock.intent,
+                    speed: clock.speed,
+                    tick: clock.tick,
+                    ticks: clock.ticks,
+                    tickLabel: view.tickLabel ?? tickLabelOf(view.turn, clock.tick),
+                    progress: clock.progress,
+                    holdReason: clock.holdReason,
+                    onPause: pauseClock,
+                    onResume: introPending ? onStartTurn : resume,
+                    onSpeed: clock.setSpeed,
+                  }
+                : undefined
             }
-            mobileTab={mobileTab}
-            onMobileTab={setMobileTab}
-            unreadCount={unread}
-            pendingCount={pendingCount}
-            dashboardExpanded={dashboardExpanded}
-            onToggleDashboard={() => setDashboardExpanded((v) => !v)}
           />
-        )}
-        <AdvisorDrawer
-          open={drawerOpen}
-          tab={drawerTab}
-          onTab={setDrawerTab}
-          onClose={closeDrawer}
-          mobile={mobile}
-        />
-        <ShortcutsSheet open={help} onClose={() => setHelp(false)} />
-        <ConfirmDialog
-          open={rewindTarget !== null}
-          title={`T+${rewindTarget ?? 0}으로 되감기`}
-          body="이 턴 이후의 결정이 모두 지워집니다. 되감기 횟수는 기록에 남으며, 되감기한 런은 최고 점수 집계에서 제외됩니다."
-          confirmLabel="되감기"
-          onConfirm={() => {
-            if (rewindTarget !== null) rewindTo(rewindTarget)
-            setRewindTarget(null)
-          }}
-          onCancel={() => setRewindTarget(null)}
-        />
-        <ConfirmDialog
-          open={abandonOpen}
-          title="시나리오를 포기하시겠습니까"
-          body="진행 중인 기록이 삭제되며 점수는 기록되지 않습니다."
-          confirmLabel="포기"
-          destructive
-          onConfirm={onAbandon}
-          onCancel={() => setAbandonOpen(false)}
-        />
-      </div>
+          {ended ? (
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
+              <TerminalCard onDebrief={onDebrief} />
+            </div>
+          ) : (
+            <PlayLayout
+              bp={bp}
+              strip={<LiquidityStrip mobile={mobile} />}
+              panels={{
+                situation: (
+                  <>
+                    {introPending && (
+                      <div className="p-3 pb-0">
+                        <TurnIntroCard onStart={onStartTurn} />
+                      </div>
+                    )}
+                    <SituationPanel onOpenFeed={() => goZone(4)} />
+                  </>
+                ),
+                dashboard: <Dashboard preview={preview} />,
+                feed: <WireFeed onUnreadChange={setFeedUnread} />,
+                log: <LogPanel />,
+                balance: (
+                  <div className="p-3">
+                    <BalanceSheetMini />
+                  </div>
+                ),
+              }}
+              dock={
+                <DecisionDock
+                  sticky={mobile}
+                  onPreview={setPreview}
+                  onCommitted={onCommitted}
+                  skipSignal={skipSignal}
+                  onNext={onNext}
+                />
+              }
+              infoTab={infoTab}
+              onInfoTab={setInfoTab}
+              mobileTab={mobileTab}
+              onMobileTab={setMobileTab}
+              unreadCount={unreadCount}
+              pendingCount={pendingCount}
+              scrollResetKey={state.turnIndex}
+            />
+          )}
+          {interrupt && !ended && (
+            <InterruptOverlay
+              key={interrupt.decision.id}
+              dv={interrupt}
+              onAnswered={() => setAnnounce('응답이 전달되었습니다')}
+            />
+          )}
+          <UndoToast
+            undoable={undoable}
+            label={undoLabel || '결정을 확정했습니다'}
+            onUndo={onUndo}
+            onExpire={clearUndo}
+          />
+          <ShortcutsSheet open={shortcuts} onClose={() => setShortcuts(false)} />
+          <ConfirmDialog
+            open={rewindTarget !== null}
+            title={`T+${rewindTarget ?? 0}으로 되감기`}
+            body="이 턴 이후의 결정이 모두 지워집니다. 되감기 횟수는 기록에 남으며, 되감기한 런은 최고 점수 집계에서 제외됩니다."
+            confirmLabel="되감기"
+            onConfirm={() => {
+              if (rewindTarget !== null) rewindTo(rewindTarget)
+              setRewindTarget(null)
+            }}
+            onCancel={() => setRewindTarget(null)}
+          />
+          <ConfirmDialog
+            open={abandonOpen}
+            title="시나리오를 포기하시겠습니까"
+            body="진행 중인 기록이 삭제되며 점수는 기록되지 않습니다."
+            confirmLabel="포기"
+            destructive
+            onConfirm={onAbandon}
+            onCancel={() => setAbandonOpen(false)}
+          />
+        </div>
+      </HelpProvider>
     </PlayContext.Provider>
   )
 }

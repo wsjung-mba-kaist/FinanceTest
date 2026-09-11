@@ -1,9 +1,9 @@
 import { latestSnapshot } from '../../engine'
 import { formatBp, formatDelta, formatNumber } from '../../lib/format'
-import { RUN_STATE_LABELS, runStateFromCi } from '../../metrics/runoff'
 import { usePlay } from '../play/playContext'
-import { REGULATOR_LABELS } from '../play/playHelpers'
-import { Badge, StatusBadge, type Tone } from '../ui'
+import { StatusBadge } from '../ui'
+import { metricSeries } from './kpiRows'
+import { Sparkline } from './Sparkline'
 
 function Chip({
   label,
@@ -16,7 +16,7 @@ function Chip({
 }) {
   return (
     <div
-      className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-[12px]"
+      className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-sm"
       aria-label={ariaLabel}
     >
       <span className="text-muted">{label}</span>
@@ -25,7 +25,14 @@ function Chip({
   )
 }
 
-/** Own stock · CDS · confidence index · regulator level · run state. */
+/**
+ * 시장 수치만 남긴 스트립: 자사 주가 · CDS · 시장 신뢰지수.
+ *
+ * 런 상태(S0~S3)와 감독 단계(R0~R4)는 대시보드 깊숙한 곳이 아니라 플레이 상태바로 옮겼다 —
+ * 상시 보여야 하는 상태 칩이지 지표 존의 항목이 아니다.
+ *
+ * 스파크라인은 `tickHistory`(틱 단위)로 그리고, 옆의 델타는 그대로 **전 턴 대비**다.
+ */
 export function MarketStrip() {
   const { scenario, state } = usePlay()
   const snap = latestSnapshot(state)
@@ -33,15 +40,11 @@ export function MarketStrip() {
   const stock = state.market.ownStock
   const stockPrev = prev?.metrics.ownStock?.value
   const stockDelta = stockPrev !== undefined ? stock - stockPrev : undefined
+  const stockSeries = metricSeries(state, 'ownStock', state.turnIndex)
   const ci = state.confidence.index
   const ciStatus = snap.metrics.confidence?.status ?? 'na'
-  const run = runStateFromCi(ci)
-  const level = state.regulator.level
-  const regTone: Tone =
-    level >= 3 ? 'critical' : level === 2 ? 'warning' : level === 1 ? 'info' : 'neutral'
-  const runTone: Tone = run >= 2 ? 'critical' : run === 1 ? 'warning' : 'positive'
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="시장·신뢰 스트립">
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="시장 지표">
       <Chip label="자사 주가">
         <span className="num font-semibold">{formatNumber(stock, 1)}</span>
         {stockDelta !== undefined && (
@@ -49,7 +52,16 @@ export function MarketStrip() {
             className={`num ${stockDelta < 0 ? 'text-critical' : stockDelta > 0 ? 'text-positive' : 'text-muted'}`}
           >
             {formatDelta(stockDelta, 'index', scenario.units)}
+            <span className="sr-only"> 전 턴 대비</span>
           </span>
+        )}
+        {stockSeries.length >= 2 && (
+          <Sparkline
+            values={stockSeries}
+            width={52}
+            height={16}
+            ariaLabel={`자사 주가 추이 ${stockSeries.length}개 표본, 현재 ${formatNumber(stock, 1)}`}
+          />
         )}
       </Chip>
       <Chip label="CDS">
@@ -58,12 +70,6 @@ export function MarketStrip() {
       <Chip label="신뢰지수">
         <span className="num font-semibold">{formatNumber(ci, 0)}</span>
         <StatusBadge status={ciStatus} />
-      </Chip>
-      <Chip label="감독당국">
-        <Badge tone={regTone}>{REGULATOR_LABELS[level] ?? `R${level}`}</Badge>
-      </Chip>
-      <Chip label="런 상태">
-        <Badge tone={runTone}>{RUN_STATE_LABELS[run]}</Badge>
       </Chip>
     </div>
   )

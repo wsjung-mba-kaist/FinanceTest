@@ -1,4 +1,4 @@
-import type { BankState, Turn } from '../../engine/types'
+import type { BankState, Interrupt, Turn } from '../../engine/types'
 import { bankFx } from '../../engine/fx/bank'
 import {
   confidence,
@@ -9,6 +9,7 @@ import {
   ownStockMove,
   regulator,
 } from '../../engine/fx/common'
+import { commitReplies } from '../../engine/core/dialogue'
 import { clamp } from '../../engine/core/paths'
 import { uninsuredDeposits } from '../../metrics/runoff'
 
@@ -30,6 +31,8 @@ const S = {
   cfp: 'interagency-cfp-2023-07-28',
   frc: 'fdic-pr-34-2023',
   fsb: 'fsb-depositor-2024',
+  bcbs248: 'bcbs-248',
+  kre: 'kre-close-2023-03-09',
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -776,20 +779,143 @@ export const t2: T = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// T3 — 2023-03-09 (목) 07:00 PT "개장"
+// T3 — 2023-03-09 (목) 07:00 PT "개장"  (5틱: 07:00~11:00, 정시)
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * 오전 창구의 일중 분포. 전방 집중형 — 07:00 PT 송금 대기열이 열리자마자 전날 밤에 쌓인 지시가
+ * 한꺼번에 나갔다는 결제팀 보고(t3-memo-wires: "개장 후 90분간 평소의 40배")를 반영한다. [STYLIZED]
+ */
+export const T3_RUNOFF_PROFILE = [0.35, 0.25, 0.2, 0.12, 0.08]
+
+/**
+ * Founders Fund 파트너의 직접 통화. **재구성된 대사이며 녹취·속기록이 아니다** — 복수 보도가 전하는
+ * VC의 인출 권고 내용을 1인칭으로 각색한 것이다(calibration.md §7).
+ */
+const t3FoundersCall: Interrupt<BankState> = {
+  id: 't3-i1-founders',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 30,
+  defaultOptionId: 't3-i1-defer',
+  scoreWeight: 0.5,
+  required: false,
+  title: 'Founders Fund 파트너 통화',
+  prompt: '포트폴리오 기업에 인출을 권고할지 지금 결정하겠다고 합니다. 어떻게 답하시겠습니까?',
+  context:
+    '이 한 통화가 수십 개 스타트업의 동시 인출로 이어질 수 있습니다. 답변은 30초 안에 필요합니다.',
+  source: { kind: 'call', caller: 'Founders Fund 파트너', tone: 'urgent' },
+  lines: [
+    {
+      speaker: 'Founders Fund 파트너',
+      text: '우리 포트폴리오사 급여 계좌가 그쪽에 있습니다. 오늘 자금을 옮기라고 해야 합니까? 30초만 주겠습니다.',
+    },
+  ],
+  dimensions: ['communication'],
+  cardRefs: ['uninsured-deposits-and-run-speed'],
+  options: [
+    {
+      id: 't3-i1-numbers',
+      label: '검증 가능한 여력 수치를 제시',
+      description:
+        '즉시 가용 현금 + 설정된 담보차입 한도를 무보험예금 대비 %로 말한다. 수치가 무보험예금의 50% 이상이면 네트워크 확산이 늦춰지고, 미달이면 부족을 스스로 확인시킨다.',
+      effects: [
+        fnEffect<BankState>('callVerifiableCapacity', { coverRatio: 0.5 }, (d, ctx) => {
+          const b = d.institution
+          const capacity = b.cash + b.wholesale.cbFacilityCapacity
+          const uninsured = uninsuredDeposits(b)
+          if (capacity >= 0.5 * uninsured) {
+            d.counters.dampener = Math.max(0.3, (d.counters.dampener || 1) * 0.9)
+            ctx.log(
+              `통화 대응: 여력 ${capacity.toFixed(1)} ≥ 무보험 50%(${(0.5 * uninsured).toFixed(1)}) → 완화 ×0.9`,
+            )
+          } else {
+            d.counters.amplifier = (d.counters.amplifier || 1) * 1.3
+            ctx.log(
+              `통화 대응: 여력 ${capacity.toFixed(1)} < 무보험 50%(${(0.5 * uninsured).toFixed(1)}) → 부족이 드러남, 증폭 ×1.3`,
+            )
+          }
+        }),
+      ],
+      expert: {
+        rating: 70,
+        rationale:
+          '보정 규칙 §6.5의 축소판이다. 검증 가능한 여력 공표는 사실일 때만 완화로 작동하고(×0.9), 무보험예금의 50%에 미달하면 같은 문장이 부족의 확인이 되어 증폭(×1.3)으로 돌아선다. 공개 서한(T2.B ×0.85/×1.5)보다 전달 범위가 좁아 계수도 약하다.',
+        sourceRefs: [S.fsb, S.bcbs],
+      },
+      preview: [
+        {
+          metric: 'projectedDailyOutflow',
+          direction: 'down',
+          magnitude: 1,
+          note: '여력 ≥ 무보험 50%일 때. 미달이면 반대로 늘어난다',
+        },
+      ],
+      consequences:
+        '수치를 그대로 전달했습니다. 파트너의 반응은 그 수치가 무엇이었는지에 달려 있습니다(로그 참조).',
+    },
+    {
+      id: 't3-i1-reassure',
+      label: '"안전합니다"라고만 답변',
+      description: '구체적 수치 없이 안전하다고만 말한다.',
+      effects: [bankFx.addAmplifier(1.1, '수치 없는 안심(통화)')],
+      expert: {
+        rating: 20,
+        rationale:
+          '네트워크형 예금자에게 검증할 수 없는 안심은 중립이 아니라 음(−)의 신호다. 상대는 즉시 다른 출처로 교차 확인하고, 확인되지 않으면 최악을 가정한다(보정 규칙: 수치 없는 호소 ×1.1).',
+        sourceRefs: [S.fsb, S.metrick],
+      },
+      preview: [{ metric: 'projectedDailyOutflow', direction: 'up', magnitude: 1 }],
+      consequences: '파트너가 "숫자를 말해 줄 수 없다는 뜻이군요"라고 답하고 전화를 끊었습니다.',
+      trap: true,
+      trapExplanation:
+        '평시의 "걱정 마십시오"는 관계 자산이지만, 런 중 검증 불가능한 안심은 "말할 수 있는 숫자가 없다"는 고백으로 읽힌다. 네트워크로 연결된 예금자는 그 해석을 수 분 안에 서로 공유한다.',
+    },
+    {
+      id: 't3-i1-defer',
+      label: '회신 보류',
+      description: '집계 후 회신하겠다고 답하고 통화를 끝낸다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 35,
+        rationale:
+          '위법도 허위도 아니지만 정보 공백을 남긴다. SVB 3월 9일의 기본 상태였다. 보정 노트: S2/S3 기본 유출률이 이미 VC 네트워크 조율을 내재하므로 이 경로에는 증폭기를 추가로 곱하지 않는다(calibration.md §1).',
+        sourceRefs: [S.nyfed, S.metrick],
+      },
+      preview: [
+        {
+          metric: 'projectedDailyOutflow',
+          direction: 'flat',
+          magnitude: 1,
+          note: '즉각적 변화 없음 — 네트워크 효과는 이미 기본 유출률에 반영',
+        },
+      ],
+      consequences: '회신을 보류했습니다. 파트너는 답을 얻지 못한 채 전화를 끊었습니다.',
+      historical: true,
+    },
+  ],
+}
+
 export const t3: T = {
   id: 't3',
   label: 'T3',
   timeLabel: '2023년 3월 9일 (목) 07:00 PT',
   title: '개장',
   time: '2023-03-09T07:00:00-08:00',
+  ticks: 5,
+  tickLabels: ['07:00', '08:00', '09:00', '10:00', '11:00'],
   entryEffects: [
+    {
+      id: 't3-rates-anchor',
+      description: '2년물 앵커를 3/8 종가 5.07%로 맞춘다(파월 증언 후 16년 최고) [fred-dgs2]',
+      effects: [op('market.govt2yBp', 'set', 507, '3/8 종가 5.07%')],
+    },
     {
       id: 't3-stock-bigbang',
       when: { all: [{ flag: 'raise_announced' }, { counter: 'backstopPct', lt: 50 }] },
-      description: '프리마켓: 손실 + 미백스톱 증자 반응 −45%',
-      effects: [ownStockMove(-0.45, '프리마켓')],
+      description: '프리마켓 갭: 손실 + 미백스톱 증자 반응 −40% (개장 후 하락은 티커가 이어받음)',
+      effects: [ownStockMove(-0.4, '프리마켓 갭')],
     },
     {
       id: 't3-stock-lossonly',
@@ -800,20 +926,20 @@ export const t3: T = {
           { notFlag: 'raise_closed' },
         ],
       },
-      description: '프리마켓: 손실 공개 반응 −35%',
-      effects: [ownStockMove(-0.35, '프리마켓')],
+      description: '프리마켓 갭: 손실 공개 반응 −29% (개장 후 하락은 티커가 이어받음)',
+      effects: [ownStockMove(-0.29, '프리마켓 갭')],
     },
     {
       id: 't3-stock-backstopped',
       when: { flag: 'raise_closed' },
-      description: '프리마켓: 확정 증자 동반 −15%',
-      effects: [ownStockMove(-0.15, '프리마켓')],
+      description: '프리마켓 갭: 확정 증자 동반 −8% (개장 후 하락은 티커가 이어받음)',
+      effects: [ownStockMove(-0.08, '프리마켓 갭')],
     },
     {
       id: 't3-stock-quiet',
       when: { flag: 'quiet_path' },
-      description: '프리마켓: 강등 반응 −12%',
-      effects: [ownStockMove(-0.12, '프리마켓')],
+      description: '프리마켓 갭: 강등 반응 −4% (개장 후 하락은 티커가 이어받음)',
+      effects: [ownStockMove(-0.04, '프리마켓 갭')],
     },
     {
       id: 't3-false-backstop',
@@ -826,12 +952,31 @@ export const t3: T = {
       description: 'Founders Fund 등 VC가 포트폴리오 기업에 인출 권고(네트워크 조율) → 신뢰지수 −5',
       effects: [confidence(-5, 'VC 네트워크 인출 권고')],
     },
+  ],
+  eachTick: [
     {
-      id: 't3-runoff',
-      description: '송금 창구 개장 — 오전 창구(당일의 55%) 유출 발생',
-      effects: [bankFx.runoffStep({ windowFraction: 0.55, label: '오전 유출' })],
+      id: 't3-runoff-tick',
+      description: '송금 창구 개장 — 오전 창구(당일의 55%)를 정시 단위로 분배',
+      effects: [
+        bankFx.runoffStep({
+          windowFraction: 0.55,
+          profile: T3_RUNOFF_PROFILE,
+          label: '오전 유출',
+        }),
+      ],
     },
   ],
+  ticker: {
+    series: [
+      // 프리마켓 갭 이후의 개장~11:00 하락. 갭(−40%)×티커(−8%) = 0.552 ≈ 기존 단일 −45%(0.55).
+      { path: 'market.ownStock', mode: 'relative', values: [100, 97, 95, 93, 92] },
+      // 2년물: 3/8 종가 5.07% → 오전 중 4.95% (3/9 종가 4.87%는 T4에서 완성) [fred-dgs2]
+      { path: 'market.govt2yBp', mode: 'absolute', values: [507, 504, 501, 498, 495] },
+      // KRE: 3/9 종가 −8.1% 중 오전분 −4% [kre-close-2023-03-09]
+      { path: 'market.custom.kre', mode: 'relative', values: [100, 99, 98, 97, 96] },
+    ],
+  },
+  interrupts: [t3FoundersCall],
   events: [
     {
       id: 't3-market-open',
@@ -841,7 +986,7 @@ export const t3: T = {
       items: [
         { label: 'PVB', value: '대시보드 참조', change: '프리마켓 급락' },
         { label: 'KBW 은행지수', value: '−3.5%', change: '실버게이트 여파' },
-        { label: 'UST 2Y', value: '4.87%', change: '−20bp (안전자산 선호)' },
+        { label: 'UST 2Y', value: '5.07%', change: '3/8 종가 — 16년 최고' },
       ],
       sourceRefs: ['fred-dgs2'],
     },
@@ -849,6 +994,7 @@ export const t3: T = {
       id: 't3-news-founders',
       kind: 'newswire',
       outlet: 'Bloomberg',
+      atTick: 1,
       time: '08:15',
       headline: 'Founders Fund, 포트폴리오 기업에 퍼시픽밸리은행 예금 인출 권고 — 복수 VC 동참',
       body: '피터 틸의 Founders Fund가 투자 기업들에 자금 이전을 권고했다고 복수의 소식통이 전했다. 다른 VC들도 "위험을 감수할 이유가 없다"며 같은 조언을 하고 있다.',
@@ -859,6 +1005,7 @@ export const t3: T = {
     {
       id: 't3-memo-wires',
       kind: 'memo',
+      atTick: 2,
       time: '09:30',
       from: '결제팀',
       to: 'CRO/Treasurer',
@@ -875,6 +1022,7 @@ export const t3: T = {
       id: 't3-dialogue-gs',
       kind: 'dialogue',
       when: { flag: 'raise_announced' },
+      atTick: 3,
       time: '10:00',
       title: '골드만 ECM 콜',
       lines: [
@@ -902,6 +1050,10 @@ export const t3: T = {
       requiredConcepts: ['discount-window-fhlb-btfp', 'htm-tainting'],
       dimensions: ['liquidity', 'timeliness'],
       timeLimitSec: 120,
+      // 당일 결제를 받으려면 오전 중 요청이 접수되어야 한다(브리핑 규제 프레임: "FHLB 당일 대출,
+      // 컷오프 존재"). 09:00에 마감하고 남은 두 틱은 결과가 잔고에 나타나는 시간으로 둔다.
+      // 역사 옵션(B·A)은 CI·증폭·완화를 건드리지 않으므로 마감 틱은 유출 보정과 무관하다.
+      deadlineTick: 2,
       defaultOptionId: 't3-b',
       options: [
         {
@@ -1027,6 +1179,11 @@ export const t3: T = {
         ],
       },
       dimensions: ['solvency', 'communication'],
+      // 북빌딩 상황 보고(t3-dialogue-gs, 10:00 = 틱 3)까지가 판단 시한이다. 무응답은 "그대로 진행",
+      // 즉 역사 경로와 같다. 이 결정의 즉시 효과도 유출률을 바꾸지 않는다.
+      availableFrom: 1,
+      deadlineTick: 3,
+      defaultOptionId: 't3-d2-a',
       options: [
         {
           id: 't3-d2-a',
@@ -1163,44 +1320,185 @@ export const t3: T = {
 }
 
 // ---------------------------------------------------------------------------------------------
-// T4 — 2023-03-09 (목) 12:00 PT "네트워크 런"
+// T4 — 2023-03-09 (목) 12:00 PT "네트워크 런"  (5틱: 12:00~16:00, 정시)
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * 오후 창구의 일중 분포. 중반 가속형 — 오전 유출이 시장에 알려지면서 대기열이 오후 중반에 정점을
+ * 찍고, 컷오프(15:00 PT = 18:00 ET Fedwire 고객 송금)가 가까워지면 신규 지시가 줄어든다. [STYLIZED]
+ */
+export const T4_RUNOFF_PROFILE = [0.15, 0.2, 0.25, 0.25, 0.15]
+
+/**
+ * 결제팀장의 데스크 인터럽트(15:00 PT, Fedwire 고객 송금 컷오프 직전). **재구성된 대사**이며
+ * 실제 통화 기록이 아니다(calibration.md §7).
+ */
+const t4DeskCall: Interrupt<BankState> = {
+  id: 't4-i1-desk',
+  interrupt: true,
+  atTick: 3,
+  timeoutSec: 45,
+  defaultOptionId: 't4-i1-asis',
+  scoreWeight: 0.5,
+  required: false,
+  title: '결제데스크: 컷오프 전 대기열 처리',
+  prompt: '컷오프까지 한 시간입니다. 대기열 처리 방식을 어떻게 지시하시겠습니까?',
+  context:
+    '지금 지시하는 처리 순서가 오늘 마감 연준 계좌 잔고와 감독당국에 보고되는 결제 기록을 함께 결정합니다.',
+  source: { kind: 'desk', caller: '결제팀장', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '결제팀장',
+      text: '컷오프까지 한 시간입니다. 대기열 상위에 $1B 이상 건이 여러 개 걸려 있습니다. 순서대로 내보내면 마감 잔고가 음수로 갑니다.',
+    },
+  ],
+  dimensions: ['compliance', 'liquidity'],
+  options: [
+    {
+      id: 't4-i1-monitor',
+      label: '전량 정시 처리 + 30분 단위 일중 잔고 보고',
+      description:
+        '순서를 바꾸지 않고 전량 처리하되, 30분 단위로 잔고·대기열·컷오프 여유를 보고받아 부족이 예상되면 즉시 담보차입으로 메운다.',
+      effects: [counter('intradayMonitoring', 1), flag('intraday_monitoring')],
+      expert: {
+        rating: 80,
+        rationale:
+          '일중 유동성은 일별 지표로 관리할 수 없다. 바젤 일중 모니터링 도구(최대 일중 순유출, 시간대별 처리량)를 위기 당일에 실제로 돌리는 것이 컷오프 전 유일한 방어선이다. 처리 순서를 건드리지 않으므로 감독상 위험도 없다.',
+        sourceRefs: [S.bcbs248, S.cfp],
+      },
+      preview: [
+        {
+          metric: 'cash',
+          direction: 'flat',
+          magnitude: 1,
+          note: '잔고 자체는 그대로, 소진 시점을 미리 안다',
+        },
+      ],
+      consequences:
+        '대기열을 순서대로 처리하면서 30분 단위 보고 체계가 가동되었습니다. 잔고 추이는 대시보드에서 확인할 수 있습니다.',
+    },
+    {
+      id: 't4-i1-asis',
+      label: '접수 순서대로 처리, 추가 지시 없음',
+      description: '평소 절차대로 접수 순서를 지키고 별도 지시를 내리지 않는다.',
+      effects: [counter('deskNoInstruction', 1)],
+      expert: {
+        rating: 45,
+        rationale:
+          '절차상 문제는 없다. 다만 일중 잔고가 언제 소진되는지 모른 채 컷오프를 맞게 되고, 담보차입을 붙일 시간도 그만큼 줄어든다.',
+        sourceRefs: [S.dfpi],
+      },
+      preview: [{ metric: 'cash', direction: 'flat', magnitude: 1 }],
+      consequences: '결제팀이 평소 절차대로 대기열을 처리했습니다.',
+      historical: true,
+    },
+    {
+      id: 't4-i1-reorder',
+      label: '대형 송금을 뒤로 돌려 잔고를 관리',
+      description:
+        '$1B 이상 건을 컷오프 직전으로 미루고 소액부터 처리해 일중 잔고가 좋아 보이게 만든다.',
+      effects: [
+        regulator({ add: 1 }, '결제 순서 조정 — 결제 기록에 남음'),
+        flag('wire_reordering'),
+      ],
+      delayedEffects: [
+        {
+          afterTurns: 1,
+          when: { flag: 'wire_reordering' },
+          description:
+            '감독당국이 연준 결제 기록에서 순서 조정을 확인 — 단계 +1, 신뢰지수 −5 (인출 지연으로 판단되면 R4)',
+          effects: [
+            regulator({ add: 1 }, '결제 순서 조정 확인'),
+            confidence(-5, '결제 순서 조정 확인'),
+          ],
+        },
+      ],
+      expert: {
+        rating: 5,
+        rationale:
+          '일중 잔고를 좋아 보이게 만드는 조작이며, 고객에게는 사실상의 인출 지연이다. 연준 결제 기록에 시각 단위로 남아 사후에 그대로 드러난다. DFPI는 인출 지연·거부를 "불안전·불건전"의 핵심 근거로 삼았다.',
+        sourceRefs: [S.dfpi, S.gao],
+      },
+      preview: [
+        {
+          metric: 'regulatorLevel',
+          direction: 'up',
+          magnitude: 2,
+          note: '연준 결제 기록에 시각 단위로 남는다',
+        },
+        { metric: 'confidence', direction: 'down', magnitude: 1 },
+      ],
+      consequences: '대형 송금이 뒤로 밀렸습니다. 해당 고객들이 처리 상태를 문의하기 시작했습니다.',
+      trap: true,
+      trapExplanation:
+        '외부 송금의 실행 순서 자체가 곧바로 위법이라고 단정하기는 어렵다(요구불예금 지급 순서를 일률적으로 규율하는 조항은 없다). 그러나 잔고를 좋아 보이게 하려는 목적의 순서 조정은 감독상 불건전 영업행위(unsafe and unsound practice)이며, 지연이 계속되면 인출 지연·거부로 평가되어 즉시 폐쇄 사유(R4)가 된다. 결제 기록은 남고, 사후 검사에서 의도가 재구성된다.',
+      irreversible: true,
+    },
+  ],
+}
+
 export const t4: T = {
   id: 't4',
   label: 'T4',
   timeLabel: '2023년 3월 9일 (목) 12:00 PT',
   title: '네트워크 런',
   time: '2023-03-09T12:00:00-08:00',
-  entryEffects: [
+  ticks: 5,
+  tickLabels: ['12:00', '13:00', '14:00', '15:00', '16:00'],
+  eachTick: [
     {
-      id: 't4-runoff',
-      description: '오후 창구(당일의 45%) 유출',
-      effects: [bankFx.runoffStep({ windowFraction: 0.45, label: '오후 유출' })],
+      id: 't4-runoff-tick',
+      description: '오후 창구(당일의 45%)를 정시 단위로 분배',
+      effects: [
+        bankFx.runoffStep({
+          windowFraction: 0.45,
+          profile: T4_RUNOFF_PROFILE,
+          label: '오후 유출',
+        }),
+      ],
     },
+  ],
+  tickEffects: [
     {
       id: 't4-visible-outflow',
+      atTick: 4,
       when: { metric: 'cumulativeOutflowPct', gt: 10 },
-      description: '가시적 유출(>10%/일)이 시장에 알려짐 → 신뢰지수 −15',
+      description: '마감 집계로 가시적 유출(>10%/일)이 시장에 알려짐 → 신뢰지수 −15',
       effects: [confidence(-15, '가시적 대규모 유출')],
     },
     {
       id: 't4-stock',
+      atTick: 4,
       when: { metric: 'cumulativeOutflowPct', gt: 10 },
-      description: '주가 추가 하락 −25%',
-      effects: [ownStockMove(-0.25, '정오')],
+      description: '마감·시간외 추가 하락 −20%',
+      effects: [ownStockMove(-0.2, '마감·시간외')],
     },
   ],
+  ticker: {
+    series: [
+      // 정규장은 13:00 PT에 끝난다. 틱 1에서 장중 잔여 하락(−6%)을 반영하고 이후는 보합,
+      // 마감·시간외 급락(−20%)은 tickEffects가 마지막 틱에 적용한다. 0.94×0.80 = 0.752 ≈ 기존 0.75.
+      { path: 'market.ownStock', mode: 'relative', values: [100, 94, 94, 94, 94] },
+      // 2년물: 오전 종착점 4.95% → 3/9 종가 4.87% [fred-dgs2]
+      { path: 'market.govt2yBp', mode: 'absolute', values: [495, 490, 487, 487, 487] },
+      // KRE: 오전 −4% 이후 종가 −8.1%를 완성 (0.96 × 0.9573 = 0.919) [kre-close-2023-03-09]
+      { path: 'market.custom.kre', mode: 'relative', values: [100, 95.73, 95.73, 95.73, 95.73] },
+    ],
+  },
+  interrupts: [t4DeskCall],
   events: [
     {
       id: 't4-market',
       kind: 'market',
-      time: '12:00',
-      headline: '정오 시세',
+      atTick: 1,
+      time: '13:00',
+      headline: '정규장 마감 시세',
       items: [
         { label: 'PVB', value: '대시보드 참조', change: '거래량 사상 최대' },
-        { label: 'KRE 지역은행 ETF', value: '−7.7%', change: '동반 급락' },
-        { label: 'UST 2Y', value: '4.90%', change: '' },
+        { label: 'KRE 지역은행 ETF', value: '−8.1%', change: '2021년 1월 이후 최저 종가' },
+        { label: 'UST 2Y', value: '4.87%', change: '−20bp (안전자산 선호)' },
       ],
+      sourceRefs: [S.kre, 'fred-dgs2'],
     },
     {
       id: 't4-news-network',
@@ -1216,6 +1514,7 @@ export const t4: T = {
     {
       id: 't4-memo-fed-account',
       kind: 'memo',
+      atTick: 1,
       time: '13:10',
       from: '결제팀',
       to: 'CRO/Treasurer',
@@ -1231,6 +1530,7 @@ export const t4: T = {
       id: 't4-memo-gs-fail',
       kind: 'memo',
       when: { flag: 'raise_failed' },
+      atTick: 2,
       time: '13:30',
       from: '골드만 ECM',
       to: 'CFO',
@@ -1244,8 +1544,13 @@ export const t4: T = {
       id: 't4-d1',
       title: '고객 커뮤니케이션',
       prompt: '오후 고객 콜에서 무엇을 말하시겠습니까?',
+      context:
+        '콜은 마감 집계가 끝나는 16:00 PT 직전에 잡혀 있습니다. 그때까지 오후 유출은 이미 대부분 나간 뒤입니다.',
       dimensions: ['communication', 'compliance'],
       timeLimitSec: 90,
+      // 마지막 틱에서만 열린다 — 아래 보정 주석 참조(오후 유출이 끝난 뒤의 콜).
+      availableFrom: 4,
+      deadlineTick: 4,
       defaultOptionId: 't4-a',
       options: [
         {
@@ -1355,12 +1660,125 @@ export const t4: T = {
       title: '감독당국 대응',
       prompt: '감독당국에 어떻게 대응하시겠습니까?',
       dimensions: ['compliance', 'timeliness'],
+      // 3단계 대화: 수치 공개 → 야간 지원 요청 여부 → 담보 목록 ETA 약속.
+      // ETA는 창구를 요청한 경로에서만 약속하므로, 역사 경로(법정 보고만 = t4-d2-b)는
+      // 카운터를 건드리지 않는다 — T5 마감 잔고 체크포인트가 구조적으로 보존된다.
+      // 대사는 기록에 근거한 재구성이며 실제 통화록이 아니다(calibration.md §7.6).
+      steps: [
+        {
+          id: 't4-d2-disclose',
+          lines: [
+            {
+              speaker: 'FRB SF 감독관',
+              text: '결제 데이터에서 오늘 유출 규모가 보입니다. 지금 잔고와 담보 여력을 말씀해 주시겠습니까?',
+            },
+          ],
+          note: '이 자리에서 말한 수치는 이후 감독당국의 판단 기준이 됩니다.',
+          replies: [
+            {
+              id: 't4-d2-r-full',
+              label: '잔고·담보 여력·예상 유출을 수치로 전부 제시',
+              effects: [flag('regulator_numbers_given')],
+              next: 't4-d2-ask',
+              expert: {
+                rating: 85,
+                rationale:
+                  '감독당국은 결제 데이터로 이미 규모를 안다. 먼저 정확히 말하는 쪽이 야간 지원 협의를 연다.',
+              },
+            },
+            {
+              id: 't4-d2-r-range',
+              label: '범위만 제시하고 정밀 수치는 집계 중이라고 답변',
+              next: 't4-d2-ask',
+              trap: true,
+              trapExplanation:
+                '감독당국은 결제 시스템에서 실제 수치를 보고 있다. 범위 제시는 축소 보고로 읽혀 이후 모든 요청의 신뢰를 깎는다.',
+              expert: { rating: 30, rationale: '정보 비대칭이 없는 상대에게 쓰는 완충 화법은 역효과다.' },
+            },
+            {
+              id: 't4-d2-r-hold',
+              label: '집계 후 회신하겠다며 답변 보류',
+              resolvesTo: 't4-d2-c',
+              expert: { rating: 5, rationale: '회피는 강제 개입을 앞당길 뿐이다.' },
+            },
+          ],
+        },
+        {
+          id: 't4-d2-ask',
+          lines: [
+            {
+              speaker: 'FRB SF 감독관',
+              text: '오늘 마감 처리와 야간 재할인창구가 필요하십니까? 필요하다면 담보 목록이 먼저 와야 합니다.',
+            },
+          ],
+          replies: [
+            {
+              id: 't4-d2-r-request',
+              label: '야간 창구·연장 결제를 요청',
+              next: 't4-d2-eta',
+              expert: {
+                rating: 85,
+                rationale: '야간 지원은 사전 접촉 없이 열리지 않는다. 요청 자체가 T5의 선택지를 만든다.',
+              },
+            },
+            {
+              id: 't4-d2-r-statutory',
+              label: '요청하지 않고 법정 보고만 유지',
+              resolvesTo: 't4-d2-b',
+              expert: { rating: 35, rationale: '위반은 아니지만 마감 후 지원을 요청할 채널이 없다.' },
+            },
+          ],
+        },
+        {
+          id: 't4-d2-eta',
+          lines: [
+            {
+              speaker: 'FRB SF 감독관',
+              text: '담보 목록은 언제까지 보내주실 수 있습니까? 그 시각에 맞춰 창구 인력을 배치합니다.',
+            },
+          ],
+          note: '약속한 ETA는 이후 이행 여부로 평가됩니다. 5시간을 넘기면 익일 담보 여력이 줄어듭니다.',
+          replies: commitReplies<BankState>('collateralEtaHours', [2, 5, 12], {
+            idPrefix: 't4-d2-eta',
+            label: (v) => `${v}시간 내 담보 목록 송부`,
+            resolvesTo: 't4-d2-a',
+            expert: (v) => ({
+              rating: v <= 2 ? 85 : v <= 5 ? 70 : 35,
+              rationale:
+                v <= 5
+                  ? '창구 인력 배치 시각 안에 목록이 도착하면 익일 담보 여력이 그대로 살아난다.'
+                  : '지킬 수 없는 시각을 부르면 창구는 열려도 담보가 도착하지 않는다.',
+            }),
+            trap: (v) => v > 5,
+            trapExplanation: (v) =>
+              v > 5
+                ? '감독당국은 약속한 시각에 맞춰 인력을 배치한다. 초과분은 익일 담보 여력 ×0.6으로 돌아온다.'
+                : undefined,
+          }),
+        },
+      ],
       options: [
         {
           id: 't4-d2-a',
           label: 'FRB SF·DFPI·FDIC에 선제 보고 + 재할인창구·연장 결제 요청',
           description: '오늘 중 감독당국과 마감 전 지원(야간 창구·일중 초과인출)을 논의한다.',
           effects: [regulator({ add: 1 }, '선제 보고'), flag('regulator_engaged')],
+          // 약속한 ETA의 이행 여부는 다음 턴에 판정된다 — 대화에서 부른 시각이 실제 비용이 된다.
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              when: { counter: 'collateralEtaHours', gt: 5 },
+              description: '담보 목록 ETA 초과 — 익일 담보 여력 ×0.6',
+              effects: [
+                op(
+                  'institution.wholesale.cbFacilityPending',
+                  'mul',
+                  0.6,
+                  '약속한 ETA를 넘겨 창구 인력 배치 시각에 담보가 도착하지 않음',
+                ),
+              ],
+            },
+          ],
           expert: {
             rating: 85,
             rationale:

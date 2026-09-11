@@ -1,5 +1,6 @@
-import type { PensionState, Turn } from '../../engine/types'
-import { confidence, flag, op, regulator } from '../../engine/fx/common'
+import type { Interrupt, PensionState, Turn } from '../../engine/types'
+import { commitReplies } from '../../engine/core/dialogue'
+import { confidence, counter, flag, op, regulator, setCounter } from '../../engine/fx/common'
 import { pensionFx } from '../../engine/fx/pension'
 import { ldiFx } from './ldiFx'
 import { MAX_LEVERAGE, S } from './turnsA'
@@ -9,31 +10,260 @@ type T = Turn<PensionState>
 // ---------------------------------------------------------------------------------------------
 // T4 — 2022-09-28 (수) 08:30 BST "수요일 아침: 매수호가 실종" (영란은행 발표 이전)
 // ---------------------------------------------------------------------------------------------
+/**
+ * 9/28 오전 LDI 운용사 담보팀의 4차 콜 통지. **재구성된 대사이며 녹취·속기록이 아니다** — 풀드펀드
+ * 운용사가 위기 중 보낸 표준 재자본화 요청의 내용(BoE 스태프 페이퍼·WPC 증언 요약)을 1인칭 통화로
+ * 각색한 것이다(calibration.md §12.4).
+ */
+const t4ManagerCall: Interrupt<PensionState> = {
+  id: 't4-i1-manager',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't4-i1-ack',
+  scoreWeight: 0.5,
+  required: false,
+  title: 'LDI 운용사 담보팀 통화 — 4차 콜 통지',
+  prompt: '11:00 딜링 컷오프까지 무엇을 보내겠다고 답하시겠습니까?',
+  context:
+    '이 답변이 운용사의 오전 처리 순서를 정합니다. 컷오프 이후 도착분은 내일 사이클로 넘어갑니다.',
+  source: {
+    kind: 'call',
+    caller: 'LDI 운용사 담보팀장',
+    agency: '풀드 LDI 펀드 운용사',
+    tone: 'urgent',
+  },
+  lines: [
+    {
+      speaker: '담보팀장',
+      text: '개장 콜은 풀 잔여 담보로 막았습니다. 11시까지 도착하는 현금·현물만 오늘 반영됩니다. 무엇이 옵니까?',
+    },
+  ],
+  dimensions: ['liquidity', 'timeliness'],
+  cardRefs: ['ldi-collateral-waterfall'],
+  options: [
+    {
+      id: 't4-i1-inspecie',
+      label: '현물 이전을 지금 지시하겠다고 답변',
+      description:
+        '매도 없이 담보를 편입하겠다고 알린다. 현물 이전 약정(T0 운영 준비)과 남은 직접보유 길트가 있어야 한다.',
+      requires: {
+        all: [{ flag: 'ops_ready' }, { path: 'institution.assets.gilts.marketValue', gt: 0 }],
+      },
+      unavailableReason:
+        '현물 이전 약정이 없거나(T0 운영 준비 미선택) 직접보유 길트가 남아 있지 않습니다.',
+      effects: [flag('inspecie_instructed'), counter('cutoffInstructions', 1)],
+      expert: {
+        rating: 80,
+        rationale:
+          '시장에 무해한 당일 담보다. 통화 단계에서 지시가 나가야 운용사의 오전 처리 대기열에 들어간다. 실제 편입은 D1의 C 옵션이 집행한다.',
+        sourceRefs: [S.tpr, S.breeden],
+      },
+      preview: [
+        {
+          metric: 'collateralHeadroomBp',
+          direction: 'up',
+          magnitude: 1,
+          note: 'D1에서 C를 함께 선택할 때',
+        },
+      ],
+      consequences: '운용사가 현물 이전 건을 오전 처리 대기열에 올렸습니다.',
+    },
+    {
+      id: 't4-i1-cash',
+      label: '11시까지 £300M 현금 송금을 약속',
+      description:
+        '당일 현금의 출처를 확정하지 못한 채 시각을 약속한다. 지키지 못하면 운용사는 다음 콜에서 우선순위를 낮춘다.',
+      effects: [counter('cutoffPromiseM', 300), flag('cutoff_promised')],
+      expert: {
+        rating: 25,
+        rationale:
+          '지킬 수 없는 시각을 부르는 것은 위기 중 담보 운영에서 흔한 실수다. 운용사는 약속된 현금을 전제로 축소를 미루고, 도착하지 않으면 더 나쁜 호가에 더 크게 자른다.',
+        sourceRefs: [S.breeden, S.wpc],
+      },
+      preview: [
+        {
+          metric: 'marginCallPending',
+          direction: 'flat',
+          magnitude: 1,
+          note: '이행 여부는 다음 턴에 판정',
+        },
+      ],
+      consequences: '운용사가 11시까지 £300M을 기다리겠다고 답했습니다.',
+      trap: true,
+      trapExplanation:
+        '담보 워터폴에서 약속은 현금이 아니다. 출처가 확정되지 않은 시각을 부르면 운용사의 축소만 늦춰지고, 늦어진 축소는 더 나쁜 호가에 체결된다.',
+    },
+    {
+      id: 't4-i1-ack',
+      label: '확인만 하고 회신 보류',
+      description: '집계 후 회신하겠다고 답하고 통화를 끝낸다. 운용사는 규정대로 처리한다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 35,
+        rationale:
+          '위법도 허위도 아니지만 운용사에게는 "오늘 들어올 것이 없다"는 뜻이다. 9/28 오전 다수 풀드펀드 투자 스킴의 실제 상태였고, 운용사는 규정대로 익스포저를 줄였다.',
+        sourceRefs: [S.breeden, S.staff],
+      },
+      preview: [
+        {
+          metric: 'hedgeRatio',
+          direction: 'flat',
+          magnitude: 1,
+          note: '운용사는 규정대로 처리 — 잔여 콜이 남으면 컷오프에 축소',
+        },
+      ],
+      consequences: '운용사가 "그러면 규정대로 진행하겠습니다"라고 답했습니다.',
+      historical: true,
+    },
+  ],
+}
+
+/**
+ * 10:45 수탁기관(커스터디언) 결제팀의 담보 이체 확인. 합성 스킴의 위탁 절차이므로 실존 인물의
+ * 발언이 아니다(calibration.md §12.4).
+ */
+const t4CustodianCall: Interrupt<PensionState> = {
+  id: 't4-i2-custodian',
+  interrupt: true,
+  atTick: 3,
+  jitter: 0,
+  timeoutSec: 30,
+  defaultOptionId: 't4-i2-standard',
+  scoreWeight: 0.5,
+  required: false,
+  title: '수탁기관 결제팀 통화 — 컷오프 15분 전',
+  prompt: '11:00 딜링 컷오프까지 15분 남았습니다. 어떻게 처리하시겠습니까?',
+  source: { kind: 'desk', caller: '수탁기관 결제팀', agency: '글로벌 커스터디언', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '수탁기관 결제팀',
+      text: '11시 컷오프까지 15분입니다. 지금 확정 지시를 주시면 당일 처리하고, 그 이후는 내일 딜링 사이클입니다.',
+    },
+  ],
+  dimensions: ['timeliness', 'compliance'],
+  options: [
+    {
+      id: 't4-i2-expedite',
+      label: '컷오프 전 확정 지시를 우선 처리하도록 지시',
+      description: '오늘 지시한 건을 컷오프 안에 밀어 넣고 처리 결과를 건별로 회신받는다.',
+      effects: [flag('cutoff_expedited'), counter('cutoffInstructions', 1)],
+      expert: {
+        rating: 75,
+        rationale:
+          'TPR 가이드가 말하는 운영 준비의 실체가 이것이다 — 컷오프 안에 지시를 넣고 건별 확인을 받는 절차. 보낼 것이 없어도 확인 자체가 다음 콜의 처리 순서를 지킨다.',
+        sourceRefs: [S.tpr],
+      },
+      preview: [
+        {
+          metric: 'collateralHeadroomBp',
+          direction: 'flat',
+          magnitude: 1,
+          note: '당일 지시가 있을 때만 반영',
+        },
+      ],
+      consequences: '결제팀이 컷오프 전 처리 결과를 건별로 회신했습니다.',
+    },
+    {
+      id: 't4-i2-standard',
+      label: '표준 절차대로 처리',
+      description: '별도 지시 없이 평시 절차로 둔다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 35,
+        rationale:
+          '평시 절차는 컷오프를 우선순위로 다루지 않는다. 9/28 오전 대부분의 스킴이 이 상태였다.',
+        sourceRefs: [S.wpc],
+      },
+      preview: [{ metric: 'collateralHeadroomBp', direction: 'flat', magnitude: 1 }],
+      consequences: '표준 절차로 처리되었습니다.',
+      historical: true,
+    },
+    {
+      id: 't4-i2-tomorrow',
+      label: '오늘 지시를 보류하고 내일 아침 일괄 처리',
+      description: '오늘 컷오프를 포기하고 내일 딜링 사이클로 미룬다.',
+      effects: [flag('cutoff_missed'), counter('cutoffInstructions', -1)],
+      expert: {
+        rating: 5,
+        rationale:
+          '컷오프를 넘기면 오늘의 담보는 없다. 운용사는 그 사실을 컷오프 시점에 확인하고 규정에 따라 익스포저를 줄인다 — 그것이 9/28 오전의 강제 매도였다.',
+        sourceRefs: [S.breeden, S.staff],
+      },
+      preview: [
+        {
+          metric: 'hedgeRatio',
+          direction: 'down',
+          magnitude: 2,
+          note: '잔여 콜이 남아 있을 때',
+        },
+      ],
+      consequences: '오늘 지시가 내일 사이클로 넘어갔습니다.',
+      trap: true,
+      trapExplanation:
+        '담보 워터폴의 구속 제약은 지급능력이 아니라 시각이다. "내일 아침"은 담보 계산상 존재하지 않는 시각이며, 그 사이에 운용사가 포지션을 자른다.',
+    },
+  ],
+}
+
 export const t4: T = {
   id: 't4',
   label: 'T4',
-  timeLabel: '2022년 9월 28일 (수) 08:30 BST',
+  timeLabel: '2022년 9월 28일 (수) 08:00~11:00 BST',
   title: '수요일 아침: 매수호가 실종',
   time: '2022-09-28T08:30:00+01:00',
+  ticks: 5,
+  tickLabels: ['08:00', '08:30', '09:30', '10:45', '11:00'],
   entryEffects: [
     {
       id: 't4-shock',
       description:
         '개장 직후 30년 길트 +5bp(5.10→5.15%, 장중 고점) — 장기물 매수호가 실종. 콜·레버리지 점검, 미충당 시 강제 축소',
       effects: [
-        pensionFx.yieldShock({ deltaBp: 5, label: '30년 +5bp (9/28 오전)' }),
-        ldiFx.marketMove({ govt2yBp: 5, govt10yBp: 5, creditSpreadIgBp: 10, volIndex: 3 }),
+        ldiFx.yieldTick({ deltaBp: 5, revalueBp: 5, label: '30년 +5bp (9/28 오전)' }),
+        ldiFx.marketMove({ govt2yBp: 5, creditSpreadIgBp: 10, volIndex: 3 }),
         ldiFx.postFromBuffer('풀 자체 버퍼로 콜 충당'),
         ldiFx.forcedDelever({ maxLeverage: MAX_LEVERAGE, discount: 0.08 }),
         confidence(-5, '장기물 시장 기능 상실'),
       ],
     },
+  ],
+  eachTick: [
+    {
+      id: 't4-post-tick',
+      description: '틱마다 풀 잔여 담보로 미충당 콜을 정산한다',
+      effects: [ldiFx.postFromBuffer('틱 담보 정산')],
+    },
+  ],
+  tickEffects: [
     {
       id: 't4-haircut',
+      atTick: 2,
       description: '레포 은행이 장기 길트 헤어컷을 인상 → 풀 레포 조달 금리 +50bp',
       effects: [op('institution.assets.ldi.repoRateBp', 'add', 50, '레포 금리(헤어컷 인상 반영)')],
     },
+    {
+      id: 't4-cutoff',
+      atTick: 4,
+      when: {
+        fn: (ctx) => (ctx.path('institution.assets.ldi.marginCallOutstanding') ?? 0) > 0,
+        label: '11:00 컷오프 시점에 잔여 콜이 남아 있음',
+      },
+      description:
+        '11:00 딜링 컷오프 — 도착하지 않은 담보는 오늘 없는 것으로 확정되어 운용사가 익스포저를 축소',
+      effects: [ldiFx.forcedDelever({ maxLeverage: MAX_LEVERAGE, discount: 0.08 })],
+    },
   ],
+  ticker: {
+    series: [
+      // 9/27 종가 5.10% → 9/28 오전 장중 고점 5.15%. 끝점만 앵커이고 일중 분포는 [STYLIZED] [boe-yield-curves]
+      { path: 'market.govt30yBp', mode: 'absolute', values: [510, 512, 514, 515, 515] },
+      // 10년: 9/27 종가 4.50% → 9/28 오전 4.55% [boe-yield-curves]
+      { path: 'market.govt10yBp', mode: 'absolute', values: [450, 452, 453, 455, 455] },
+    ],
+  },
+  interrupts: [t4ManagerCall, t4CustodianCall],
   events: [
     {
       id: 't4-market',
@@ -123,37 +353,28 @@ export const t4: T = {
       requiredConcepts: ['ldi-collateral-waterfall', 'ldi-leverage-buffer-250bp'],
       dimensions: ['liquidity', 'marketRisk', 'timeliness'],
       timeLimitSec: 90,
+      // 08:00 개장부터 열려 있고 10:45(틱 3)가 마감이다 — 11:00 컷오프(틱 4) 자체를 마감으로 두면
+      // 스윕이 컷오프 이후에 돌아 자동 확정이 일어나지 않는다(calibration.md §12.5).
+      availableFrom: 0,
+      deadlineTick: 3,
       defaultOptionId: 't4-a',
       options: [
         {
           id: 't4-a',
-          label: '운용사 축소 수용, 스폰서에 £300M 출연 요청(이사회 승인 대기)',
+          label: '운용사 축소 수용 — 11시까지 보낼 당일 담보 없음',
           description:
-            '당일 담보가 없어 운용사의 익스포저 축소를 받아들이고, 스폰서에 긴급 출연을 요청한다. 대기성 약정이 없으면 스폰서 이사회 승인 후 다음 턴 도착. 실행가능성: 항상 가능.',
-          effects: [
-            flag('accepted_cuts_t4'),
-            confidence(-4, '운용사: 추가 축소 통보'),
-            ldiFx.requestSponsor({ amount: 300 }),
-          ],
-          delayedEffects: [
-            {
-              afterTurns: 1,
-              when: { counter: 'sponsorInstructed', gt: 0 },
-              description: '스폰서 이사회 승인 후 출연금 도착 → 풀 재자본화',
-              effects: [ldiFx.settleSponsor()],
-            },
-          ],
+            '당일 컷오프 안에 도착할 담보가 없으므로 운용사의 익스포저 축소를 받아들인다. 스폰서 출연은 별도 협상(D2)에서 다룬다. 실행가능성: 항상 가능.',
+          effects: [flag('accepted_cuts_t4'), confidence(-4, '운용사: 추가 축소 통보')],
           expert: {
             rating: 30,
             rationale:
-              '풀드펀드 투자 스킴 다수의 실제 수요일 아침. 스폰서 요청은 옳지만 승인이 늦어 오전의 축소를 막지 못했다. Breeden은 "통상 1주, 때로 2주" 걸리는 리밸런싱 절차가 강제 매도의 원인이었다고 본다.',
+              '풀드펀드 투자 스킴 다수의 실제 수요일 아침. Breeden은 "통상 1주, 때로 2주" 걸리는 리밸런싱 절차가 강제 매도의 원인이었다고 본다. 축소를 받아들이는 것 자체가 잘못이라기보다, 컷오프 안에 보낼 것을 미리 만들어 두지 않은 것이 잘못이다.',
             historicalNote: '실제 다수 스킴이 9/28 오전 운용사의 추가 축소를 통보받았다.',
             sourceRefs: [S.breeden, S.wpc],
           },
-          consequences:
-            '운용사가 축소를 진행했습니다. 스폰서에 요청서를 보냈습니다(도착 시점은 로그 참조).',
+          consequences: '운용사가 축소를 진행했습니다.',
           historical: true,
-          feasibility: { basis: '항상 가능; 스폰서 승인 1일', sourceRefs: [S.wpc] },
+          feasibility: { basis: '항상 가능', sourceRefs: [S.wpc] },
         },
         {
           id: 't4-b',
@@ -241,12 +462,202 @@ export const t4: T = {
         },
       ],
     },
+    {
+      id: 't4-d2',
+      title: '스폰서 긴급 출연 협상',
+      prompt: '스폰서 CFO와의 통화에서 무엇을 요청하시겠습니까?',
+      context:
+        '대기성 약정이 없으므로 출연은 스폰서 이사회 승인을 거칩니다. 요청 규모가 커버넌트 한도(£300M)를 넘으면 이사회가 재심의하고 입금이 하루 더 늦어집니다. 늦게 도착한 현금은 오늘의 축소를 막지 못합니다.',
+      // 대기성 약정이 있으면 협상 자체가 없다 — 서명된 약정을 집행할 뿐이므로 D1의 D 옵션이 처리한다.
+      when: { notFlag: 'sponsor_standby' },
+      required: false,
+      availableFrom: 1,
+      deadlineTick: 2,
+      defaultOptionId: 't4-d2-b',
+      timeLimitSec: 90,
+      select: { min: 1, max: 1 },
+      dimensions: ['liquidity', 'communication', 'timeliness'],
+      cardRefs: ['ldi-collateral-waterfall'],
+      // 3단계 대화: 이사회 소집 요청 → 요청 규모(commitReplies) → 이사회 제출 자료.
+      // 약속한 규모는 `counters.sponsorAskM`에 남고, 입금 시차는 t4-d2-a의 지연효과가 판정한다.
+      // 대사는 공개 기록(WPC 증언·TPR 가이드)에 근거한 재구성이며 실제 통화록이 아니다.
+      steps: [
+        {
+          id: 't4-d2-open',
+          lines: [
+            {
+              speaker: '스폰서 CFO',
+              text: '아침부터 전화가 옵니다. 무슨 일입니까? 이사회를 소집해야 하는 사안입니까?',
+            },
+          ],
+          note: '여기서 요청한 규모와 근거가 이사회 승인 속도를 정합니다.',
+          replies: [
+            {
+              id: 't4-d2-r-escalate',
+              label: '담보 워터폴·잔여 콜·컷오프 시각을 제시하고 긴급 이사회 소집을 요청',
+              next: 't4-d2-size',
+              expert: {
+                rating: 80,
+                rationale:
+                  '스폰서는 "얼마가, 왜, 언제까지"라는 세 가지에만 반응한다. 수치 없는 경고는 정기 절차로 흘러간다.',
+              },
+            },
+            {
+              id: 't4-d2-r-inform',
+              label: '상황만 공유하고 정식 요청은 투자위원회 절차를 거치겠다고 답변',
+              resolvesTo: 't4-d2-b',
+              expert: {
+                rating: 25,
+                rationale:
+                  '절차를 지키는 것처럼 보이지만, 담보 콜의 시계는 위원회 일정과 무관하게 흐른다.',
+              },
+            },
+          ],
+        },
+        {
+          id: 't4-d2-size',
+          lines: [
+            {
+              speaker: '스폰서 CFO',
+              text: '숫자가 있어야 이사회를 소집합니다. 얼마입니까?',
+            },
+          ],
+          note: '약속한 규모는 이후 입금 시차로 평가됩니다. 커버넌트 한도(£300M)를 넘으면 재심의로 하루가 더 걸립니다.',
+          replies: commitReplies<PensionState>('sponsorAskM', [150, 300, 500], {
+            idPrefix: 't4-d2-ask',
+            label: (v) => `£${v}M 출연을 요청`,
+            next: 't4-d2-evidence',
+            expert: (v) => ({
+              rating: v === 300 ? 75 : v === 150 ? 40 : 30,
+              rationale:
+                v === 300
+                  ? '커버넌트가 허용하는 긴급 출연 여력과 같은 금액이다. 이사회가 한 번에 결의할 수 있는 최대치를 부르는 것이 승인 속도를 가장 빠르게 한다.'
+                  : v === 150
+                    ? '보수적으로 부르면 승인은 쉽지만 다음 콜에서 다시 요청해야 하고, 두 번째 요청은 첫 번째보다 느리다.'
+                    : '커버넌트 한도를 넘는 요청은 스폰서 이사회 재심의를 부른다 — 승인 자체가 늦어져 입금이 하루 밀린다.',
+            }),
+            trap: (v) => v > 300,
+            trapExplanation: (v) =>
+              v > 300
+                ? '"많이 부르면 많이 온다"가 성립하지 않는 유일한 경우가 커버넌트다. 한도를 넘는 금액은 들어오지 않고, 재심의 때문에 한도 안의 금액마저 하루 늦게 들어온다.'
+                : undefined,
+          }),
+        },
+        {
+          id: 't4-d2-evidence',
+          lines: [
+            {
+              speaker: '스폰서 CFO',
+              text: '이사회에는 무엇을 근거로 올립니까? 회계법인이 물어볼 겁니다.',
+            },
+          ],
+          replies: [
+            {
+              id: 't4-d2-r-pack',
+              label: '담보 워터폴·잔여 콜·컷오프 시각을 수치로 정리해 송부',
+              effects: [flag('sponsor_pack_sent')],
+              resolvesTo: 't4-d2-a',
+              expert: {
+                rating: 80,
+                rationale:
+                  'TPR 가이드가 요구하는 유동성 계획 문서가 그대로 이사회 자료가 된다. 준비된 스킴은 이 단계에서 시간을 벌지 않는다.',
+              },
+            },
+            {
+              id: 't4-d2-r-verbal',
+              label: '구두 설명으로 갈음',
+              resolvesTo: 't4-d2-a',
+              expert: {
+                rating: 35,
+                rationale: '이사회는 문서 없이 긴급 결의를 하지 않는다. 승인은 되어도 느려진다.',
+              },
+            },
+            {
+              id: 't4-d2-r-withdraw',
+              label: '요청을 철회하고 정기 위원회 절차로 회부',
+              resolvesTo: 't4-d2-b',
+              expert: { rating: 20, rationale: '철회는 요청하지 않은 것과 같다.' },
+            },
+          ],
+        },
+      ],
+      options: [
+        {
+          id: 't4-d2-a',
+          label: '스폰서 긴급 출연을 요청(이사회 승인 대기)',
+          description:
+            '대화에서 합의한 규모로 요청서를 보낸다. 대기성 약정이 없으므로 스폰서 이사회 승인 후 입금되며, 오늘 오전의 축소는 막지 못한다.',
+          effects: [ldiFx.requestSponsorAsk({ fallback: 300 })],
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              when: {
+                all: [
+                  { counter: 'sponsorInstructed', gt: 0 },
+                  { counter: 'sponsorAskM', lte: 300 },
+                ],
+              },
+              description: '스폰서 이사회 승인 후 출연금 도착 → 풀 재자본화',
+              effects: [ldiFx.settleSponsor()],
+            },
+            {
+              afterTurns: 2,
+              when: {
+                all: [
+                  { counter: 'sponsorInstructed', gt: 0 },
+                  { counter: 'sponsorAskM', gt: 300 },
+                ],
+              },
+              description:
+                '커버넌트 한도 초과 요청으로 스폰서 이사회 재심의 — 출연금이 하루 늦게 도착',
+              effects: [ldiFx.settleSponsor()],
+            },
+          ],
+          expert: {
+            rating: 60,
+            rationale:
+              '스폰서 출연은 길트를 팔지 않는 담보의 유일한 원천이다. 요청 자체는 옳고, 늦는 것은 대기성 약정을 미리 서명해 두지 않은 T0의 결과다.',
+            sourceRefs: [S.wpc, S.tpr],
+          },
+          preview: [
+            {
+              metric: 'collateralHeadroomBp',
+              direction: 'up',
+              magnitude: 1,
+              note: '다음 턴에 도착',
+            },
+          ],
+          consequences: '스폰서에 요청서를 보냈습니다. 도착 시점은 로그를 확인하십시오.',
+          historical: true,
+          feasibility: { basis: '스폰서 이사회 승인 1일', sourceRefs: [S.wpc] },
+        },
+        {
+          id: 't4-d2-b',
+          label: '요청하지 않고 정기 투자위원회 절차로 회부',
+          description: '긴급 출연을 요청하지 않는다. 다음 정기 위원회에서 다룬다.',
+          effects: [flag('sponsor_not_asked')],
+          expert: {
+            rating: 20,
+            rationale:
+              '커버넌트가 허용하는 유일한 비(非)매도 담보원을 쓰지 않는 선택이다. 위원회 일정은 담보 콜의 시계와 무관하다.',
+            sourceRefs: [S.wpc],
+          },
+          preview: [{ metric: 'collateralHeadroomBp', direction: 'flat', magnitude: 1 }],
+          consequences: '스폰서에게 상황만 공유했습니다.',
+        },
+      ],
+    },
   ],
   advisorHints: [
     {
       level: 1,
       decisionId: 't4-d1',
       text: '"담보 여력(bp)"과 "마진콜 대기액"을 보세요. 잔여 콜이 있으면 11시 전 현금만 의미가 있습니다.',
+    },
+    {
+      level: 2,
+      decisionId: 't4-d2',
+      text: '스폰서 출연은 커버넌트 한도(£300M) 안에서만 한 번에 결의됩니다. 한도를 넘는 요청은 재심의로 하루가 더 걸립니다.',
     },
     {
       level: 2,
@@ -265,21 +676,112 @@ export const t4: T = {
 // ---------------------------------------------------------------------------------------------
 // T5 — 2022-09-28 (수) 17:30 BST "영란은행 개입"
 // ---------------------------------------------------------------------------------------------
+/**
+ * 14:00 스폰서 기업 재무담당(CFO)의 확인 통화. 오전에 보낸 긴급 출연 요청이 이사회에 올라가 있는
+ * 상태에서 금리가 급락하자 "정말 필요한가"를 묻는 장면이다. **재구성된 대사이며 실제 통화록이
+ * 아니다**(calibration.md §12.4).
+ */
+const t5SponsorCall: Interrupt<PensionState> = {
+  id: 't5-i1-sponsor',
+  interrupt: true,
+  atTick: 2,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't5-i1-keep',
+  scoreWeight: 0.5,
+  required: false,
+  title: '스폰서 CFO 통화 — 출연 요청을 유지합니까',
+  prompt: '금리가 급락했습니다. 스폰서 이사회에 올라간 요청을 어떻게 하시겠습니까?',
+  context: '영란은행 발표문은 이 조치가 일시적이며 종료일이 정해져 있다고 명시하고 있습니다.',
+  source: { kind: 'call', caller: '스폰서 CFO', agency: '모기업 재무본부', tone: 'concerned' },
+  lines: [
+    {
+      speaker: '스폰서 CFO',
+      text: '금리가 1%포인트 넘게 내렸다고 들었습니다. 이사회 안건을 그대로 올릴까요, 아니면 내리는 게 좋겠습니까?',
+    },
+  ],
+  dimensions: ['policy', 'communication'],
+  cardRefs: ['ldi-leverage-buffer-250bp'],
+  options: [
+    {
+      id: 't5-i1-standby',
+      label: '요청을 유지하고 대기성 약정도 지금 서명하자고 제안',
+      description:
+        '이번 출연과 별개로, 다음 콜에 당일 집행할 수 있는 대기성 약정을 지금 문서로 만든다.',
+      requires: { path: 'institution.sponsor.contributionCapacity', gt: 0 },
+      unavailableReason: '스폰서 출연 여력이 남아 있지 않습니다.',
+      effects: [flag('sponsor_standby'), confidence(3, '스폰서 대기성 약정 서명')],
+      expert: {
+        rating: 80,
+        rationale:
+          '임시 매입은 시한이 정해져 있었고 종료 후 금리는 다시 올랐다. 창이 열려 있는 동안 만들어야 하는 것은 담보와 절차이지 안도감이 아니다. 대기약정은 다음 콜을 당일 현금으로 바꾼다.',
+        sourceRefs: [S.pr0928, S.tpr],
+      },
+      preview: [
+        {
+          metric: 'collateralHeadroomBp',
+          direction: 'up',
+          magnitude: 1,
+          note: '다음 콜부터 당일 집행',
+        },
+      ],
+      consequences: '대기성 약정 초안이 오늘 중 회람됩니다.',
+    },
+    {
+      id: 't5-i1-keep',
+      label: '요청을 그대로 유지',
+      description: '이사회 안건을 그대로 두고 승인 절차를 진행한다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 55,
+        rationale:
+          '요청을 유지한 것은 옳다 — 운용사의 재자본화 요청은 발표 이후에도 유지·상향되었다. 다만 다음 콜을 당일 현금으로 바꿀 절차는 여전히 없다.',
+        sourceRefs: [S.breeden, S.fsr],
+      },
+      preview: [{ metric: 'collateralHeadroomBp', direction: 'flat', magnitude: 1 }],
+      consequences: '스폰서 이사회 안건이 유지되었습니다.',
+      historical: true,
+    },
+    {
+      id: 't5-i1-withdraw',
+      label: '요청을 철회 — 영란은행이 시장을 지킨다',
+      description: '금리가 내렸으니 출연이 필요 없다고 판단하고 안건을 내린다.',
+      effects: [
+        setCounter('sponsorInstructed', 0),
+        flag('sponsor_withdrawn'),
+        confidence(2, '스폰서: 출연 불필요 판단'),
+      ],
+      expert: {
+        rating: 5,
+        rationale:
+          '영란은행은 발표문에서 "일시적이며 시한이 정해진" 조치라고 명시했고, 30년물은 10/11까지 다시 5%에 근접했다. 백스톱이 있는 동안 담보원을 포기하는 것이 이 시나리오의 핵심 함정이다.',
+        sourceRefs: [S.pr0928, S.fsr],
+      },
+      preview: [{ metric: 'collateralHeadroomBp', direction: 'down', magnitude: 2 }],
+      consequences: '스폰서 이사회 안건이 철회되었습니다.',
+      trap: true,
+      trapExplanation:
+        '중앙은행이 뒤에 있다는 안도감이 가장 위험한 순간이다. 임시 매입은 시장 기능을 되살리는 백스톱이지 스킴의 버퍼를 대신하는 것이 아니며, 종료일이 이미 공표되어 있었다.',
+      irreversible: true,
+    },
+  ],
+}
+
 export const t5: T = {
   id: 't5',
   label: 'T5',
-  timeLabel: '2022년 9월 28일 (수) 17:30 BST',
+  timeLabel: '2022년 9월 28일 (수) 11:00~17:30 BST',
   title: '영란은행 개입: −110bp',
   time: '2022-09-28T17:30:00+01:00',
+  ticks: 5,
+  tickLabels: ['11:00', '12:30', '14:00', '16:30', '17:30'],
   entryEffects: [
     {
       id: 't5-boe',
       description:
-        '11:00 영란은행 장기 길트 임시 매입 발표 → 30년 −110bp(5.15→4.05%), 사상 최대 일일 하락. 변동증거금 반환, 임시 매입 창구 개방',
+        '11:00 영란은행 장기 길트 임시 매입 발표 — 장중 30년 −110bp(5.15→4.05%)로 사상 최대 일일 하락. 변동증거금은 장중 반환되고 임시 매입 창구가 열린다',
       effects: [
-        pensionFx.yieldShock({ deltaBp: -110, label: '30년 −110bp (9/28 오후)' }),
-        ldiFx.marketMove({ govt2yBp: -30, govt10yBp: -50, creditSpreadIgBp: -15, volIndex: -5 }),
-        ldiFx.postFromBuffer('반환 담보 정리'),
+        ldiFx.marketMove({ govt2yBp: -30, creditSpreadIgBp: -15, volIndex: -5 }),
         flag('boe_window_open'),
         confidence(12, '영란은행 임시 매입 발표'),
       ],
@@ -291,6 +793,56 @@ export const t5: T = {
       effects: [confidence(-5, '수탁자: 언헤지 손실 인식')],
     },
   ],
+  // 변동증거금은 장중 네 번에 나누어 반환된다(전방 집중: 발표 직후 한 시간에 대부분이 움직였다).
+  // 장부·부채 재평가는 마지막 틱(종가)에서 하루치 −110bp를 한 번에 적용한다 — calibration.md §12.1.
+  tickEffects: [
+    {
+      id: 't5-boe-tick1',
+      atTick: 1,
+      description: '발표 직후 되돌림 −60bp — 변동증거금 반환',
+      effects: [
+        ldiFx.yieldTick({ deltaBp: -60, label: '30년 −60bp (11:00~12:30)' }),
+        ldiFx.postFromBuffer('반환 담보 정리'),
+      ],
+    },
+    {
+      id: 't5-boe-tick2',
+      atTick: 2,
+      description: '오후 초반 −25bp — 변동증거금 반환',
+      effects: [
+        ldiFx.yieldTick({ deltaBp: -25, label: '30년 −25bp (12:30~14:00)' }),
+        ldiFx.postFromBuffer('반환 담보 정리'),
+      ],
+    },
+    {
+      id: 't5-boe-tick3',
+      atTick: 3,
+      description: '종가까지 −15bp — 변동증거금 반환',
+      effects: [
+        ldiFx.yieldTick({ deltaBp: -15, label: '30년 −15bp (14:00~16:30)' }),
+        ldiFx.postFromBuffer('반환 담보 정리'),
+      ],
+    },
+    {
+      id: 't5-boe-tick4',
+      atTick: 4,
+      description:
+        '마감 정산 −10bp — 장부·부채를 종가(−110bp) 기준으로 재평가하고 남은 변동증거금을 반환',
+      effects: [
+        ldiFx.yieldTick({ deltaBp: -10, revalueBp: -110, label: '30년 종가 정산 (9/28)' }),
+        ldiFx.postFromBuffer('반환 담보 정리'),
+      ],
+    },
+  ],
+  ticker: {
+    series: [
+      // 5.15%(오전 고점) → 4.05%(9/28 종가, 사상 최대 일일 하락). 끝점만 앵커, 장중 분포는 [STYLIZED]
+      { path: 'market.govt30yBp', mode: 'absolute', values: [515, 455, 430, 415, 405] },
+      // 10년: 4.55% → 4.05% (−50bp) [boe-yield-curves]
+      { path: 'market.govt10yBp', mode: 'absolute', values: [455, 428, 416, 409, 405] },
+    ],
+  },
+  interrupts: [t5SponsorCall],
   events: [
     {
       id: 't5-news-boe',
@@ -389,6 +941,12 @@ export const t5: T = {
       select: { min: 1, max: 2 },
       requiredConcepts: ['ldi-collateral-waterfall', 'ldi-leverage-buffer-250bp'],
       dimensions: ['liquidity', 'marketRisk', 'policy', 'communication'],
+      // 17:30 수탁자 긴급회의 — 마감 정산이 끝난 뒤에 내리는 판단이다. 틱 4는 턴의 마지막 틱이므로
+      // 마감 스윕이 돌지 않는다(린트 `deadline-last-tick`); 무응답은 UI 타이머가 처리한다.
+      // 이 창은 보정 게이트이기도 하다 — calibration.md §12.5.
+      availableFrom: 4,
+      timeLimitSec: 120,
+      defaultOptionId: 't5-a',
       options: [
         {
           id: 't5-a',

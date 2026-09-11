@@ -1,7 +1,88 @@
+import type { Interrupt, SecuritiesState } from '../../engine/types'
 import { securitiesFx } from '../../engine/fx/securities'
 import { confidence, flag, op, ownStockMove, regulator } from '../../engine/fx/common'
 import { legoFx } from './localFx'
 import { rolloverDecision, S, type T } from './shared'
+import { MM_TICK_LABELS } from './turnsA'
+
+/** 11/1: 흥국생명 공시가 08:30에 나온 날 — 개장과 동시에 단기물 수요가 사라진다 [STYLIZED]. */
+export const T5_CP_PROFILE = [0.3, 0.35, 0.25, 0.1]
+
+/**
+ * 11:00 콜머니 상대 은행 자금부 전화. 대사는 흥국생명 콜 미행사 직후의 크레딧 시장 반응(공개 기록)을
+ * 바탕으로 한 **재구성**이며 실제 통화가 아니다.
+ */
+const t5CallDeskCall: Interrupt<SecuritiesState> = {
+  id: 't5-i1-calldesk',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 40,
+  defaultOptionId: 't5-i1-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '콜머니 상대 은행 자금부 전화',
+  prompt: '오늘 오후 콜 만기분의 롤오버 여부를 지금 알려 달라고 합니다.',
+  dimensions: ['liquidity', 'communication'],
+  source: { kind: 'desk', caller: '주거래은행 자금부 차장', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '자금부 차장',
+      text: '아침 공시 보셨죠. 본부에서 증권사 무담보 콜 한도를 재검토하라는 지시가 내려왔습니다. 오늘 오후 만기분을 롤오버할지, 지금 말씀해 주셔야 한도를 잡아 둡니다.',
+    },
+  ],
+  options: [
+    {
+      id: 't5-i1-a',
+      label: '오늘 만기분은 상환하고 증권금융·RP로 대체하겠다고 답한다',
+      description:
+        '무담보 익일물 의존을 스스로 줄이고 담보 조달로 옮기겠다는 계획을 말한다. 상대 은행은 한도를 유지한다.',
+      effects: [flag('call_desk_reassured')],
+      expert: {
+        rating: 75,
+        rationale:
+          'BCBS 2023이 정리한 대로 무담보 도매자금은 필요할 때 먼저 사라진다. 상대가 한도를 줄이기 전에 의존을 줄이겠다고 먼저 말하는 것이 한도를 남기는 방법이다.',
+        sourceRefs: [S.bcbs555, S.bcbs144],
+      },
+      consequences:
+        '자금부가 한도를 유지하겠다고 답했습니다. 대체 조달은 오늘 결정에 달려 있습니다.',
+      historical: true,
+      preview: [{ metric: 'cash', direction: 'flat', magnitude: 1, note: '한도 유지' }],
+    },
+    {
+      id: 't5-i1-b',
+      label: '한도 유지를 요청하며 11/15 후순위채 콜 행사를 확약한다',
+      description:
+        '흥국생명과 다르다는 것을 상대가 가장 신경 쓰는 지표로 말한다. 다만 이 자리에서 한 확약은 지켜야 한다.',
+      effects: [flag('call_desk_reassured'), confidence(1, '콜 관행 준수 확약')],
+      expert: {
+        rating: 70,
+        rationale:
+          '시장이 지금 보는 것은 잔액이 아니라 콜 관행이다. 다만 확약은 T5의 콜옵션 결정과 일치해야 하며, 어긋나면 확약 자체가 증거가 된다.',
+        sourceRefs: [S.pHeungkuk, S.fsr],
+      },
+      consequences: '자금부가 "그 말씀을 본부에 그대로 전하겠다"고 했습니다.',
+      preview: [{ metric: 'confidence', direction: 'up', magnitude: 1 }],
+    },
+    {
+      id: 't5-i1-c',
+      label: '"문제없다"고만 답하고 구체적 계획은 말하지 않는다',
+      description: '상세를 주지 않는다. 상대는 한도를 잡아 두지 못한다.',
+      effects: [confidence(-2, '수치 없는 안심 답변')],
+      expert: {
+        rating: 25,
+        rationale:
+          '보정 규칙의 "수치 없는 침착 메시지"가 1:1 통화로 나타난 형태다. 무담보 대여자는 설명을 받지 못하면 한도부터 줄인다.',
+        sourceRefs: [S.fsb, S.bcbs555],
+      },
+      consequences: '자금부가 "본부 판단에 맡기겠다"고 답했습니다.',
+      trap: true,
+      trapExplanation:
+        '"불안을 키우지 말자"는 침묵이 대여자에게는 "설명할 수 없는 상태"로 읽힌다. 무담보 한도는 설명을 받지 못한 쪽부터 사라진다.',
+      preview: [{ metric: 'confidence', direction: 'down', magnitude: 1 }],
+    },
+  ],
+}
 
 // ---------------------------------------------------------------------------------------------
 // T5 — 2022-11-01 (화) "2차 충격: 흥국생명"
@@ -12,19 +93,21 @@ export const t5: T = {
   timeLabel: '2022년 11월 1일 (화) 09:00 KST',
   title: '2차 충격: 콜옵션',
   time: '2022-11-01T09:00:00+09:00',
+  ticks: 4,
+  tickLabels: MM_TICK_LABELS,
   entryEffects: [
     {
       id: 't5-market',
       description:
-        'CP91 4.70%, CD91 3.98%, 스프레드 150bp, 자사 CP 5.9%; 흥국생명 충격으로 증권주 −3%',
+        '개장 앵커(10/31 종가): 국고 3년 4.185%, 회사채 AA- 5.580%, CD91 3.96%, CP91 4.65%; 자사 CP 호가 5.9%, 흥국생명 충격으로 증권주 −3%',
       effects: [
-        op('market.custom.cp91', 'set', 470),
-        op('market.custom.cd91', 'set', 398),
-        op('market.fundingStressBp', 'set', 72),
-        op('market.custom.creditSpreadAA', 'set', 150),
-        op('market.creditSpreadIgBp', 'set', 150),
-        op('market.custom.govt3y', 'set', 420),
-        op('market.custom.corpAA3y', 'set', 570),
+        op('market.custom.cp91', 'set', 465),
+        op('market.custom.cd91', 'set', 396),
+        op('market.fundingStressBp', 'set', 69),
+        op('market.custom.creditSpreadAA', 'set', 139),
+        op('market.creditSpreadIgBp', 'set', 139),
+        op('market.custom.govt3y', 'set', 419),
+        op('market.custom.corpAA3y', 'set', 558),
         op('market.custom.ownCpRate', 'set', 5.9),
         ownStockMove(-0.03, '흥국생명 콜옵션 미행사'),
       ],
@@ -62,12 +145,40 @@ export const t5: T = {
       effects: [regulator({ set: 2 }, 'NCR 130% 미만 — 자본확충 계획 요구')],
     },
     {
-      id: 't5-cp',
-      description: 'CP 만기(잔액 9%) 재발행',
-      effects: [legoFx.cpRollStep({ share: 0.09 }), legoFx.callRollStep()],
+      id: 't5-call',
+      description: '콜차입(익일물) 정산 — 신뢰지수가 낮으면 대여자가 한도를 회수',
+      effects: [legoFx.callRollStep()],
     },
-    { id: 't5-settle', description: '결제일 점검', effects: [legoFx.settlementCheck()] },
   ],
+  eachTick: [
+    {
+      id: 't5-cp-tick',
+      description: 'CP·전단채 만기(잔액 9%) 재발행 — 청약 구간별 확정',
+      effects: [legoFx.cpRollTicks({ share: 0.09, profile: T5_CP_PROFILE, label: 'CP 청약 구간' })],
+    },
+  ],
+  tickEffects: [
+    {
+      id: 't5-settle',
+      atTick: 3,
+      description: '마감 결제 점검',
+      effects: [legoFx.settlementCheck()],
+    },
+  ],
+  ticker: {
+    series: [
+      // CP91 4.65%(보간) → 4.70%, CD91 3.96% → 3.97% (11/1 종가) [ecos-817Y002 / kofia-bond]
+      { path: 'market.custom.cp91', mode: 'absolute', values: [465, 467, 469, 470] },
+      { path: 'market.custom.cd91', mode: 'absolute', values: [396, 396, 397, 397] },
+      { path: 'market.fundingStressBp', mode: 'absolute', values: [69, 71, 72, 73] },
+      // 국고 3년 4.185% → 4.068%, 회사채 AA- 3년 5.580% → 5.486% (11/1 종가) [ecos-817Y002]
+      { path: 'market.custom.govt3y', mode: 'absolute', values: [419, 415, 411, 407] },
+      { path: 'market.custom.corpAA3y', mode: 'absolute', values: [558, 555, 552, 549] },
+      // 스프레드는 두 계열의 차이 — 139 → 142bp
+      { path: 'market.custom.creditSpreadAA', mode: 'absolute', values: [139, 140, 141, 142] },
+      { path: 'market.creditSpreadIgBp', mode: 'absolute', values: [139, 140, 141, 142] },
+    ],
+  },
   events: [
     {
       id: 't5-news-heungkuk',
@@ -134,6 +245,7 @@ export const t5: T = {
       when: { metric: 'ncr', lt: 130 },
       agency: '금융감독원 금융투자검사국',
       time: '14:00',
+      atTick: 2,
       headline: '[감독당국] NCR 130% 미만 — 자본·유동성 확충 계획 제출 요구',
       body: '귀사의 순자본비율이 내부 관리 기준(130%)을 밑돌고 있습니다. 2주 내 자본 확충·자산 매각·익스포저 축소 계획을 제출하고, 신규 PF 신용공여를 중단하십시오.',
       tone: 'urgent',
@@ -143,44 +255,53 @@ export const t5: T = {
     },
   ],
   decisions: [
-    rolloverDecision({
-      turn: 5,
-      riskWeight: 1,
-      prompt: '11/1~8 만기(750억 + 추가분) 중 차환 실패분(약 60%)을 어떻게 처리하시겠습니까?',
-      context:
-        '11월은 만기가 가장 많은 달입니다. 이번 턴 매입은 여전히 위험값 100%로 신용위험액에 가산됩니다.',
-      honour: {
-        rating: 70,
-        rationale:
-          '이행. 11월 만기의 벽에서 자체매입 잔액이 급증한 것이 업계 현실이었고, 이것이 11/9 특례의 배경이 됐다.',
-        historicalNote: '11월 초 증권사 자체매입 잔액이 급증했다.',
-        consequences: '차환 실패분을 자체매입했습니다. 보유 ABCP가 크게 늘었습니다.',
-      },
-      negotiate: {
-        rating: 75,
-        extendShare: 0.4,
-        rationale:
-          '연장분은 11월 말(T7)로 밀린다. 그 시점의 시장은 알 수 없지만, 지금 위험값 100%로 사는 것보다는 낫다.',
-        consequences: '일부 연장, 잔여분 자체매입.',
-      },
-      abandon: {
-        rating: 5,
-        rationale:
-          '흥국생명 콜 미행사로 시장이 극도로 예민한 시점의 불이행은 즉각적인 시장 퇴출을 부른다.',
-        consequences: 'SPC 부도 처리. 콜 대여자들이 한도 회수를 통보했습니다.',
-        trapExplanation:
-          '흥국생명이 보여주듯 시장은 "약속을 지키지 않는 기관"을 즉시 가격에 반영한다.',
-      },
-    }),
+    {
+      // 차환 마감(15:30) 집계가 나온 뒤에야 미달 금액이 확정된다 — 이 결정은 마지막 틱에 열린다.
+      ...rolloverDecision({
+        turn: 5,
+        riskWeight: 1,
+        prompt: '11/1~8 만기(750억 + 추가분) 중 차환 실패분(약 60%)을 어떻게 처리하시겠습니까?',
+        context:
+          '11월은 만기가 가장 많은 달입니다. 마감 집계가 방금 나왔습니다. 이번 턴 매입은 여전히 위험값 100%로 신용위험액에 가산됩니다.',
+        honour: {
+          rating: 70,
+          rationale:
+            '이행. 11월 만기의 벽에서 자체매입 잔액이 급증한 것이 업계 현실이었고, 이것이 11/9 특례의 배경이 됐다.',
+          historicalNote: '11월 초 증권사 자체매입 잔액이 급증했다.',
+          consequences: '차환 실패분을 자체매입했습니다. 보유 ABCP가 크게 늘었습니다.',
+        },
+        negotiate: {
+          rating: 75,
+          extendShare: 0.4,
+          rationale:
+            '연장분은 11월 말(T7)로 밀린다. 그 시점의 시장은 알 수 없지만, 지금 위험값 100%로 사는 것보다는 낫다.',
+          consequences: '일부 연장, 잔여분 자체매입.',
+        },
+        abandon: {
+          rating: 5,
+          rationale:
+            '흥국생명 콜 미행사로 시장이 극도로 예민한 시점의 불이행은 즉각적인 시장 퇴출을 부른다.',
+          consequences: 'SPC 부도 처리. 콜 대여자들이 한도 회수를 통보했습니다.',
+          trapExplanation:
+            '흥국생명이 보여주듯 시장은 "약속을 지키지 않는 기관"을 즉시 가격에 반영한다.',
+        },
+      }),
+      availableFrom: 3,
+      defaultOptionId: 't5-d1-a',
+      timeLimitSec: 120,
+    },
     {
       id: 't5-d2',
       title: '조달 채널 선택',
       prompt: '어떤 창구를 쓰시겠습니까? (최대 2개)',
       context:
-        '증권금융 창구가 열렸습니다. 한은 RP는 대상기관이 아닙니다. 산은 CP 매입은 아직 일반기업 위주입니다.',
+        '증권금융 창구가 열렸습니다. 한은 RP는 대상기관이 아닙니다. 산은 CP 매입은 아직 일반기업 위주입니다. 당일 자금이 되려면 오후 중에 신청이 접수되어야 합니다.',
       select: { min: 1, max: 2 },
       requiredConcepts: ['korea-crisis-toolkit'],
       dimensions: ['liquidity', 'policy'],
+      availableFrom: 0,
+      deadlineTick: 2,
+      defaultOptionId: 't5-d2-a',
       options: [
         {
           id: 't5-d2-a',
@@ -281,9 +402,12 @@ export const t5: T = {
       title: '후순위채 콜옵션',
       prompt: '11/15 콜 도래 후순위채 500억을 어떻게 하시겠습니까?',
       context:
-        '차환 발행 금리는 8%대입니다. 콜을 건너뛰면 이자를 아끼지만, 흥국생명이 방금 무엇을 겪었는지 시장은 기억합니다.',
+        '차환 발행 금리는 8%대입니다. 콜을 건너뛰면 이자를 아끼지만, 흥국생명이 방금 무엇을 겪었는지 시장은 기억합니다. 주관 증권사는 오후 중에 답을 받아야 11/15 일정을 맞출 수 있다고 합니다.',
       requiredConcepts: ['crisis-communication', 'capital-raise-sequencing'],
       dimensions: ['communication', 'solvency', 'compliance'],
+      availableFrom: 1,
+      deadlineTick: 2,
+      defaultOptionId: 't5-d3-a',
       options: [
         {
           id: 't5-d3-a',
@@ -363,6 +487,7 @@ export const t5: T = {
       ],
     },
   ],
+  interrupts: [t5CallDeskCall],
   advisorHints: [
     {
       level: 1,
@@ -395,15 +520,15 @@ export const t6: T = {
     {
       id: 't6-market',
       description:
-        'CP91 4.92%(11/7), CD91 4.00%, 스프레드 155bp, 자사 CP 6.1%; 흥국 번복·특례로 증권주 +4%',
+        'CP91 4.92%(11/7), CD91 3.97%, 스프레드 151bp, 자사 CP 6.1%; 흥국 번복·특례로 증권주 +4%',
       effects: [
         op('market.custom.cp91', 'set', 492),
-        op('market.custom.cd91', 'set', 400),
-        op('market.fundingStressBp', 'set', 92),
-        op('market.custom.creditSpreadAA', 'set', 155),
-        op('market.creditSpreadIgBp', 'set', 155),
-        op('market.custom.govt3y', 'set', 410),
-        op('market.custom.corpAA3y', 'set', 565),
+        op('market.custom.cd91', 'set', 397),
+        op('market.fundingStressBp', 'set', 95),
+        op('market.custom.creditSpreadAA', 'set', 151),
+        op('market.creditSpreadIgBp', 'set', 151),
+        op('market.custom.govt3y', 'set', 409),
+        op('market.custom.corpAA3y', 'set', 559),
         op('market.custom.ownCpRate', 'set', 6.1),
         ownStockMove(0.04, '흥국 번복·NCR 특례'),
       ],
@@ -654,16 +779,16 @@ export const t7: T = {
     {
       id: 't7-market',
       description:
-        '기준금리 3.25%, CP91 5.49%, CD91 4.03%(11/22 4% 돌파), 스프레드 165bp, 국고3y 3.80%, 자사 CP 6.7%',
+        '기준금리 3.25%, CP91 5.49%, CD91 4.03%(11/21 4% 돌파), 스프레드 171bp, 국고3y 3.689%, 자사 CP 6.7%',
       effects: [
         op('market.policyRateBp', 'set', 325),
         op('market.custom.cp91', 'set', 549),
         op('market.custom.cd91', 'set', 403),
         op('market.fundingStressBp', 'set', 146),
-        op('market.custom.creditSpreadAA', 'set', 165),
-        op('market.creditSpreadIgBp', 'set', 165),
-        op('market.custom.govt3y', 'set', 380),
-        op('market.custom.corpAA3y', 'set', 545),
+        op('market.custom.creditSpreadAA', 'set', 171),
+        op('market.creditSpreadIgBp', 'set', 171),
+        op('market.custom.govt3y', 'set', 369),
+        op('market.custom.corpAA3y', 'set', 540),
         op('market.custom.ownCpRate', 'set', 6.7),
         ownStockMove(0.05, 'PF-ABCP 매입프로그램'),
       ],
@@ -719,7 +844,7 @@ export const t7: T = {
       outlet: '연합인포맥스',
       time: '15:40',
       headline: 'CP91 5.49% — 10월 초 이후 하루도 빠짐없이 상승, 5.5% 목전',
-      body: 'CD91은 11/22 14년 만에 4%를 넘었다. 시장은 프로그램이 실제 매입에 들어가야 CP 금리가 꺾일 것으로 본다.',
+      body: 'CD91은 11/21 14년 만에 4%를 넘었다. 시장은 프로그램이 실제 매입에 들어가야 CP 금리가 꺾일 것으로 본다.',
       severity: 'warning',
       sourceRefs: [S.kofia, S.pCp],
     },
@@ -881,15 +1006,15 @@ export const t8: T = {
   entryEffects: [
     {
       id: 't8-market',
-      description: 'CP91 5.54%(정점), CD91 4.02%, 스프레드 168bp, 국고3y 3.72%, 자사 CP 6.7%',
+      description: 'CP91 5.54%(정점), CD91 4.03%, 스프레드 177bp, 국고3y 3.650%, 자사 CP 6.7%',
       effects: [
         op('market.custom.cp91', 'set', 554),
-        op('market.custom.cd91', 'set', 402),
-        op('market.fundingStressBp', 'set', 152),
-        op('market.custom.creditSpreadAA', 'set', 168),
-        op('market.creditSpreadIgBp', 'set', 168),
-        op('market.custom.govt3y', 'set', 372),
-        op('market.custom.corpAA3y', 'set', 540),
+        op('market.custom.cd91', 'set', 403),
+        op('market.fundingStressBp', 'set', 151),
+        op('market.custom.creditSpreadAA', 'set', 177),
+        op('market.creditSpreadIgBp', 'set', 177),
+        op('market.custom.govt3y', 'set', 365),
+        op('market.custom.corpAA3y', 'set', 542),
         op('market.custom.ownCpRate', 'set', 6.7),
         ownStockMove(0.03, '금리 정점 인식'),
       ],
@@ -922,7 +1047,7 @@ export const t8: T = {
       kind: 'newswire',
       outlet: '연합인포맥스',
       time: '12/1 15:40',
-      headline: 'CP91 5.54% — 두 달 연속 상승 끝 정점 신호, 스프레드 168bp',
+      headline: 'CP91 5.54% — 두 달 연속 상승 끝 정점 신호, 스프레드 177bp',
       body: 'CP 금리가 5.54%를 기록했다. 국고 3년은 3.72%로 내려와 기준금리(3.25%)와의 격차가 좁아졌다. 시장은 프로그램 집행이 누적되면서 CP 금리가 곧 꺾일 것으로 본다.',
       severity: 'warning',
       sourceRefs: [S.kofia],

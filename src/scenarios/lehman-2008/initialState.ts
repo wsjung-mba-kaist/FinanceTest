@@ -90,7 +90,7 @@ export const lehmanInitialBank: BankState = {
   htmTainted: true, // 투자은행 트레이딩 북은 시가평가 — ASC 320 tainting 규칙 미적용 [STYLIZED]
   custom: {
     minimumCash: 0,
-    encumberedInPool: 7.5, // JPM 담보 ≈5.5 + 씨티 comfort deposit 2 [valukas-report-2010]
+    encumberedInPool: 7.5, // JPM 담보 ≈5.5 + 씨티 comfort deposit 2 [valukas-report-2010 Vol.4 p.1455]
     neubergerValue: 7, // 파산 전 제안가 [press-nb-carlyle-2008-09, VERIFY]
     repoRollRate: 100,
     repoBookStart: 185,
@@ -101,18 +101,18 @@ export const lehmanInitialBank: BankState = {
 
 export const lehmanInitialMarket: MarketState = {
   policyRateBp: 200, // FF 목표 2.00% (2008-04-30 이후)
-  govt2yBp: 225, // 9/9 [VERIFY]
-  govt10yBp: 360, // 9/9 [VERIFY]
-  govt30yBp: 420, // [VERIFY]
-  creditSpreadIgBp: 300, // [VERIFY]
-  creditSpreadHyBp: 850, // [VERIFY]
-  fundingStressBp: 115, // TED ≈1.1~1.2% (9월 초) [VERIFY]; 10/10 458bp 정점 [fcic-report-2011]
+  govt2yBp: 223, // 2008-09-09 종가 2.23% [frb-h15-treasury-2008]
+  govt10yBp: 362, // 2008-09-09 종가 3.62% [frb-h15-treasury-2008]
+  govt30yBp: 420, // 2008-09-09 종가 4.20% [frb-h15-treasury-2008]
+  creditSpreadIgBp: 300, // FRED API 키로 BAMLC0A0CM 2008-09-09 확정 필요 [VERIFY, facts.ts 주석 참조]
+  creditSpreadHyBp: 850, // FRED API 키로 BAMLH0A0HYM2 2008-09-09 확정 필요 [VERIFY, facts.ts 주석 참조]
+  fundingStressBp: 119, // TED 2008-09-09 1.19% [fred-tedrate-2008]; 10/10 458bp 정점 [fcic-report-2011]
   equityIndex: 100,
-  volIndex: 25, // VIX 9/9 ≈25 [VERIFY]
+  volIndex: 25.5, // VIX 2008-09-09 종가 25.47 [cboe-vix-2008]
   fxUsdLocal: 1,
   ownStock: 100, // 9/8 종가 기준 지수
-  ownCdsBp: 475, // 5y CDS 9/9 ≈475bp [VERIFY]
-  custom: { tedBp: 115 },
+  ownCdsBp: 475, // 리먼 5y CDS 9/9 ≈475bp — Markit 일별 미공개 [VERIFY, facts.ts 주석 참조]
+  custom: { tedBp: 119 },
 }
 
 export const lehmanInitialConfidence: ConfidenceState = {

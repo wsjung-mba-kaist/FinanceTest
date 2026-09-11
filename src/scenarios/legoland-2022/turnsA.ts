@@ -1,10 +1,19 @@
-import type { SecuritiesState } from '../../engine/types'
+import type { DialogueStep, Interrupt, SecuritiesState } from '../../engine/types'
 import { securitiesFx } from '../../engine/fx/securities'
+import { commitReplies } from '../../engine/core/dialogue'
 import { confidence, flag, fnEffect, op, ownStockMove, regulator } from '../../engine/fx/common'
 import { legoFx } from './localFx'
 import { rolloverDecision, S, type T } from './shared'
 
-const CALL_LIMIT = 1500 // 자기자본 15% [fsc-call-market-2015, VERIFY]
+const CALL_LIMIT = 1500 // 자기자본 15%(월평균 상한을 일별 캡으로 단순화) [fsc-call-market-2015, STYLIZED]
+
+/**
+ * 단기금융시장 하루의 틱 구조. 전단채·CP·ABCP의 발행 조건 제시 → 오전 청약 → 오후 청약 → 마감
+ * 집계가 한 영업일의 실제 순서다. 프로필은 `calibration.md` §13.1 참조 — 합은 항상 1이어야 한다.
+ */
+export const MM_TICK_LABELS = ['09:00', '11:00', '14:00', '15:30']
+/** 10/21: MMF·은행 신탁이 이탈해 미달이 오전·오후 청약에서 확정된다 — 중반 집중 [STYLIZED]. */
+export const T3_CP_PROFILE = [0.1, 0.4, 0.35, 0.15]
 
 // ---------------------------------------------------------------------------------------------
 // T0 — 2022-09-28 (수) "회생신청 발표"
@@ -35,9 +44,9 @@ export const t0: T = {
       headline: '마감 시세',
       items: [
         { label: '기준금리', value: '2.50%', change: '8/25 +25bp' },
-        { label: '국고 3년', value: '4.30%', change: '9/26 4.548% 정점 후 소폭 하락' },
+        { label: '국고 3년', value: '4.338%', change: '9/26 4.548% 정점 후 소폭 하락' },
         { label: 'CP91 (A1)', value: '3.15%', change: '9/22 기준; 연초 1.55%' },
-        { label: '회사채 AA- 3년', value: '5.15%', change: '스프레드 85bp' },
+        { label: '회사채 AA- 3년', value: '5.342%', change: '스프레드 100bp' },
         { label: '원/달러', value: '1,440', change: '13년 만 최고 부근' },
       ],
       sourceRefs: [S.kofia, S.bokRate],
@@ -240,15 +249,15 @@ export const t1: T = {
   entryEffects: [
     {
       id: 't1-market',
-      description: 'CP91 3.50%, 스프레드 95bp, 자사 CP 4.7%, 증권주 −5%',
+      description: 'CP91 3.50%, 스프레드 108bp, 자사 CP 4.7%, 증권주 −5%',
       effects: [
         op('market.custom.cp91', 'set', 350),
-        op('market.custom.cd91', 'set', 340),
-        op('market.fundingStressBp', 'set', 10),
-        op('market.custom.creditSpreadAA', 'set', 95),
-        op('market.creditSpreadIgBp', 'set', 95),
-        op('market.custom.govt3y', 'set', 425),
-        op('market.custom.corpAA3y', 'set', 520),
+        op('market.custom.cd91', 'set', 332),
+        op('market.fundingStressBp', 'set', 18),
+        op('market.custom.creditSpreadAA', 'set', 108),
+        op('market.creditSpreadIgBp', 'set', 108),
+        op('market.custom.govt3y', 'set', 416),
+        op('market.custom.corpAA3y', 'set', 524),
         op('market.custom.ownCpRate', 'set', 4.7),
         ownStockMove(-0.05, '부도 확정'),
       ],
@@ -306,7 +315,7 @@ export const t1: T = {
       headline: '개장 시세',
       items: [
         { label: 'CP91 (A1)', value: '3.50%', change: '+35bp (1주)' },
-        { label: '회사채 AA- 스프레드', value: '95bp', change: '+10bp' },
+        { label: '회사채 AA- 스프레드', value: '108bp', change: '+8bp' },
         { label: '자사 CP(A2) 호가', value: '4.7%', change: '+30bp' },
         { label: '증권업 지수', value: '−5%', change: '' },
       ],
@@ -476,11 +485,12 @@ export const t1: T = {
           expert: {
             rating: 40,
             rationale:
-              '익일물 의존 확대는 롤오버 위험을 키운다. 2015년 콜시장 개편이 증권사 콜차입을 자기자본 15%로 제한한 이유가 바로 이것이다.',
+              '익일물 의존 확대는 롤오버 위험을 키운다. 2013년 금융위가 증권사 콜차입 한도를 자기자본 25%에서 15%로 낮추고, 2015년 콜시장 참가 자체를 국고채전문딜러·한은 공개시장운영 대상 증권사로 좁힌 이유가 바로 이것이다.',
             sourceRefs: [S.callLimit],
           },
           consequences: '콜차입이 한도까지 늘었습니다. 매일 갱신해야 합니다.',
-          calibrationNote: '콜 한도 자기자본 15% [VERIFY]',
+          calibrationNote:
+            '콜 한도 자기자본 15% — 모범규준 제2-15조②의 월평균 상한을 일별 하드캡으로 단순화 [STYLIZED]',
         },
         {
           id: 't1-d2-c',
@@ -561,14 +571,14 @@ export const t2: T = {
     {
       id: 't2-market',
       description:
-        '기준금리 3.00%(10/12), 국고3y 4.207%, AA- 5.320%, 스프레드 113bp, CP91 4.00%, 자사 CP 5.2%',
+        '기준금리 3.00%(10/12), 국고3y 4.207%, AA- 5.320%, 스프레드 111bp, CP91 4.00%, 자사 CP 5.2%',
       effects: [
         op('market.policyRateBp', 'set', 300),
         op('market.custom.cp91', 'set', 400),
-        op('market.custom.cd91', 'set', 370),
-        op('market.fundingStressBp', 'set', 30),
-        op('market.custom.creditSpreadAA', 'set', 113),
-        op('market.creditSpreadIgBp', 'set', 113),
+        op('market.custom.cd91', 'set', 366),
+        op('market.fundingStressBp', 'set', 34),
+        op('market.custom.creditSpreadAA', 'set', 111),
+        op('market.creditSpreadIgBp', 'set', 111),
         op('market.custom.govt3y', 'set', 421),
         op('market.custom.corpAA3y', 'set', 532),
         op('market.custom.ownCpRate', 'set', 5.2),
@@ -811,24 +821,191 @@ export const t2: T = {
 // ---------------------------------------------------------------------------------------------
 // T3 — 2022-10-21 (금) "45일의 시작"
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * 11:00 주관사(자산관리회사) 전화. 대사는 2022년 10월 PF-ABCP 차환 실패의 공개 기록을 바탕으로 한
+ * **재구성**이며 실제 통화의 녹취가 아니다.
+ */
+const t3ArrangerCall: Interrupt<SecuritiesState> = {
+  id: 't3-i1-arranger',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 40,
+  defaultOptionId: 't3-i1-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '주관사 전화 — 오전 청약 미달',
+  prompt: '오후 청약 전에 조건을 바꾸시겠습니까?',
+  dimensions: ['liquidity', 'marketRisk'],
+  source: { kind: 'desk', caller: 'ABCP 주관사(자산관리회사) 팀장', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '주관사 팀장',
+      text: '오전 청약이 사실상 0입니다. 오후 청약 전에 발행금리를 올릴지, 아니면 매입확약 이행을 전제로 투자자에게 미달 통지를 먼저 보낼지 30분 안에 정해 주셔야 합니다.',
+    },
+  ],
+  options: [
+    {
+      id: 't3-i1-a',
+      label: '조건 그대로 오후 청약 진행, 이행 확약을 서면 재확인',
+      description:
+        '발행 조건은 건드리지 않고 매입확약 이행 의사만 서면으로 재확인해 준다. 미달분은 마감에 우리가 산다.',
+      effects: [flag('commitment_reaffirmed')],
+      expert: {
+        rating: 70,
+        rationale:
+          '업계가 실제로 한 대응이다. 금리를 올려도 A2 PF-ABCP를 살 수요처(MMF·은행 신탁)가 편입 자체를 중단한 국면에서는 금리가 문제가 아니었다.',
+        sourceRefs: [S.pCp, S.kcmi23],
+      },
+      consequences: '오후 청약을 예정대로 열었습니다. 미달분은 마감 후 확정됩니다.',
+      historical: true,
+      preview: [{ metric: 'rollRate', direction: 'flat', magnitude: 1, note: '조건 불변' }],
+    },
+    {
+      id: 't3-i1-b',
+      label: '발행금리 200bp 인상해 오후 청약 재시도',
+      description:
+        '가격으로 수요를 찾는다. 이번 턴 차환률이 5%p 오르지만 인상분은 사업장 비용으로 남고 시장에 "한빛 물량은 비싸게 나온다"는 신호가 간다.',
+      effects: [
+        op('institution.pf.rollRate', 'add', 0.05, '발행금리 인상 — 당일 차환률 +5%p'),
+        op('institution.equityCapital', 'add', -10, '금리 인상분 보전'),
+      ],
+      expert: {
+        rating: 45,
+        rationale:
+          '한계적으로는 작동하지만 수요처가 편입을 중단한 국면에서 가격 대응의 효과는 작다. 같은 논리로 증권사 CP 금리는 10월 내내 올랐고 발행은 늘지 않았다.',
+        sourceRefs: [S.pCp],
+      },
+      consequences: '금리를 올려 오후 청약을 다시 열었습니다. 일부 법인 수요가 들어왔습니다.',
+      preview: [{ metric: 'rollRate', direction: 'up', magnitude: 1, note: '+5%p (당일)' }],
+    },
+    {
+      id: 't3-i1-c',
+      label: '오후 청약을 취소하고 전액 자체매입을 지금 통지',
+      description:
+        '더 볼 것 없다고 보고 청약을 접는다. 투자자 명부에 "주관사가 청약을 접었다"가 남고, 잔여 물량의 차환 심리가 나빠진다.',
+      effects: [
+        op('institution.pf.rollRate', 'add', -0.1, '오후 청약 취소 — 당일 차환률 −10%p'),
+        legoFx.adjustRollRate(-0.05, '청약 조기 철회'),
+      ],
+      expert: {
+        rating: 15,
+        rationale:
+          '자체매입 금액을 스스로 늘리는 선택이다. 오후 청약에서 들어오던 잔여 수요까지 포기하게 되고, 조기 철회는 이후 발행에도 따라다닌다.',
+        sourceRefs: [S.kcmi23, S.fsr],
+      },
+      consequences: '오후 청약을 취소했습니다. 미달분 전액이 자체매입으로 확정됩니다.',
+      trap: true,
+      trapExplanation:
+        '"어차피 안 될 것"이라는 판단이 맞더라도, 청약을 여는 비용은 0이고 접는 비용은 잔여 물량 전체의 차환 심리다.',
+      preview: [{ metric: 'abcpHeld', direction: 'up', magnitude: 2, note: '자체매입 증가' }],
+    },
+  ],
+}
+
+/** 15:00 금감원 담당자. 대사는 금감원 일일 보고 요청의 공개 기록을 바탕으로 한 **재구성**이다. */
+const t3FssCall: Interrupt<SecuritiesState> = {
+  id: 't3-i2-fss',
+  interrupt: true,
+  atTick: 3,
+  jitter: 0,
+  timeoutSec: 45,
+  defaultOptionId: 't3-i2-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '금융감독원 담당자 전화',
+  prompt: '일일 보고 서식을 마감 시각까지 제출하시겠습니까?',
+  dimensions: ['compliance', 'communication'],
+  source: {
+    kind: 'regulator',
+    caller: '금융감독원 금융투자검사국 담당자',
+    agency: '금융감독원',
+    tone: 'concerned',
+  },
+  lines: [
+    {
+      speaker: '금감원 담당자',
+      text: '오늘자 서식에 자체매입 잔액과 익일 만기, 가용 유동성을 마감 시각까지 넣어 주십시오. 그리고 기자들이 귀사 PF 우발채무 규모를 묻고 있습니다 — 공시 계획이 있으면 같이 알려 주시죠.',
+    },
+  ],
+  options: [
+    {
+      id: 't3-i2-a',
+      label: '서식대로 마감 시각까지 제출',
+      description: '요청받은 항목을 그대로 채워 오늘 중 제출한다. 추가 설명은 붙이지 않는다.',
+      effects: [flag('daily_report_filed')],
+      expert: {
+        rating: 70,
+        rationale:
+          '감독당국 반응표에서 R1(강화 모니터링)을 유지하는 최소 요건이다. 보고 자체는 비용이 없고, 누락은 곧바로 상향 사유가 된다.',
+        sourceRefs: [S.fss],
+      },
+      consequences: '서식을 제출했습니다. 담당자가 "내일도 같은 시각"이라고 답했습니다.',
+      historical: true,
+      preview: [{ metric: 'regulatorLevel', direction: 'flat', magnitude: 1 }],
+    },
+    {
+      id: 't3-i2-b',
+      label: '제출과 함께 익스포저 공시 계획도 선제 보고',
+      description:
+        '서식을 내면서 공시 수준과 시점을 먼저 알린다. 감독당국이 언론 대응의 예측 가능성을 얻는다.',
+      effects: [
+        flag('daily_report_filed'),
+        flag('disclosure_pre_notified'),
+        confidence(1, '감독당국 선제 보고'),
+      ],
+      expert: {
+        rating: 80,
+        rationale:
+          'FSB(2024)가 말하는 "같은 수치를 같은 시각에" 원칙의 감독당국 판이다. 공시 계획을 먼저 알린 기관은 언론 보도가 나와도 당국의 확인을 받을 수 있다.',
+        sourceRefs: [S.fss, S.fsb],
+      },
+      consequences:
+        '서식과 공시 계획을 함께 냈습니다. 담당자가 보도 대응 시 확인해 주겠다고 했습니다.',
+      preview: [{ metric: 'confidence', direction: 'up', magnitude: 1 }],
+    },
+    {
+      id: 't3-i2-c',
+      label: '마감 집계를 정리해 내일 아침 제출하겠다고 답한다',
+      description: '오늘 마감 수치가 확정되지 않았다는 이유로 하루 미룬다.',
+      effects: [regulator({ add: 1 }, '일일 보고 지연')],
+      expert: {
+        rating: 20,
+        rationale:
+          '일일 보고 체계에서 하루 지연은 "숫자를 말할 수 없는 상태"로 읽힌다. 감독 단계 상향은 이후 모든 창구(특례·프로그램) 심사에 따라온다.',
+        sourceRefs: [S.fss, S.fsb],
+      },
+      consequences: '내일 제출하겠다고 답했습니다. 담당자가 "사유를 서면으로 남기라"고 했습니다.',
+      trap: true,
+      trapExplanation:
+        '"정확한 수치를 내는 것이 낫다"는 명분은 옳게 들리지만, 일일 보고는 정확성이 아니라 연속성을 보는 장치다. 공백이 생긴 날이 곧 검사 대상 기간이 된다.',
+      preview: [{ metric: 'regulatorLevel', direction: 'up', magnitude: 2, note: '감독 단계 +1' }],
+    },
+  ],
+}
+
 export const t3: T = {
   id: 't3',
   label: 'T3',
   timeLabel: '2022년 10월 21일 (금) 09:00 KST',
   title: 'CP 수요처 이탈',
   time: '2022-10-21T09:00:00+09:00',
+  ticks: 4,
+  tickLabels: MM_TICK_LABELS,
   entryEffects: [
     {
       id: 't3-market',
-      description: '회사채 AA- 5.736% 정점, 스프레드 140bp, CP91 4.30%, 자사 CP 5.5%',
+      description:
+        '개장 앵커(10/20 종가): 국고 3년 4.350%, 회사채 AA- 5.588%, CP91 4.14%, CD91 3.85%; 자사 CP 호가 5.5%',
       effects: [
-        op('market.custom.cp91', 'set', 430),
+        op('market.custom.cp91', 'set', 414),
         op('market.custom.cd91', 'set', 385),
-        op('market.fundingStressBp', 'set', 45),
-        op('market.custom.creditSpreadAA', 'set', 140),
-        op('market.creditSpreadIgBp', 'set', 140),
-        op('market.custom.govt3y', 'set', 434),
-        op('market.custom.corpAA3y', 'set', 574),
+        op('market.fundingStressBp', 'set', 29),
+        op('market.custom.creditSpreadAA', 'set', 124),
+        op('market.creditSpreadIgBp', 'set', 124),
+        op('market.custom.govt3y', 'set', 435),
+        op('market.custom.corpAA3y', 'set', 559),
         op('market.custom.ownCpRate', 'set', 5.5),
         ownStockMove(-0.04, 'CP 금리 상승'),
       ],
@@ -854,12 +1031,37 @@ export const t3: T = {
       effects: [regulator({ add: 1 }, '금감원 일일 보고 요청')],
     },
     {
-      id: 't3-cp',
-      description: 'CP 만기(잔액 8%) 재발행',
-      effects: [legoFx.cpRollStep({ share: 0.08 }), legoFx.callRollStep()],
+      id: 't3-call',
+      description: '콜차입(익일물) 정산 — 신뢰지수가 낮으면 대여자가 한도를 회수',
+      effects: [legoFx.callRollStep()],
     },
-    { id: 't3-settle', description: '결제일 점검', effects: [legoFx.settlementCheck()] },
   ],
+  eachTick: [
+    {
+      id: 't3-cp-tick',
+      description: 'CP·전단채 만기(잔액 8%) 재발행 — 청약 구간별 확정',
+      effects: [legoFx.cpRollTicks({ share: 0.08, profile: T3_CP_PROFILE, label: 'CP 청약 구간' })],
+    },
+  ],
+  tickEffects: [
+    {
+      id: 't3-settle',
+      atTick: 3,
+      description: '마감 결제 점검',
+      effects: [legoFx.settlementCheck()],
+    },
+  ],
+  ticker: {
+    series: [
+      // CP91 4.14% → 4.30%, CD91 3.85% → 3.90% (10/21 종가) [ecos-817Y002]
+      { path: 'market.custom.cp91', mode: 'absolute', values: [414, 419, 425, 430] },
+      { path: 'market.custom.cd91', mode: 'absolute', values: [385, 387, 389, 390] },
+      { path: 'market.fundingStressBp', mode: 'absolute', values: [29, 32, 36, 40] },
+      // 국고 3년 4.350% → 4.495%, 회사채 AA- 3년 5.588% → 5.736%(연중 최고) [ecos-817Y002]
+      { path: 'market.custom.govt3y', mode: 'absolute', values: [435, 440, 446, 450] },
+      { path: 'market.custom.corpAA3y', mode: 'absolute', values: [559, 564, 570, 574] },
+    ],
+  },
   events: [
     {
       id: 't3-news-gangwon',
@@ -876,8 +1078,9 @@ export const t3: T = {
       kind: 'newswire',
       outlet: '연합인포맥스',
       time: '15:40',
-      headline: '회사채 AA- 3년 5.736% 마감 — 연중 최고, 국고 3년 4.34%',
-      body: '우량 회사채마저 5.7%대에 거래되며 스프레드가 140bp에 이르렀다. 증권사 CP·전단채 금리는 A1 기준 4.3%, A2는 5% 중반이다.',
+      atTick: 3,
+      headline: '회사채 AA- 3년 5.736% 마감 — 연중 최고, 국고 3년 4.495%',
+      body: '우량 회사채마저 5.7%대에 거래되며 스프레드가 124bp에 이르렀다. 증권사 CP·전단채 금리는 A1 기준 4.3%, A2는 5% 중반이다.',
       severity: 'critical',
       sourceRefs: [S.kofia],
     },
@@ -900,6 +1103,7 @@ export const t3: T = {
       kind: 'regulator',
       agency: '금융감독원 금융투자검사국',
       time: '10:30',
+      atTick: 1,
       headline: '[감독당국] PF 우발채무·유동성 현황 일일 보고 요청',
       body: '증권사 전체를 대상으로 매입확약 잔액, 자체매입 잔액, 만기 도래액, 가용 유동성을 매일 보고하도록 요청합니다. NCR·유동성비율이 내부 관리 기준을 밑도는 경우 즉시 별도 보고하십시오.',
       tone: 'concerned',
@@ -911,6 +1115,7 @@ export const t3: T = {
       id: 't3-data-industry',
       kind: 'data',
       time: '11:00',
+      atTick: 1,
       title: '[데이터] 증권사 보증 PF-ABCP 만기 (업계)',
       rows: [
         { label: '10월 만기', value: '6.2~6.7조원' },
@@ -923,40 +1128,50 @@ export const t3: T = {
     },
   ],
   decisions: [
-    rolloverDecision({
-      turn: 3,
-      riskWeight: 1,
-      prompt: '10/21~23 만기 250억 중 차환 실패분(약 65%)을 어떻게 처리하시겠습니까?',
-      context: '차환률이 35%입니다. 다음 주 만기 450억이 곧 이어집니다.',
-      honour: {
-        rating: 70,
-        rationale:
-          '이행. 다만 신뢰지수가 40 아래면 협상 동의율이 떨어지므로 지금이 협상의 마지막 창일 수 있다.',
-        consequences: '차환 실패분을 자체매입했습니다.',
-      },
-      negotiate: {
-        rating: 75,
-        extendShare: 0.4,
-        rationale:
-          '연장분은 11월 말로 밀린다. 그때는 시장 상황이 지금보다 나쁠 수도, 정책 창구가 열렸을 수도 있다 — 하지만 자체매입의 확정 비용보다는 낫다.',
-        consequences: '일부 연장, 잔여분 자체매입.',
-      },
-      abandon: {
-        rating: 5,
-        rationale: '금감원이 일일 보고를 받는 상황에서의 불이행은 즉시 검사·제재로 이어진다.',
-        consequences: 'SPC 부도 처리. 금감원이 현장 검사를 예고했습니다.',
-        trapExplanation:
-          '감독당국의 시야 안에서 약정을 어기는 것은 유동성 문제를 제재 문제로 바꾼다.',
-      },
-    }),
+    {
+      // 차환 마감(15:30) 집계가 나온 뒤에야 미달 금액이 확정된다 — 이 결정은 마지막 틱에 열린다.
+      ...rolloverDecision({
+        turn: 3,
+        riskWeight: 1,
+        prompt: '10/21~23 만기 250억 중 차환 실패분(약 65%)을 어떻게 처리하시겠습니까?',
+        context:
+          '차환률이 35%입니다. 마감 집계가 방금 나왔습니다. 다음 주 만기 450억이 곧 이어집니다.',
+        honour: {
+          rating: 70,
+          rationale:
+            '이행. 다만 신뢰지수가 40 아래면 협상 동의율이 떨어지므로 지금이 협상의 마지막 창일 수 있다.',
+          consequences: '차환 실패분을 자체매입했습니다.',
+        },
+        negotiate: {
+          rating: 75,
+          extendShare: 0.4,
+          rationale:
+            '연장분은 11월 말로 밀린다. 그때는 시장 상황이 지금보다 나쁠 수도, 정책 창구가 열렸을 수도 있다 — 하지만 자체매입의 확정 비용보다는 낫다.',
+          consequences: '일부 연장, 잔여분 자체매입.',
+        },
+        abandon: {
+          rating: 5,
+          rationale: '금감원이 일일 보고를 받는 상황에서의 불이행은 즉시 검사·제재로 이어진다.',
+          consequences: 'SPC 부도 처리. 금감원이 현장 검사를 예고했습니다.',
+          trapExplanation:
+            '감독당국의 시야 안에서 약정을 어기는 것은 유동성 문제를 제재 문제로 바꾼다.',
+        },
+      }),
+      availableFrom: 3,
+      defaultOptionId: 't3-d1-a',
+      timeLimitSec: 120,
+    },
     {
       id: 't3-d2',
       title: '익스포저 공시 수준',
       prompt: '언론과 투자자에게 PF 익스포저를 어느 수준까지 공개하시겠습니까?',
       context:
-        '검증 가능한 여력이 있을 때만 공개가 신뢰를 만듭니다. 유동성비율이 100% 아래라면 상세 공시는 부족을 확인시킵니다.',
+        '검증 가능한 여력이 있을 때만 공개가 신뢰를 만듭니다. 유동성비율이 100% 아래라면 상세 공시는 부족을 확인시킵니다. IR팀은 오전 중에 답을 받아야 조간 마감에 맞출 수 있다고 합니다.',
       requiredConcepts: ['crisis-communication'],
       dimensions: ['communication', 'compliance'],
+      availableFrom: 0,
+      deadlineTick: 1,
+      defaultOptionId: 't3-d2-b',
       options: [
         {
           id: 't3-d2-a',
@@ -1024,9 +1239,13 @@ export const t3: T = {
       id: 't3-d3',
       title: '조달',
       prompt: '이번 주 조달은? (최대 2개)',
-      context: '증권금융 지원은 아직 없습니다. CP는 절반만 소화됩니다.',
+      context:
+        '증권금융 지원은 아직 없습니다. CP는 절반만 소화됩니다. 당일 자금이 되려면 오후 청약 마감 전에 지시가 나가야 합니다.',
       select: { min: 1, max: 2 },
       dimensions: ['liquidity', 'solvency'],
+      availableFrom: 0,
+      deadlineTick: 2,
+      defaultOptionId: 't3-d3-d',
       options: [
         {
           id: 't3-d3-a',
@@ -1120,6 +1339,7 @@ export const t3: T = {
       ],
     },
   ],
+  interrupts: [t3ArrangerCall, t3FssCall],
   advisorHints: [
     {
       level: 1,
@@ -1137,6 +1357,116 @@ export const t3: T = {
 // ---------------------------------------------------------------------------------------------
 // T4 — 2022-10-24 (월) "50조원+α 다음 날"
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * T4.D3 증권금융·금융투자협회 지원 조건 협의 (3단계). 대사는 10/23 대책과 10/26 증권금융 시행의
+ * 공개 기록을 바탕으로 한 **재구성**이며 속기록이 아니다. 신청 규모는 `ksfcRequested` 카운터로
+ * 이산화되고, 담보 평가액을 넘는 신청의 결과는 다음 턴 지연효과가 판정한다 — `calibration.md` §14.
+ *
+ * 세 옵션의 효과는 **플래그와 신뢰지수뿐이며 현금·위험액에 손대지 않는다.** 증권금융 자금 1,000억은
+ * `t4-d2-a`의 지연효과가 그대로 집행하므로, 이 결정은 설계상 T5 NCR·T8 자체매입 체크포인트와 무관하다.
+ */
+const t4KsfcSteps: DialogueStep<SecuritiesState>[] = [
+  {
+    id: 't4-d3-collateral',
+    lines: [
+      {
+        speaker: '한국증권금융 담보관리부',
+        text: '26일 시행에 맞추려면 담보 목록이 먼저입니다. 적격 담보는 국채·통안채·은행채와 일부 우량 회사채입니다. 어디까지 올리시겠습니까.',
+      },
+    ],
+    replies: [
+      {
+        id: 'coll-full',
+        label: '국공채·은행채 보유분 전량을 목록에 올린다',
+        next: 't4-d3-amount',
+        expert: {
+          rating: 85,
+          rationale:
+            '담보 여력은 쓰지 않아도 줄지 않는다. 목록을 넓게 올려 두면 한도만 확보되고 실제 인출은 필요할 때 한다.',
+        },
+      },
+      {
+        id: 'coll-partial',
+        label: '국공채만 올리고 은행채는 RP용으로 남긴다',
+        next: 't4-d3-amount',
+        expert: {
+          rating: 55,
+          rationale:
+            '같은 담보를 두 창구에 중복으로 걸 수는 없으니 배분 자체는 합리적이다. 다만 증권금융 한도가 그만큼 줄어든다.',
+        },
+      },
+      {
+        id: 'coll-abcp',
+        label: '보유 A2 PF-ABCP를 담보로 받아 달라고 요청한다',
+        resolvesTo: 't4-d3-c',
+        expert: {
+          rating: 15,
+          rationale:
+            '가장 급한 자산을 담보로 내겠다는 요청이지만, 증권금융의 적격 담보 목록에 A2 유동화증권은 없다. 심사만 늘어지고 시행 첫날을 놓친다.',
+        },
+        trap: true,
+        trapExplanation:
+          '"어차피 당국이 도와주려는 것이니 담보도 유연하게 볼 것"이라는 기대. 그러나 지원 창구의 적격 담보 목록은 대책 발표로 바뀌지 않는다 — A2 PF-ABCP를 사 주는 창구는 11/24 매입프로그램까지 없었다.',
+      },
+    ],
+  },
+  {
+    id: 't4-d3-amount',
+    lines: [
+      {
+        speaker: '금융투자협회 자율규제본부',
+        text: '신청 규모를 적어 주십시오. 업권 전체 3조+α를 나누는 자리라 신청액은 담보 평가액으로 검증됩니다.',
+      },
+    ],
+    note: '여기서 적은 신청 규모는 다음 주 담보 평가 결과로 검증됩니다.',
+    replies: commitReplies<SecuritiesState>('ksfcRequested', [500, 1000, 2000], {
+      unit: '억원',
+      next: 't4-d3-timing',
+      expert: (v) => ({
+        rating: v === 1000 ? 85 : v === 500 ? 55 : 45,
+        rationale:
+          v === 1000
+            ? '보유 채권 2,400억의 헤어컷 후 담보가액과 11월 만기 규모에 모두 맞는 신청액이다.'
+            : v === 500
+              ? '안전하지만 11월 만기 2,500억 앞에서는 작다. 한도는 쓰지 않아도 비용이 없다.'
+              : '담보 평가액을 넘는 신청은 초과분이 반려되고, 업권 배분 자리에서 "규모를 부풀렸다"는 기록만 남는다.',
+      }),
+    }),
+  },
+  {
+    id: 't4-d3-timing',
+    lines: [
+      {
+        speaker: '한국증권금융 담보관리부',
+        text: '목록을 오늘 중 넘기시면 26일 시행과 동시에 처리됩니다. 다음 주로 미루시면 순번이 뒤로 갑니다.',
+      },
+    ],
+    replies: [
+      {
+        id: 'time-today',
+        label: '오늘 중 담보 목록과 신청서를 모두 넘긴다',
+        resolvesTo: 't4-d3-a',
+        expert: {
+          rating: 85,
+          rationale:
+            '집행 시차가 곧 유동성이다. 시행 첫날 집행을 받는 것과 일주일 뒤에 받는 것은 11월 만기 앞에서 다른 사건이다.',
+        },
+      },
+      {
+        id: 'time-next-week',
+        label: '신청서만 내고 담보 목록은 다음 주에 정리해 넘긴다',
+        resolvesTo: 't4-d3-b',
+        expert: {
+          rating: 35,
+          rationale:
+            '서류 부담을 미루는 대가로 집행 순번을 내준다. 11월 첫 주 만기가 750억이라는 것을 알면서 내릴 결정은 아니다.',
+        },
+      },
+    ],
+  },
+]
+
 export const t4: T = {
   id: 't4',
   label: 'T4',
@@ -1147,15 +1477,15 @@ export const t4: T = {
     {
       id: 't4-market',
       description:
-        '채안펀드 CP 매입 개시; CP91 4.40%(A1은 소폭 안정), 스프레드 145bp, 자사 CP 5.6%',
+        '채안펀드 CP 매입 개시; CP91 4.40%(A1은 소폭 안정), 스프레드 129bp, 자사 CP 5.6%',
       effects: [
         op('market.custom.cp91', 'set', 440),
-        op('market.custom.cd91', 'set', 390),
-        op('market.fundingStressBp', 'set', 50),
-        op('market.custom.creditSpreadAA', 'set', 145),
-        op('market.creditSpreadIgBp', 'set', 145),
-        op('market.custom.govt3y', 'set', 430),
-        op('market.custom.corpAA3y', 'set', 575),
+        op('market.custom.cd91', 'set', 392),
+        op('market.fundingStressBp', 'set', 48),
+        op('market.custom.creditSpreadAA', 'set', 129),
+        op('market.creditSpreadIgBp', 'set', 129),
+        op('market.custom.govt3y', 'set', 431),
+        op('market.custom.corpAA3y', 'set', 559),
         op('market.custom.ownCpRate', 'set', 5.6),
         ownStockMove(0.03, '시장안정대책'),
       ],
@@ -1229,7 +1559,7 @@ export const t4: T = {
       headline: '개장 시세',
       items: [
         { label: 'CP91 (A1)', value: '4.40%', change: '상승세 둔화' },
-        { label: '회사채 AA- 스프레드', value: '145bp', change: '+5bp' },
+        { label: '회사채 AA- 스프레드', value: '129bp', change: '+5bp' },
         { label: '자사 CP(A2) 호가', value: '5.6%', change: '+10bp — 여전히 상승' },
         { label: '증권업 지수', value: '+3%', change: '대책 반응' },
       ],
@@ -1364,6 +1694,95 @@ export const t4: T = {
           trap: true,
           trapExplanation:
             '"정부가 50조를 넣었으니 끝났다"는 안도는 범위(회사채·A1 CP)와 집행 시차(캐피탈콜·시행일)를 무시한다. 상품 특정 프로그램(11/11, 11/24)까지 PF-ABCP 시장은 닫혀 있었다.',
+        },
+      ],
+    },
+    {
+      id: 't4-d3',
+      title: '증권금융 지원 조건 협의',
+      prompt: '증권금융·금융투자협회와 신청 조건을 어떻게 정리하시겠습니까?',
+      context:
+        '증권금융 3조+α는 10/26 시행입니다. 담보 목록·신청 규모·제출 시점을 상대와 주고받아야 시행 첫날 집행을 받습니다. 자금 자체는 신청서로 결정되지만, 이 대화가 정하는 것은 그 자금이 언제 어떤 평가와 함께 오느냐입니다.',
+      when: { chose: { decision: 't4-d2', option: 't4-d2-a' } },
+      required: false,
+      select: { min: 1, max: 1 },
+      steps: t4KsfcSteps,
+      requiredConcepts: ['korea-crisis-toolkit', 'hqla-and-haircuts'],
+      dimensions: ['liquidity', 'policy'],
+      defaultOptionId: 't4-d3-a',
+      options: [
+        {
+          id: 't4-d3-a',
+          label: '담보 목록 즉시 제출 — 시행 첫날 집행 확약',
+          description:
+            '적격 담보 목록과 신청서를 오늘 중 넘겨 10/26 시행과 동시에 처리되도록 한다. 자금 규모는 신청서가 정하고, 이 확약이 정하는 것은 집행 시점이다.',
+          effects: [flag('ksfc_collateral_ready')],
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              when: { counter: 'ksfcRequested', gte: 2000 },
+              description:
+                '담보 평가액을 넘는 신청분이 반려됨 — 업권 배분 자리의 기록으로 남아 신뢰지수 −3',
+              effects: [confidence(-3, '담보 평가액 초과 신청 반려'), flag('ksfc_over_requested')],
+            },
+          ],
+          expert: {
+            rating: 85,
+            rationale:
+              '금융위 10/28 점검회의는 증금 3조+α가 10/26부터 집행됐음을 확인한다. 중형사에게 범위가 정확히 일치하는 유일한 창구이고, 집행 순번은 서류 제출 시점이 정한다.',
+            historicalNote: '증권금융 지원은 중소형 증권사가 실제로 가장 많이 이용한 창구였다.',
+            sourceRefs: [S.fsc1028, S.pkg],
+          },
+          consequences: '담보 목록과 신청서를 넘겼습니다. 시행 첫날 처리 대상에 올랐습니다.',
+          historical: true,
+          feasibility: {
+            basis: '증권금융 담보 목록 제출은 당일 가능 — 시행일은 10/26',
+            sourceRefs: [S.fsc1028],
+          },
+        },
+        {
+          id: 't4-d3-b',
+          label: '신청서만 제출하고 담보 목록은 다음 주 정리',
+          description: '서류 부담을 미룬다. 집행 순번이 뒤로 밀려 11월 첫 주 만기와 겹친다.',
+          effects: [confidence(-2, '담보 목록 제출 지연')],
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              description: '증권금융 집행 순번 지연 — 11월 첫 주 만기와 겹침, 신뢰지수 −3',
+              effects: [confidence(-3, '지원 집행 지연'), flag('ksfc_execution_delayed')],
+            },
+          ],
+          expert: {
+            rating: 40,
+            rationale:
+              '발표와 집행의 차이를 이해했다면 서류가 곧 순번이라는 것도 이해해야 한다. 11월 첫 주 만기가 750억인 것은 오늘 이미 알고 있다.',
+            sourceRefs: [S.fsc1028, S.bcbs144],
+          },
+          consequences: '신청서만 접수되었습니다. 담보 심사는 다음 주에 시작됩니다.',
+        },
+        {
+          id: 't4-d3-c',
+          label: '보유 A2 PF-ABCP를 담보로 받아 달라고 요청 — 심사 지연',
+          description:
+            '가장 급한 자산을 담보로 내밀지만 적격 담보 목록에 없다. 심사가 늘어져 시행 첫날을 놓친다.',
+          effects: [confidence(-3, '부적격 담보 요청 — 심사 지연')],
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              description: '부적격 담보 반려 후 재신청 — 집행이 한 주 밀리고 신뢰지수 −3',
+              effects: [confidence(-3, '부적격 담보 반려'), flag('ksfc_execution_delayed')],
+            },
+          ],
+          expert: {
+            rating: 15,
+            rationale:
+              '지원 창구의 적격 담보 목록은 대책 발표로 바뀌지 않는다. A2 PF-ABCP를 사 주는 창구는 11/24 종투사 매입프로그램까지 존재하지 않았다.',
+            sourceRefs: [S.fsc1028, S.prog1124],
+          },
+          consequences: '요청서를 보냈습니다. 담보관리부가 "적격 목록을 확인해 달라"고 답했습니다.',
+          trap: true,
+          trapExplanation:
+            '"당국이 도우려는 것이니 담보도 유연할 것"이라는 기대는 범위 조항을 읽지 않은 것이다. 정책 창구는 언제나 적격 기준과 함께 온다.',
         },
       ],
     },

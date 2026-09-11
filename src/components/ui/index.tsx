@@ -14,15 +14,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const base =
     'inline-flex items-center justify-center gap-1 rounded-md border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
   const v = {
-    primary: 'bg-accent text-white border-accent hover:opacity-90',
+    primary: 'bg-accent text-accent-fg border-accent hover:opacity-90',
     secondary: 'bg-surface text-text border-border hover:bg-surface-2',
     ghost: 'bg-transparent text-text border-transparent hover:bg-surface-2',
     danger: 'bg-critical-bg text-critical border-critical/40 hover:opacity-90',
   }[variant]
   const s = {
-    sm: 'px-2 py-1 text-[12px]',
-    md: 'px-3 py-1.5 text-[13px]',
-    lg: 'px-4 py-2.5 text-[14px]',
+    sm: 'px-2 py-1 text-sm',
+    md: 'px-3 py-1.5 text-base',
+    lg: 'px-4 py-2.5 text-md',
   }[size]
   return (
     <button ref={ref} className={`${base} ${v} ${s} ${className}`} {...rest}>
@@ -50,7 +50,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-none ${toneClass[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium leading-none ${toneClass[tone]} ${className}`}
     >
       {children}
     </span>
@@ -61,7 +61,7 @@ export function StatusBadge({ status }: { status: 'ok' | 'warn' | 'breach' | 'na
   if (status === 'ok') return <Badge tone="positive">● 정상</Badge>
   if (status === 'warn') return <Badge tone="warning">⚠ 경고</Badge>
   if (status === 'breach') return <Badge tone="critical">■ 위험</Badge>
-  return <Badge tone="neutral">— 해당없음</Badge>
+  return <Badge tone="neutral">기준 없음</Badge>
 }
 
 export function Card({
@@ -99,7 +99,7 @@ export function Tabs<T extends string>({
           key={t.id}
           role="tab"
           aria-selected={value === t.id}
-          className={`px-3 py-2 text-[13px] border-b-2 -mb-px ${value === t.id ? 'border-accent text-text font-medium' : 'border-transparent text-muted hover:text-text'}`}
+          className={`px-3 py-2 text-base border-b-2 -mb-px ${value === t.id ? 'border-accent text-text font-medium' : 'border-transparent text-muted hover:text-text'}`}
           onClick={() => onChange(t.id)}
         >
           {t.label}
@@ -162,12 +162,12 @@ export function ConfirmDialog({
         className="w-full max-w-md rounded-lg border border-border bg-surface p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId} className="text-[15px] font-semibold mb-2">
+        <h2 id={titleId} className="text-md font-semibold mb-2">
           {title}
         </h2>
-        <div className="text-[13px] text-muted mb-3">{body}</div>
+        <div className="text-base text-muted mb-3">{body}</div>
         {typeToConfirm && (
-          <label className="block text-[12px] mb-3">
+          <label className="block text-sm mb-3">
             계속하려면 <code className="font-mono">{typeToConfirm}</code> 을(를) 입력하세요
             <input
               className="mt-1 w-full rounded border border-border bg-bg px-2 py-1"
@@ -202,7 +202,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   return (
     <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted">
       <div className="font-medium text-text">{title}</div>
-      {children && <div className="mt-1 text-[12px]">{children}</div>}
+      {children && <div className="mt-1 text-sm">{children}</div>}
     </div>
   )
 }

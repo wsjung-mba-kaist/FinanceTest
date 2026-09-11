@@ -15,7 +15,7 @@ export function ScenarioClock({
   const progress = `T+${turnIndex}/${Math.max(0, durationTurns - 1)}`
   return (
     <div
-      className="flex items-center gap-2 whitespace-nowrap text-[12px] text-muted"
+      className="flex items-center gap-2 whitespace-nowrap text-sm text-muted"
       role="group"
       aria-label={`시나리오 시계 ${timeLabel}, ${progress}`}
     >

@@ -3,11 +3,14 @@ import type {
   GameState,
   InstitutionState,
   MetricDelta,
-  MetricSnapshot,
   ScenarioDefinition,
+  Turn,
 } from '../types'
 import { applyDecision, DecisionError } from './applyDecision'
-import { latestSnapshot } from './metrics'
+import { diffSnapshots, latestSnapshot } from './metrics'
+import { findTurnDecision } from './lookup'
+
+export { diffSnapshots } from './metrics'
 
 export interface PreviewResult {
   deltas: MetricDelta[]
@@ -15,28 +18,6 @@ export interface PreviewResult {
   feed: FeedItem[]
   wouldEnd?: { title: string; failed: boolean }
   error?: string
-}
-
-export function diffSnapshots(before: MetricSnapshot, after: MetricSnapshot): MetricDelta[] {
-  const out: MetricDelta[] = []
-  for (const [key, a] of Object.entries(after.metrics)) {
-    const b = before.metrics[key]
-    if (!b) continue
-    if (!Number.isFinite(a.value) || !Number.isFinite(b.value)) continue
-    const delta = a.value - b.value
-    if (Math.abs(delta) < 1e-9) continue
-    out.push({
-      key,
-      label: a.label,
-      unit: a.unit,
-      before: b.value,
-      after: a.value,
-      delta,
-      statusBefore: b.status,
-      statusAfter: a.status,
-    })
-  }
-  return out
 }
 
 /**
@@ -52,7 +33,7 @@ export function previewOption<S extends InstitutionState>(
   try {
     const next = applyDecision(state, scenario, decisionId, optionIds)
     const turn = scenario.turns[state.turnIndex]
-    const decision = turn?.decisions.find((d) => d.id === decisionId)
+    const decision = turn ? findTurnDecision(turn as unknown as Turn, decisionId) : undefined
     const delayed: PreviewResult['delayed'] = []
     for (const id of optionIds) {
       const o = decision?.options.find((x) => x.id === id)

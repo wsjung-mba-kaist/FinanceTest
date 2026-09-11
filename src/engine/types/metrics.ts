@@ -52,3 +52,13 @@ export interface MetricDelta {
   statusBefore: MetricStatus
   statusAfter: MetricStatus
 }
+
+/**
+ * One intra-turn metric sample. `metricsHistory` keeps exactly one snapshot per turn (scoring,
+ * conditions and the debrief all rely on that); tick samples live here for live sparklines/tickers.
+ */
+export interface TickSample {
+  turnIndex: number
+  tick: number
+  values: Record<string, number>
+}

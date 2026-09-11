@@ -60,16 +60,20 @@ export function buildConditionContext(state: GameState): ConditionContext {
     turnIndex: state.turnIndex,
     flags: state.flags,
     counters: state.counters,
+    // Finiteness only — **never** `status`. `status` is a display concept: `statusFor` returns 'na'
+    // for any metric without a threshold band, and filtering on it here silently made every
+    // condition on such a metric false. A scenario that routes a value through `institution.custom`
+    // and reads it from a game-over rule, an ending or a scoring component must still see it.
     metric: (key) => {
       const m = latest?.metrics[key]
-      if (!m || m.status === 'na' || Number.isNaN(m.value)) return undefined
+      if (!m || !Number.isFinite(m.value)) return undefined
       return m.value
     },
     metricHistory: (key) => {
       const out: number[] = []
       for (let i = state.metricsHistory.length - 1; i >= 0; i--) {
         const m = state.metricsHistory[i]!.metrics[key]
-        if (m && m.status !== 'na' && !Number.isNaN(m.value)) out.push(m.value)
+        if (m && Number.isFinite(m.value)) out.push(m.value)
       }
       return out
     },

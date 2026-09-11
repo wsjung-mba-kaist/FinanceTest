@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { findDecision, findOption } from '../../engine'
 import type {
   Decision,
@@ -8,7 +9,9 @@ import type {
 } from '../../engine/types'
 import { decisionAnchorId } from '../../lib/catalog'
 import { Button, Badge } from '../ui'
+import { Icon } from '../ui/Icon'
 import { Citation } from '../knowledge/Citation'
+import { InlineMarkdown } from '../knowledge/InlineMarkdown'
 
 function historicalIds(scenario: ScenarioDefinition, decision: Decision): string[] {
   const path = scenario.paths.historical.choices[decision.id]
@@ -34,7 +37,7 @@ function OptionCell({
 }) {
   if (!option) return <span className="text-muted">—</span>
   return (
-    <div className="text-[12px]">
+    <div className="text-sm">
       <div className="flex items-start gap-2">
         <span className="font-medium">{option.label}</span>
         <Badge
@@ -56,7 +59,7 @@ function OptionCell({
         {option.illegal && <Badge tone="critical">규정 위반 소지</Badge>}
       </div>
       <p className="mt-1 text-muted">
-        {option.expert.rationale}
+        <InlineMarkdown>{option.expert.rationale}</InlineMarkdown>
         {option.expert.sourceRefs && option.expert.sourceRefs.length > 0 && (
           <Citation ids={option.expert.sourceRefs} local={scenario.meta.sources} />
         )}
@@ -65,7 +68,9 @@ function OptionCell({
         <p className="mt-1 text-muted italic">{option.expert.historicalNote}</p>
       )}
       {option.trap && option.trapExplanation && (
-        <p className="mt-1 text-warning">{option.trapExplanation}</p>
+        <p className="mt-1 text-warning">
+          <InlineMarkdown>{option.trapExplanation}</InlineMarkdown>
+        </p>
       )}
     </div>
   )
@@ -75,13 +80,21 @@ export function PathComparison({
   scenario,
   state,
   onFork,
+  expandedDecisionIds,
+  forceExpanded,
 }: {
   scenario: ScenarioDefinition
   state: GameState
   onFork: (turnIndex: number) => void
+  /** Decisions that stay open (the top-3 mistakes); everything else collapses to its header. */
+  expandedDecisionIds?: readonly string[]
+  /** Printing: open every entry. */
+  forceExpanded?: boolean
 }) {
   const records: DecisionRecord[] = state.decisions
-  if (records.length === 0) return <p className="text-[12px] text-muted">기록된 결정이 없습니다.</p>
+  const [opened, setOpened] = useState<Set<string>>(() => new Set())
+  if (records.length === 0) return <p className="text-sm text-muted">기록된 결정이 없습니다.</p>
+  const alwaysOpen = new Set(expandedDecisionIds ?? [])
   return (
     <ol className="m-0 list-none space-y-3 p-0">
       {records.map((rec) => {
@@ -97,50 +110,67 @@ export function PathComparison({
         const exp = expertIds(scenario, decision)
           .map((id) => findOption(decision, id))
           .filter((o): o is Option => Boolean(o))
+        const key = `${rec.turnIndex}-${rec.decisionId}`
+        const panelId = `path-${key}-panel`
+        const open = Boolean(forceExpanded) || alwaysOpen.has(rec.decisionId) || opened.has(key)
         return (
           <li
-            key={`${rec.turnIndex}-${rec.decisionId}`}
+            key={key}
             id={decisionAnchorId(rec.decisionId)}
             className="rounded-lg border border-border bg-surface scroll-mt-4"
             tabIndex={-1}
           >
-            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+            <div
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-border' : ''}`}
+            >
               <Badge tone="neutral" className="num">
                 {turn.label}
               </Badge>
-              <span className="text-[12px] text-muted">{turn.timeLabel}</span>
+              <span className="text-sm text-muted">{turn.timeLabel}</span>
               <span className="font-medium">{decision.title}</span>
               {rec.timedOut && <Badge tone="warning">시간 초과</Badge>}
               {rec.hintsUsed ? <Badge tone="neutral">힌트 {rec.hintsUsed}단계</Badge> : null}
-              <span className="ml-auto">
+              <span className="ml-auto flex items-center gap-1">
+                {!open && (
+                  <button
+                    type="button"
+                    aria-expanded={false}
+                    aria-controls={panelId}
+                    onClick={() => setOpened((s2) => new Set(s2).add(key))}
+                    className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-accent"
+                  >
+                    경로 비교 보기
+                    <Icon name="chevron-right" size={14} />
+                  </button>
+                )}
                 <Button size="sm" variant="secondary" onClick={() => onFork(rec.turnIndex)}>
                   T+{rec.turnIndex}부터 다시 하기
                 </Button>
               </span>
             </div>
-            <div className="grid gap-3 px-3 py-3 md:grid-cols-3">
+            <div id={panelId} hidden={!open} className="grid gap-3 px-3 py-3 md:grid-cols-3">
               <div>
-                <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">
                   플레이어
                 </h4>
                 {chosen.length === 0 ? (
-                  <span className="text-muted text-[12px]">—</span>
+                  <span className="text-muted text-sm">—</span>
                 ) : (
                   chosen.map((o) => <OptionCell key={o.id} option={o} scenario={scenario} />)
                 )}
                 {rec.memo && (
-                  <p className="mt-2 rounded border border-border bg-surface-2 p-2 text-[12px]">
+                  <p className="mt-2 rounded border border-border bg-surface-2 p-2 text-sm">
                     <span className="text-muted">메모: </span>
                     {rec.memo}
                   </p>
                 )}
               </div>
               <div>
-                <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
                   역사적 대응
                 </h4>
                 {hist.length === 0 ? (
-                  <span className="text-muted text-[12px]">지정 없음</span>
+                  <span className="text-muted text-sm">지정 없음</span>
                 ) : (
                   hist.map((o) => (
                     <OptionCell key={o.id} option={o} scenario={scenario} showHistoricalNote />
@@ -148,11 +178,11 @@ export function PathComparison({
                 )}
               </div>
               <div>
-                <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-positive">
+                <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-positive">
                   전문가 권고
                 </h4>
                 {exp.length === 0 ? (
-                  <span className="text-muted text-[12px]">—</span>
+                  <span className="text-muted text-sm">—</span>
                 ) : (
                   exp.map((o) => <OptionCell key={o.id} option={o} scenario={scenario} />)
                 )}

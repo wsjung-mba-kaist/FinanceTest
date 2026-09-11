@@ -13,8 +13,11 @@ import {
   type ScenarioDefinition,
   type Turn,
 } from '../../engine'
+import type { PensionState } from '../../engine/types'
+import { op } from '../../engine/fx/common'
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import { cardIds, sourceIds } from '../../content'
+import { ldiFx } from './ldiFx'
 import typed from './scenario'
 
 /** The engine's autoplay/score helpers are written against the generic definition (mirrors tests/helpers). */
@@ -116,13 +119,20 @@ function visibleText(turn: Turn<InstitutionState>): string {
     const { effects: _e, sourceRefs: _s, cardRefs: _c, id: _i, ...rest } = ev
     push(rest)
   }
-  for (const d of turn.decisions) {
+  // Interrupts are decisions too, and a mid-turn call is as player-visible as a prompt.
+  for (const d of [...turn.decisions, ...(turn.interrupts ?? [])]) {
     push([d.title, d.prompt, d.context])
     for (const o of d.options) {
       push([o.label, o.description, o.consequences, o.unavailableReason, o.trapExplanation])
       for (const de of o.delayedEffects ?? []) push(de.description)
+      for (const pv of o.preview ?? []) push(pv.note)
+    }
+    for (const step of d.steps ?? []) {
+      push([step.note, ...step.lines.map((l) => l.text)])
+      for (const r of step.replies) push([r.label, r.trapExplanation])
     }
   }
+  for (const it of turn.interrupts ?? []) push(it.lines.map((l) => l.text))
   for (const h of turn.advisorHints ?? []) push(h.text)
   return out.join('\n')
 }
@@ -154,6 +164,48 @@ const HINDSIGHT: { untilTurn: number; tokens: string[] }[] = [
   // 사후 기준(FPC 2023.3 / TPR 2023.4)은 게임 중 어디에도 등장하지 않는다
   { untilTurn: 7, tokens: ['2023', 'FPC 권고', '최소 회복력', '250bp 기준'] },
 ]
+
+/**
+ * The same scenario with T5 collapsed back to a single tick: the four intraday −110bp slices become
+ * one call and the ticker's net move is applied as a plain op. Used to assert that the sub-turn
+ * conversion is **exactly** additive at `variance: 0` (calibration.md §12.1).
+ */
+function untickedT5(): ScenarioDefinition<InstitutionState> {
+  const turns = typed.turns.map((t) => {
+    if (t.id !== 't5') return t
+    const flat: Turn<PensionState> = {
+      ...t,
+      ticks: undefined,
+      tickLabels: undefined,
+      ticker: undefined,
+      interrupts: undefined,
+      tickEffects: undefined,
+      entryEffects: [
+        ...(t.entryEffects ?? []),
+        {
+          id: 't5-boe-single',
+          description: '비교용: 하루치 −110bp를 한 번에 적용',
+          effects: [
+            ldiFx.yieldTick({ deltaBp: -110, revalueBp: -110 }),
+            ldiFx.postFromBuffer('반환 담보 정리'),
+            op('market.govt30yBp', 'add', -110),
+            op('market.govt10yBp', 'add', -50),
+          ],
+        },
+      ],
+      decisions: t.decisions.map((d) => ({ ...d, availableFrom: 0 })),
+    }
+    return flat
+  })
+  return { ...typed, turns } as unknown as ScenarioDefinition<InstitutionState>
+}
+
+/** Historical-path state at the start of `turnIndex`, then every remaining tick of it played out. */
+function historicalThroughTurn(turnIndex: number): State {
+  const full = autoplay(scenario, 'historical', { seed: 1 })
+  const log = full.decisions.filter((d) => d.turnIndex < turnIndex)
+  return replay(scenario, { seed: 1, decisions: log, turnIndex }).state
+}
 
 describe('uk-ldi-2022 scenario', () => {
   it('passes integrity lint (errors) with shared cards/sources', () => {
@@ -325,6 +377,120 @@ describe('uk-ldi-2022 scenario', () => {
     s = advanceTurn(s, scenario)
     expect(s.counters.cashInstructed).toBe(0)
     expect(s.institution.kind === 'pension' ? s.institution.assets.cash : NaN).toBeCloseTo(0, 5)
+  })
+
+  it('T5의 일중 슬라이스 합계는 variance 0에서 단일 호출과 정확히 일치한다', () => {
+    const ticked = autoplay(scenario, 'historical', { seed: 1 }).state
+    const flat = autoplay(untickedT5(), 'historical', { seed: 1 }).state
+    const keys = [
+      'govt30y',
+      'collateralHeadroomBp',
+      'marginCallPending',
+      'ldiLeverage',
+      'hedgeRatio',
+      'fundingRatio',
+      'liquidAssets',
+    ]
+    const drift: string[] = []
+    for (const k of keys) {
+      const a = metricAt(ticked, 5, k)
+      const b = metricAt(flat, 5, k)
+      if (!(Math.abs(a - b) < 1e-9)) drift.push(`${k}: 틱 ${a} vs 단일 ${b}`)
+    }
+    // the pool's own books, not just the derived metrics
+    const poolOf = (st: State) =>
+      st.institution.kind === 'pension' ? st.institution.assets.ldi : undefined
+    const pa = poolOf(ticked)!
+    const pb = poolOf(flat)!
+    for (const [k, a, b] of [
+      ['equity', pa.equity, pb.equity],
+      ['collateral.cash', pa.collateral.cash, pb.collateral.cash],
+      ['collateral.eligibleGilts', pa.collateral.eligibleGilts, pb.collateral.eligibleGilts],
+      ['marginCallOutstanding', pa.marginCallOutstanding, pb.marginCallOutstanding],
+    ] as [string, number, number][]) {
+      if (!(Math.abs(a - b) < 1e-9)) drift.push(`ldi.${k}: 틱 ${a} vs 단일 ${b}`)
+    }
+    expect(drift, `\n${drift.join('\n')}`).toEqual([])
+  })
+
+  it('T4 인터럽트는 무응답 시 역사적 기본 선택으로 자동 확정된다', () => {
+    const s = historicalThroughTurn(4)
+    const manager = s.decisions.find((d) => d.decisionId === 't4-i1-manager')
+    expect(manager, '마진콜 통지 인터럽트가 확정되지 않았습니다').toBeDefined()
+    expect(manager!.interrupt).toBe(true)
+    expect(manager!.timedOut).toBe(true)
+    expect(manager!.optionIds).toEqual(['t4-i1-ack'])
+    const custodian = s.decisions.find((d) => d.decisionId === 't4-i2-custodian')
+    expect(custodian?.timedOut).toBe(true)
+    expect(custodian?.optionIds).toEqual(['t4-i2-standard'])
+    // 무응답이 역사로 수렴한다: 기본 선택은 역사 옵션이고 효과는 카운터뿐이다
+    const t4 = typed.turns.find((t) => t.id === 't4')!
+    for (const it of t4.interrupts ?? []) {
+      const def = it.options.find((o) => o.id === it.defaultOptionId)!
+      expect(def.historical, `${it.id}의 기본 선택이 역사 옵션이 아닙니다`).toBe(true)
+    }
+  })
+
+  it('T4 스폰서 협상 대화는 걸어간 응답 경로 그대로 재현된다', () => {
+    const full = autoplay(scenario, 'historical', { seed: 1 })
+    const rec = full.decisions.find((d) => d.decisionId === 't4-d2')
+    expect(rec, 't4-d2가 확정되지 않았습니다').toBeDefined()
+    expect(rec!.path).toEqual(['t4-d2-r-escalate', 't4-d2-ask-300', 't4-d2-r-pack'])
+    expect(rec!.optionIds).toEqual(['t4-d2-a'])
+    const again = replay(scenario, { seed: 1, decisions: full.decisions })
+    expect(again.state.counters.sponsorAskM).toBe(300)
+    expect(latestSnapshot(again.state).metrics).toEqual(latestSnapshot(full.state).metrics)
+    // a path the scenario does not allow is rejected, never silently downgraded
+    const broken = full.decisions.map((d) =>
+      d.decisionId === 't4-d2' ? { ...d, path: ['t4-d2-r-pack'] } : d,
+    )
+    expect(() => replay(scenario, { seed: 1, decisions: broken })).toThrow()
+  })
+
+  it('협상에서 커버넌트 한도를 넘겨 부르면 출연금이 한 턴 늦게 도착한다', () => {
+    // `replay` only ever moves forward, so the log must be truncated at the turn we want to read.
+    const walk = (path: string[]) => {
+      const full = autoplay(scenario, 'historical', { seed: 1 })
+      const log = full.decisions
+        .filter((d) => d.turnIndex <= 5)
+        .map((d) => (d.decisionId === 't4-d2' ? { ...d, path } : d))
+      return replay(scenario, { seed: 1, decisions: log, turnIndex: 5 }).state
+    }
+    const onTime = walk(['t4-d2-r-escalate', 't4-d2-ask-300', 't4-d2-r-pack'])
+    const late = walk(['t4-d2-r-escalate', 't4-d2-ask-500', 't4-d2-r-pack'])
+    expect(onTime.counters.sponsorAskM).toBe(300)
+    expect(late.counters.sponsorAskM).toBe(500)
+    // 한도 안의 요청은 T5에 도착해 요청 잔액이 비고, 한도 초과 요청은 T5까지 남아 있다
+    expect(onTime.counters.sponsorInstructed ?? 0).toBe(0)
+    expect(late.counters.sponsorInstructed ?? 0).toBeGreaterThan(0)
+    expect(metricAt(late, 5, 'collateralHeadroomBp')).toBeLessThan(
+      metricAt(onTime, 5, 'collateralHeadroomBp'),
+    )
+  })
+
+  it('라이브 플레이(variance 1): 엔진 시드 10개에서 종료 사유가 흔들리지 않고 9/28 종가가 허용폭 안에 있다', () => {
+    // `tests/engine/variance.test.ts`는 `rngSeed`(정책 난수)만 바꾸므로 엔진 노이즈 스트림은 한 가지다.
+    // 여기서는 `seed`(엔진 난수 시드) 자체를 바꿔 실제 노이즈 분포를 확인한다.
+    const canonical = autoplay(scenario, 'historical', { seed: 1, variance: 0 })
+    const cp = (scenario.checkpoints ?? []).find((c) => c.turnId === 't5')!
+    const problems: string[] = []
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      const r = autoplay(scenario, 'historical', { seed, rngSeed: 7, variance: 1 })
+      if (r.state.ended?.reason !== canonical.state.ended?.reason)
+        problems.push(`seed ${seed}: 종료 사유 ${r.state.ended?.reason}`)
+      if (findNonFinite(r.state).length > 0) problems.push(`seed ${seed}: 유한하지 않은 값`)
+      const v = metricAt(r.state, 5, 'govt30y')
+      const err = Math.abs(v - cp.expected) / cp.expected
+      if (err > cp.tolerance)
+        problems.push(`seed ${seed}: 9/28 종가 ${v.toFixed(3)} (허용 ±${cp.tolerance * 100}%)`)
+      // 노이즈는 크기만 바꾼다 — 헤지비율(결과 축)은 정본과 같아야 한다
+      if (
+        Math.abs(metricAt(r.state, 5, 'hedgeRatio') - metricAt(canonical.state, 5, 'hedgeRatio')) >
+        1e-9
+      )
+        problems.push(`seed ${seed}: 헤지비율이 노이즈로 바뀌었습니다`)
+    }
+    expect(problems, `\n${problems.join('\n')}`).toEqual([])
   })
 
   it('worst and random policies complete without NaN/Infinity', () => {

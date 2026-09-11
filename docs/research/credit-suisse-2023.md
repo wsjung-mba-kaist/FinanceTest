@@ -56,3 +56,48 @@
 - SNB, 긴급유동성지원(ELA·ELA+) 및 PLB 관련 발표(2023.3.16~26)
 - 스위스 연방정부 긴급법령(2023.3.16), UBS 인수 발표(2023.3.19)
 - 스위스 연방행정법원 AT1 상각 판결(2025.10.14)
+
+## 정확성 검증 결과 (2026-09) — 1차 문서 위치와 함정
+
+### 문서 이름·CIK의 함정
+
+- **"Credit Suisse Group AG 4Q22 Financial Report"라는 문서는 존재하지 않는다.** CS는 1~3분기에만
+  Financial Report를 냈고 4분기는 **Earnings Release 4Q22**(2023-02-09, Form 6-K Ex.99.1)와
+  **Annual Report 2022 = Form 20-F(FY2022)** 다.
+- **CIK 1053092는 Credit Suisse AG(은행)이고 그룹은 1159510이다.** 20-F는 두 등록인의 공동 제출이라
+  EDGAR가 양쪽 CIK 아래 색인한다(접수번호 0001370368-23-000026, 2023-03-14 제출).
+  문서: `https://www.sec.gov/Archives/edgar/data/1053092/000137036823000026/cs-20221231.htm`
+- 같은 표에서 **그룹과 은행 수치가 다르다** — 고객예금 233,235 vs 234,554, 총자산 531,358 vs 530,039,
+  RWA(BIS) 250,540 vs 249,536, 자기자본 45,129 vs 47,871. 인용할 때 반드시 주체를 밝힌다.
+
+2022-12-31 그룹 확정치: 고객예금 **233,235** · 총자산 **531,358** · 총부채 **486,027** · 자기자본
+**45,129**(+비지배지분 202) · RWA **BIS 250,540 / 스위스 250,963** · CET1 비율 **14.1%** ·
+레버리지 익스포저 650,551(백만 프랑).
+
+### 스위스 공식 통계 — 두 개의 함정
+
+- **명목 GDP는 빈티지를 밝혀야 한다.** BFS 표 T 04.02.01.02 `B.1*b`: 1995~2022년판(2023-08-24 공표)
+  **781,460** → 1995~2023년판 791,087 → 벤치마크 개정 후 1995~2025년판(2026-08-25) **819,704**백만.
+  2023년 3월 시점 서술에는 781을 쓰고 빈티지를 병기한다.
+- **마스트리흐트 부채비율 27.5%는 2022년이 아니라 2016년 값이다.** EFV 재정통계
+  `https://www.data.finance.admin.ch/static/assets/datasets/gfs_dashboard/kennz_int.csv` 의 지표
+  `schuldenquote`: 2016 **27.51** · 2020 27.15 · 2021 25.65 · **2022 24.55** · 2023 24.31.
+  IMF 정의의 `fremdkapitalquote`(2022년 39.15%)와 다른 지표다.
+- **SNB 정책금리 1.00%는 2022-12-15 결정(12-16 적용)** 이다. 2022-09-22 결정은 0.50%(9-23 적용),
+  2023-03-23 결정이 1.50%(3-24 적용). 보도자료 PDF 경로 규칙:
+  `snb.ch/public/asset/en/www-snb-ch/publications/communication/press-releases/{연도}/pre_{YYYYMMDD}/publications0_en/pre_{YYYYMMDD}.en.pdf`
+- SNB 데이터포털은 키 없이 CSV를 준다: `data.snb.ch/api/cube/{cube}/data/csv/en` — `devkum`(환율 월별),
+  `snbgwdzid` 계열 `LZ`(정책금리, 변경일 2022-09-23 0.50 → 2022-12-16 1.00 → 2023-03-24 1.50).
+
+### 닫히지 않는 두 계열과 그 이유
+
+**CS 5년 선순위 CDS의 일별 수준**과 **CSGN의 일별 종가**는 스위스 공식 사후검토 두 건을 직접 읽어도 나오지
+않는다. FINMA 보고서 인쇄본 p.38 도표 "CS Group: share price and CDS spreads"에는 데이터 라벨이 없고
+(좌축 CHF 1.5~2.9, 우축 200~1,200bp), 본문의 유일한 수치 진술은 3월 15일의 "rose above the 1000
+basis-point mark"로 날짜·문턱값이 다르고 만기·순위를 특정하지 않는다. SNB FSR 2023 차트 33은 출처가
+"Bloomberg"일 뿐이고, PUK 최종보고서(569쪽)는 CDS를 단 한 번 — 그것도 "시장지표가 경시되었다"는 정책
+비판으로 — 언급하며 주가도 지수화 계열(Abbildung 4)만 싣는다. SIX는 CSGN(ISIN CH0012138530)을 2023-06-12
+상장폐지 후 공개 시세 엔드포인트에서 내렸다(`six-group.com/fqs/movie.json` 조회 결과 `totalRows: 0`).
+닫는 경로는 **S&P Global Market Intelligence CDS end-of-day composite**(Credit Suisse Group AG,
+senior unsecured, 5Y, doc clause CR14/XR14, value date 2023-03-13)와 **SIX 공식 시세표(Kursblatt)
+또는 SIX 과거 시세 데이터**뿐이다.

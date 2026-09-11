@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { advanceTurn, applyDecision, findDecision, findOption, getTurnView } from '../../engine'
 import type { GameState, KpiSpec, ScenarioDefinition } from '../../engine/types'
 import type { decisionRegrets } from '../../engine'
 import { formatMetric } from '../../lib/format'
 import { Badge, Button } from '../ui'
+import { InlineMarkdown } from '../knowledge/InlineMarkdown'
 
 type Regret = ReturnType<typeof decisionRegrets>[number]
 
@@ -18,11 +19,12 @@ interface WhatIf {
   ended: GameState['ended']
 }
 
+/** `status: 'na'` means "no threshold band", not "no value" — only finiteness may reject a point. */
 function minOf(state: GameState, metric: string): number | undefined {
   let min: number | undefined
   for (const s of state.metricsHistory) {
     const m = s.metrics[metric]
-    if (!m || m.status === 'na' || !Number.isFinite(m.value)) continue
+    if (!m || !Number.isFinite(m.value)) continue
     min = min === undefined ? m.value : Math.min(min, m.value)
   }
   return min
@@ -113,14 +115,28 @@ export function MistakeList({
     return (primary.length > 0 ? primary : scenario.kpis).slice(0, 3)
   }, [scenario])
   const top = useMemo(() => regrets.filter((r) => r.regret > 0).slice(0, 3), [regrets])
-  const whatIfs = useMemo(
-    () => top.map((r) => computeWhatIf(scenario, state, history, r, kpis)),
-    [top, scenario, state, history, kpis],
-  )
+  // Each what-if re-simulates the rest of the run; defer it so the list paints first.
+  const [whatIfs, setWhatIfs] = useState<(WhatIf | undefined)[] | undefined>()
+  useEffect(() => {
+    let cancelled = false
+    setWhatIfs(undefined)
+    if (top.length === 0) {
+      setWhatIfs([])
+      return
+    }
+    const t = setTimeout(() => {
+      const out = top.map((r) => computeWhatIf(scenario, state, history, r, kpis))
+      if (!cancelled) setWhatIfs(out)
+    }, 0)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [top, scenario, state, history, kpis])
 
   if (top.length === 0) {
     return (
-      <p className="text-[12px] text-muted">
+      <p className="text-sm text-muted">
         모든 결정에서 최선의 옵션을 선택했습니다. 실수로 분류된 결정이 없습니다.
       </p>
     )
@@ -135,11 +151,11 @@ export function MistakeList({
           .map((id) => findOption(decision, id))
           .filter((o): o is NonNullable<typeof o> => Boolean(o))
         const best = findOption(decision, r.best)
-        const wi = whatIfs[i]
+        const wi = whatIfs?.[i]
         return (
           <li key={r.decisionId} className="rounded-lg border border-border bg-surface p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="num text-[15px] font-semibold text-muted">#{i + 1}</span>
+              <span className="num text-md font-semibold text-muted">#{i + 1}</span>
               <Badge tone="neutral" className="num">
                 {turn.label}
               </Badge>
@@ -153,14 +169,16 @@ export function MistakeList({
                 </Button>
               </span>
             </div>
-            <dl className="mt-2 grid gap-x-3 gap-y-1 text-[12px] sm:grid-cols-[auto_1fr]">
+            <dl className="mt-2 grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
               <dt className="text-muted">선택</dt>
               <dd>
                 {chosen.map((o) => (
                   <div key={o.id}>
                     {o.label} <span className="num text-muted">({o.expert.rating}점)</span>
                     {o.trap && o.trapExplanation && (
-                      <div className="text-warning">{o.trapExplanation}</div>
+                      <div className="text-warning">
+                        <InlineMarkdown>{o.trapExplanation}</InlineMarkdown>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -170,7 +188,9 @@ export function MistakeList({
                 {best ? (
                   <>
                     {best.label} <span className="num text-muted">({best.expert.rating}점)</span>
-                    <div className="text-muted">{best.expert.rationale}</div>
+                    <div className="text-muted">
+                      <InlineMarkdown>{best.expert.rationale}</InlineMarkdown>
+                    </div>
                   </>
                 ) : (
                   '—'
@@ -179,8 +199,8 @@ export function MistakeList({
             </dl>
             {wi ? (
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full text-[12px]">
-                  <caption className="text-left text-[11px] text-muted mb-1">
+                <table className="w-full text-sm">
+                  <caption className="text-left text-xs text-muted mb-1">
                     만약 최선을 택했다면 (이후 선택은 가능한 한 동일하게 유지, 실행 중 최저값 기준)
                     {wi.ended && wi.ended.failed !== Boolean(state.ended?.failed) && (
                       <span className={wi.ended.failed ? ' text-critical' : ' text-positive'}>
@@ -225,8 +245,12 @@ export function MistakeList({
                   </tbody>
                 </table>
               </div>
+            ) : whatIfs === undefined ? (
+              <p className="mt-2 text-sm text-muted" role="status">
+                대안 경로를 계산 중…
+              </p>
             ) : (
-              <p className="mt-2 text-[11px] text-muted">
+              <p className="mt-2 text-sm text-muted">
                 대안 경로를 재실행할 수 없어 what-if 수치는 생략합니다.
               </p>
             )}

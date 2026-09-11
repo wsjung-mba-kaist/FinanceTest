@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>금융위기 대응 시뮬레이터</title>
+    <script>
+      // Stamp the resolved theme before first paint so the dark palette (declared
+      // once, under [data-theme='dark']) applies without a flash.
+      ;(function () {
+        try {
+          var raw = localStorage.getItem('fcs:settings')
+          var s = raw ? JSON.parse(raw) : null
+          var theme = (s && s.theme) || 'system'
+          var dark =
+            theme === 'dark' ||
+            (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          root.setAttribute('data-theme', dark ? 'dark' : 'light')
+          if (s && typeof s.fontScale === 'number')
+            root.style.fontSize = Math.round(14 * s.fontScale) + 'px'
+          if (s && s.reducedMotion) root.setAttribute('data-reduced-motion', 'true')
+          if (s && s.useSystemFont) root.setAttribute('data-system-font', 'true')
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

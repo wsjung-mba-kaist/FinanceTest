@@ -11,6 +11,7 @@ import {
   type ScenarioDefinition,
 } from '@/engine'
 import { miniBank } from '../fixtures/miniBank'
+import { miniTicks, TICKED_TURN_INDEX } from '../fixtures/miniTicks'
 import { loadAvailableScenariosSafe } from '../helpers/load'
 import { findNonFinite } from '../helpers/scan'
 import { asGeneric } from '../helpers/scenario'
@@ -40,8 +41,14 @@ function checkpointActual(
   const turnIndex = def.turns.findIndex((t) => t.id === cp.turnId)
   if (turnIndex < 0) return { actual: undefined, turnIndex }
   const full = autoplay(def, 'historical', { seed })
-  const log = full.decisions.filter((d) => d.turnIndex <= turnIndex)
-  const { state } = replay(def, { seed, decisions: log, turnIndex })
+  // A replay can only move forward, so a tick-scoped checkpoint must also drop the decisions that
+  // were committed later in that turn — otherwise the log itself drags the state past the tick.
+  const log = full.decisions.filter(
+    (d) =>
+      d.turnIndex < turnIndex ||
+      (d.turnIndex === turnIndex && (cp.tick === undefined || (d.tick ?? 0) <= cp.tick)),
+  )
+  const { state } = replay(def, { seed, decisions: log, turnIndex, tick: cp.tick })
   if (state.turnIndex !== turnIndex) return { actual: undefined, turnIndex }
   if (cp.metric) return { actual: latestSnapshot(state).metrics[cp.metric]?.value, turnIndex }
   if (cp.counter) return { actual: state.counters[cp.counter] ?? 0, turnIndex }
@@ -51,6 +58,30 @@ function checkpointActual(
 
 function relativeError(actual: number, expected: number): number {
   return expected === 0 ? Math.abs(actual) : Math.abs(actual - expected) / Math.abs(expected)
+}
+
+/**
+ * Verdict for one checkpoint; `undefined` means it passed. `absTolerance` is an alternative to the
+ * relative one, not a narrowing of it — near zero (a closing balance of −$958M) a relative band is
+ * meaningless, so either tolerance being met is enough.
+ */
+function checkpointFailure(
+  cp: Checkpoint,
+  actual: number | undefined,
+  turnIndex: number,
+): string | undefined {
+  const target = cp.metric ?? cp.counter ?? cp.path
+  const at = cp.tick === undefined ? '' : ` tick ${cp.tick}`
+  if (turnIndex < 0) return `${cp.label}: turn ${cp.turnId} not found`
+  if (actual === undefined || !Number.isFinite(actual))
+    return `${cp.label}: no value for ${target} at T${turnIndex}${at} (run may have ended earlier)`
+  const err = relativeError(actual, cp.expected)
+  const absErr = Math.abs(actual - cp.expected)
+  if (err <= cp.tolerance) return undefined
+  if (cp.absTolerance !== undefined && absErr <= cp.absTolerance) return undefined
+  const abs =
+    cp.absTolerance === undefined ? '' : `, abs. error ${absErr.toFixed(3)} > ${cp.absTolerance}`
+  return `${cp.label} (T${turnIndex}${at} ${target}): actual ${actual} vs expected ${cp.expected} (rel. error ${(err * 100).toFixed(1)}% > ${(cp.tolerance * 100).toFixed(0)}%${abs})`
 }
 
 describe('autoplayer', () => {
@@ -98,22 +129,8 @@ describe('autoplayer', () => {
         const failures: string[] = []
         for (const cp of checkpoints) {
           const { actual, turnIndex } = checkpointActual(def, cp, 1)
-          if (turnIndex < 0) {
-            failures.push(`${cp.label}: turn ${cp.turnId} not found`)
-            continue
-          }
-          if (actual === undefined || !Number.isFinite(actual)) {
-            failures.push(
-              `${cp.label}: no value for ${cp.metric ?? cp.counter ?? cp.path} at T${turnIndex} (run may have ended earlier)`,
-            )
-            continue
-          }
-          const err = relativeError(actual, cp.expected)
-          if (err > cp.tolerance) {
-            failures.push(
-              `${cp.label} (T${turnIndex} ${cp.metric ?? cp.counter ?? cp.path}): actual ${actual} vs expected ${cp.expected} (rel. error ${(err * 100).toFixed(1)}% > ${(cp.tolerance * 100).toFixed(0)}%)`,
-            )
-          }
+          const failure = checkpointFailure(cp, actual, turnIndex)
+          if (failure) failures.push(failure)
         }
         expect(failures, `\n${failures.join('\n')}`).toEqual([])
       },
@@ -136,5 +153,37 @@ describe('autoplayer', () => {
     const { actual, turnIndex } = checkpointActual(asGeneric(miniBank), cp, 1)
     expect(turnIndex).toBe(1)
     expect(actual).toBeCloseTo(cp.expected, 1)
+  })
+
+  describe('checkpoint tolerance', () => {
+    const base: Checkpoint = { turnId: 't1', metric: 'cash', expected: -0.958, tolerance: 0.15, label: '마감 잔고' }
+
+    it('fails a value outside the relative band', () => {
+      expect(checkpointFailure(base, -1.6, 1)).toMatch(/rel\. error/)
+    })
+
+    it('passes it when `absTolerance` covers the gap (near-zero targets)', () => {
+      expect(checkpointFailure({ ...base, absTolerance: 0.8 }, -1.6, 1)).toBeUndefined()
+    })
+
+    it('still fails when neither tolerance is met', () => {
+      expect(checkpointFailure({ ...base, absTolerance: 0.2 }, -1.6, 1)).toMatch(/abs\. error/)
+    })
+
+    it('reads a ticked checkpoint at the requested tick, not the turn end', () => {
+      const ticked: Checkpoint = {
+        turnId: miniTicks.turns[TICKED_TURN_INDEX]!.id,
+        path: 'institution.cash',
+        expected: 0,
+        tolerance: 1,
+        label: 'tick 0 cash',
+      }
+      const gen = asGeneric(miniTicks)
+      const first = checkpointActual(gen, { ...ticked, tick: 0 }, 1).actual
+      const last = checkpointActual(gen, ticked, 1).actual
+      expect(first).toBeDefined()
+      expect(last).toBeDefined()
+      expect(first).not.toBeCloseTo(last!, 6)
+    })
   })
 })

@@ -2,16 +2,27 @@ import type { Draft } from 'immer'
 import type { Flags, FlagValue, RegulatorLevel } from './common'
 import type { Condition } from './conditions'
 import type { MetricSnapshot } from './metrics'
+import type { NoiseSpec } from './scenario'
 import type { ConfidenceTarget, FeedItem, GameState, InstitutionState } from './state'
 
 export interface EffectContext {
   turnIndex: number
-  /** Deterministic PRNG in [0,1). */
+  /** Deterministic PRNG in [0,1). Never called while `variance` is 0. */
   rng: () => number
   /** Metrics computed before this effect batch. */
   metrics: MetricSnapshot
   flags: Flags
   log: (msg: string) => void
+  /** Sub-turn tick this batch runs at (0 for turns without `ticks`). */
+  tick: number
+  /** Number of ticks in the current turn (1 when the turn is not ticked). */
+  ticks: number
+  /** True on the final tick of the turn (always true when `ticks` is 1). */
+  isLastTick: boolean
+  /** 0 = canonical run (no RNG draws). */
+  variance: number
+  /** Scenario-level noise magnitudes, if authored. */
+  noise?: NoiseSpec
 }
 
 export type NumericOp = 'set' | 'add' | 'mul' | 'min' | 'max'
@@ -40,6 +51,8 @@ export type Effect<S extends InstitutionState = InstitutionState> =
 
 export interface DelayedEffectSpec<S extends InstitutionState = InstitutionState> {
   afterTurns: number
+  /** Extra offset inside the due turn (only meaningful on ticked turns). */
+  afterTicks?: number
   when?: Condition
   effects: Effect<S>[]
   description: string
@@ -48,6 +61,8 @@ export interface DelayedEffectSpec<S extends InstitutionState = InstitutionState
 export interface PendingEffect {
   id: string
   dueTurn: number
+  /** Tick within `dueTurn` at which the effect fires (defaults to 0 = turn start). */
+  dueTick?: number
   description: string
   /** Reference to the option's delayed spec so state stays serialisable. */
   ref: { decisionId: string; optionId: string; index: number }

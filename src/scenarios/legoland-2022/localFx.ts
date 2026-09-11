@@ -1,6 +1,7 @@
 import type { Draft } from 'immer'
 import type { Effect, GameState, SecuritiesState } from '../../engine/types'
 import { clamp } from '../../engine/core/paths'
+import { DEFAULT_NOISE, noiseFactor } from '../../engine/core/noise'
 import { fnEffect } from '../../engine/fx/common'
 
 /**
@@ -38,6 +39,44 @@ export const legoFx = {
         d.counters.cpRunoff = (d.counters.cpRunoff ?? 0) + shortfall
         ctx.log(
           `CP 만기 ${matured.toFixed(0)} 중 재발행 ${(roll * 100).toFixed(0)}%${closed ? ' (시장 폐쇄)' : ''} → 순상환 ${shortfall.toFixed(0)}`,
+        )
+      },
+      p.label,
+    )
+  },
+
+  /**
+   * `cpRollStep`의 **틱 분할판**. 발행·상환이 하루 안에서 언제 확정되는지를 `profile`(합 = 1)로
+   * 나눈다. 슬라이스는 줄어드는 잔액이 아니라 **개장 시점 CP 잔액**(`counters.cpWindowBase`)에
+   * 투영되므로, variance 0에서 슬라이스 합계가 단일 호출 결과와 (부동소수점 오차 범위에서) 정확히
+   * 일치한다 — 기존 체크포인트가 그대로 산다.
+   *
+   * 재발행률(`cpRollFraction`)은 **매 틱 실시간으로** 신뢰지수를 읽는다. 틱 중간에 신뢰지수가 구간
+   * 경계(60/50/40/30)를 넘으면 남은 슬라이스부터 다른 재발행률이 적용된다.
+   */
+  cpRollTicks(p: { share: number; profile: number[]; label?: string }): Effect<SecuritiesState> {
+    return fnEffect<SecuritiesState>(
+      'cpRollTicks',
+      { share: p.share, profile: p.profile.join('/') },
+      (d, ctx) => {
+        const s = sec(d)
+        if (ctx.tick === 0) d.counters.cpWindowBase = s.funding.cp
+        const base = d.counters.cpWindowBase ?? s.funding.cp
+        const slice = p.profile[ctx.tick] ?? 0
+        const noise = noiseFactor(
+          ctx,
+          ctx.noise?.runoffSigma ?? DEFAULT_NOISE.runoffSigma,
+          ctx.noise?.runoffCap ?? DEFAULT_NOISE.runoffCap,
+        )
+        const matured = base * p.share * slice * noise
+        const closed = (d.counters.cpClosedUntil ?? -1) >= d.turnIndex
+        const roll = cpRollFraction(d.confidence.index, closed)
+        const shortfall = matured * (1 - roll)
+        s.funding.cp -= shortfall
+        s.liquidity.cash -= shortfall
+        d.counters.cpRunoff = (d.counters.cpRunoff ?? 0) + shortfall
+        ctx.log(
+          `CP 청약 ${(slice * 100).toFixed(0)}% 구간: 만기 ${matured.toFixed(0)} 중 재발행 ${(roll * 100).toFixed(0)}%${closed ? ' (시장 폐쇄)' : ''} → 순상환 ${shortfall.toFixed(0)}`,
         )
       },
       p.label,

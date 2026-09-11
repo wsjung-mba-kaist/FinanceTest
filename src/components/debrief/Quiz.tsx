@@ -63,11 +63,11 @@ function QuestionCard({
   return (
     <li className="rounded-lg border border-border bg-surface p-3">
       <fieldset className="m-0 border-0 p-0" disabled={submitted}>
-        <legend className="text-[13px] font-medium">
+        <legend className="text-base font-medium">
           <span className="num text-muted">Q{index + 1}.</span> {q.prompt}
-          {q.type === 'multi' && <span className="text-muted text-[11px]"> (복수 선택)</span>}
+          {q.type === 'multi' && <span className="text-muted text-xs"> (복수 선택)</span>}
         </legend>
-        <div className="mt-2 space-y-1 text-[12px]">
+        <div className="mt-2 space-y-1 text-sm">
           {(q.type === 'single' || q.type === 'multi') &&
             q.choices.map((c) => {
               const arr = Array.isArray(answer) ? answer : []
@@ -137,7 +137,7 @@ function QuestionCard({
         </div>
       ) : (
         <div
-          className={`mt-2 rounded-md border p-2 text-[12px] ${correct ? 'border-positive/40 bg-positive-bg' : 'border-critical/40 bg-critical-bg'}`}
+          className={`mt-2 rounded-md border p-2 text-sm ${correct ? 'border-positive/40 bg-positive-bg' : 'border-critical/40 bg-critical-bg'}`}
           role="status"
         >
           <div className={`font-semibold ${correct ? 'text-positive' : 'text-critical'}`}>
@@ -190,11 +190,11 @@ export function Quiz({
     setSaved(true)
   }, [done, saved, recordQuiz, scenarioId, answers, correctCount, questions.length])
 
-  if (questions.length === 0) return <p className="text-[12px] text-muted">퀴즈가 없습니다.</p>
+  if (questions.length === 0) return <p className="text-sm text-muted">퀴즈가 없습니다.</p>
   return (
     <div>
       {previous && !saved && (
-        <p className="mb-2 text-[12px] text-muted num">
+        <p className="mb-2 text-sm text-muted num">
           이전 결과: {previous.correct}/{previous.total} ({shortDate(previous.completedAt)})
         </p>
       )}
@@ -214,7 +214,7 @@ export function Quiz({
       </ol>
       {done && (
         <p
-          className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-[12px]"
+          className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-sm"
           role="status"
         >
           결과:{' '}

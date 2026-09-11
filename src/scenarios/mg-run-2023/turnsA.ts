@@ -1,9 +1,20 @@
-import type { BankState, Turn } from '../../engine/types'
+import type { BankState, DialogueStep, Interrupt, Turn } from '../../engine/types'
 import { bankFx } from '../../engine/fx/bank'
-import { confidence, flag, regulator } from '../../engine/fx/common'
+import { commitReplies } from '../../engine/core/dialogue'
+import { confidence, flag, op, regulator } from '../../engine/fx/common'
 import { mgFx } from './fx'
 
 type T = Turn<BankState>
+
+/**
+ * 창구 하루의 틱 구조. 1,293개 금고의 영업시간(09:30~16:00)을 네 구간으로 나눈다.
+ * 프로필은 `calibration.md` §9.1 참조 — 합은 항상 1이어야 한다.
+ */
+export const QUEUE_TICK_LABELS = ['09:30', '11:00', '14:00', '16:00']
+/** 7/5 첫 줄: 개점 전부터 대기 행렬 — 전방 집중 [STYLIZED]. */
+export const T1_QUEUE_PROFILE = [0.4, 0.3, 0.2, 0.1]
+/** 7/6 전국 확산: 하루 종일 고르게 — 완만 [STYLIZED]. */
+export const T2_QUEUE_PROFILE = [0.3, 0.27, 0.25, 0.18]
 
 /** 출처 id 축약 (sources.ts). 사후 출처(2023.11 이후)는 턴 텍스트에서 인용하지 않는다. */
 export const S = {
@@ -115,8 +126,8 @@ export const t0: T = {
       headline: '개장 시세',
       items: [
         { label: '한은 기준금리', value: '3.50%', change: '1월 이후 동결' },
-        { label: '국고 3년', value: '3.65%', change: '' },
-        { label: '원/달러', value: '1,300', change: '' },
+        { label: '국고 3년', value: '3.619%', change: '' },
+        { label: '원/달러', value: '1,301', change: '' },
       ],
       sourceRefs: [S.bokRate],
     },
@@ -336,17 +347,110 @@ export const t0: T = {
 // ---------------------------------------------------------------------------------------------
 // T1 — 2023-07-05 (수) "합병 공시, 줄이 생기다"
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * 11:20 지역금고 이사장 전화. 종전 `t1-call-branch` 이벤트를 인터럽트로 옮긴 것이며, 대사는
+ * 공개 기록(대기 행렬 보도·행안부 7/5 보도자료)을 바탕으로 한 **재구성**이다 — 녹취가 아니다.
+ */
+const t1BranchCall: Interrupt<BankState> = {
+  id: 't1-i1-branch',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't1-i1-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '지역금고 이사장 전화',
+  prompt: '창구 현금이 오후를 못 버틴다고 합니다. 지금 무엇을 답하시겠습니까?',
+  dimensions: ['compliance', 'liquidity'],
+  source: {
+    kind: 'call',
+    caller: '지역금고 이사장(경기 북부)',
+    tone: 'urgent',
+  },
+  lines: [
+    {
+      speaker: '이사장',
+      text: '창구에 현금이 오후를 못 버팁니다. 상환준비금에서 오늘 중으로 지원되는 겁니까? 일부 직원은 큰 금액은 내일 오라고 안내하자고 합니다.',
+    },
+  ],
+  options: [
+    {
+      id: 't1-i1-a',
+      label: '오늘 중 지원 확약 + 인근 금고 현금 재배치 지시',
+      description:
+        '상환준비금 인출을 즉시 승인하고 인근 금고·중앙회 지점에서 현금을 돌린다. 합성 기관 내부 이동이므로 시스템 현금은 줄지 않는다.',
+      effects: [flag('branch_cash_dispatched')],
+      expert: {
+        rating: 80,
+        rationale:
+          '상환준비금의 존재 이유다. 지급이 한 창구에서라도 멈추면 그 사진이 다음 날 전국의 대기 행렬이 된다.',
+        sourceRefs: [S.brief, S.fsb],
+      },
+      consequences:
+        '현금 수송 차량이 배차되었습니다. 이사장이 직원 안내문을 회수하겠다고 답합니다.',
+      historical: true,
+      preview: [{ metric: 'cash', direction: 'flat', magnitude: 1, note: '중앙회 내부 이동' }],
+    },
+    {
+      id: 't1-i1-b',
+      label: '요청서 접수 후 오후에 심사 결과 회신',
+      description:
+        '절차대로 서면 요청을 받고 심사한다. 오늘 오후 창구는 자체 현금으로 버텨야 한다.',
+      effects: [bankFx.addAmplifier(1.1, '창구 현금 부족·회신 지연')],
+      expert: {
+        rating: 25,
+        rationale:
+          '위기 중 절차는 속도를 이기지 못한다. 1,293개 금고의 창구 현금은 균일하지 않고, 한 곳의 "오늘은 안 됩니다"가 전체의 뉴스가 된다(보정 규칙: 정보 공백 ×1.2의 축소판 ×1.1).',
+        sourceRefs: [S.fsb],
+      },
+      consequences:
+        '요청서를 접수했습니다. 오후 늦게 두 금고에서 현금이 바닥났다는 보고가 왔습니다.',
+      preview: [
+        { metric: 'dailyOutflow', direction: 'up', magnitude: 1, note: '남은 시간대 증폭 ×1.1' },
+      ],
+    },
+    {
+      id: 't1-i1-c',
+      label: '한도 내 지급 후 초과분은 본점 확인 절차 안내',
+      description:
+        '일정 금액까지는 즉시 지급하고 그 이상은 본점 확인을 거치게 한다. 창구에서는 "오늘은 어렵다"로 들린다.',
+      effects: [regulator({ add: 1 }, '사실상의 인출 지연 안내')],
+      expert: {
+        rating: 5,
+        rationale:
+          '지급 유예의 축소판이다. 예금의 요구불성을 조건부로 만드는 안내는 감독당국 반응표에서 곧바로 상향 사유가 되며, 2011년 저축은행 사태에서 같은 안내가 인출을 가속했다.',
+        sourceRefs: [S.sb2011a, S.frc],
+      },
+      consequences:
+        '한도 안내가 창구에 붙었습니다. 대기 중인 예금자들이 휴대전화로 촬영하고 있습니다.',
+      trap: true,
+      trapExplanation:
+        '"전부 막는 것은 아니다"라는 절충은 창구에서 "오늘은 다 못 준다"로 번역된다. 조건이 붙는 순간 요구불예금은 요구불이 아니다.',
+      preview: [{ metric: 'regulatorLevel', direction: 'up', magnitude: 2, note: '감독 단계 +1' }],
+    },
+  ],
+}
+
 export const t1: T = {
   id: 't1',
   label: 'T1',
   timeLabel: '2023년 7월 5일 (수) 09:00 KST',
   title: '합병 공시 — 줄이 생기다',
   time: '2023-07-05T09:00:00+09:00',
+  ticks: 4,
+  tickLabels: QUEUE_TICK_LABELS,
   entryEffects: [
     {
       id: 't1-settle',
       description: '사전 협의한 은행 RP 라인 반영(해당 시)',
       effects: [bankFx.settlePendingCapacity()],
+    },
+    {
+      id: 't1-market',
+      description: '원/달러 시가 1,298.0원 (전일 종가 1,301.4)',
+      effects: [op('market.fxUsdLocal', 'set', 1298, '7/5 시가')],
     },
     {
       id: 't1-disclosure-plain',
@@ -381,12 +485,20 @@ export const t1: T = {
         bankFx.addAmplifier(1.3, '피어(부실 금고) 실패'),
       ],
     },
+  ],
+  eachTick: [
     {
-      id: 't1-runoff',
-      description: '7/5 창구 개장 — 당일 인출',
-      effects: [mgFx.runoffDays({ days: 1, label: '7/5 인출' })],
+      id: 't1-runoff-tick',
+      description: '7/5 창구 인출 (개점 집중)',
+      effects: [mgFx.runoffTicks({ profile: T1_QUEUE_PROFILE, label: '7/5 인출' })],
     },
   ],
+  ticker: {
+    series: [
+      // 원/달러 시가 1,298.0 · 저가 1,297.0 · 고가 1,305.9 · 종가 1,298.6 [ecos-731Y003]
+      { path: 'market.fxUsdLocal', mode: 'absolute', values: [1298, 1297, 1305.9, 1298.6] },
+    ],
+  },
   events: [
     {
       id: 't1-news-merger',
@@ -404,6 +516,7 @@ export const t1: T = {
       kind: 'newswire',
       outlet: '온라인 매체·SNS',
       time: '10:30',
+      atTick: 1,
       headline: '"돈 빼러 왔어요" — 남양주 지점 앞 대기 행렬, 인증샷 확산',
       body: '대기 행렬 사진이 SNS로 퍼지며 다른 지역 지점에도 "우리 금고는 괜찮냐"는 문의가 몰리고 있다. 일부 예금자는 만기 전 중도해지를 감수하고 있다.',
       severity: 'critical',
@@ -423,6 +536,7 @@ export const t1: T = {
       id: 't1-memo-flow',
       kind: 'memo',
       time: '16:00',
+      atTick: 3,
       from: '중앙회 자금운용부',
       to: '범정부 대응단 담당관',
       subject: '당일 인출 및 유동성',
@@ -445,29 +559,10 @@ export const t1: T = {
       sourceRefs: [S.bankRp],
     },
     {
-      id: 't1-call-branch',
-      kind: 'call',
-      time: '11:20',
-      caller: '지역금고 이사장(경기 북부)',
-      callee: '중앙회 자금담당',
-      tone: 'urgent',
-      lines: [
-        {
-          speaker: '이사장',
-          text: '창구에 현금이 오후를 못 버팁니다. 상환준비금에서 오늘 중으로 지원되는 겁니까? 일부 직원은 큰 금액은 내일 오라고 안내하자고 합니다.',
-        },
-        {
-          speaker: '자금담당',
-          text: '지급을 미루는 안내는 절대 하지 마십시오. 현금 수송과 상환준비금 지원을 오늘 결정합니다.',
-        },
-      ],
-      severity: 'critical',
-      cardRefs: ['regulator-escalation-ladder'],
-    },
-    {
       id: 't1-call-mois',
       kind: 'call',
       time: '14:00',
+      atTick: 2,
       caller: '행정안전부 지역경제지원관',
       callee: '범정부 대응단 담당관',
       agency: '행정안전부',
@@ -487,11 +582,14 @@ export const t1: T = {
       id: 't1-d1',
       title: '지역금고 창구·지급 대응',
       prompt: '오늘 창구에서 무엇을 하시겠습니까?',
-      context: '예금은 요구불입니다. 지급을 늦추는 순간 "못 준다"는 소문이 사실이 됩니다.',
+      context:
+        '예금은 요구불입니다. 지급을 늦추는 순간 "못 준다"는 소문이 사실이 됩니다. 창구 현금 배차는 오전 중에 결정해야 오후 마감까지 닿습니다.',
       requiredConcepts: ['regulator-escalation-ladder'],
       dimensions: ['compliance', 'liquidity'],
       timeLimitSec: 120,
       defaultOptionId: 't1-d1-a',
+      availableFrom: 0,
+      deadlineTick: 1,
       options: [
         {
           id: 't1-d1-a',
@@ -560,8 +658,13 @@ export const t1: T = {
       id: 't1-d2',
       title: '대응 체계',
       prompt: '누가 이 사태를 지휘합니까?',
+      context:
+        '행안부 지역경제지원관이 14:00에 물어 왔습니다. 오늘 중에 정해야 내일 아침 브리핑 형식이 나옵니다.',
       requiredConcepts: ['korea-crisis-toolkit'],
       dimensions: ['policy', 'timeliness'],
+      availableFrom: 2,
+      deadlineTick: 2,
+      defaultOptionId: 't1-d2-a',
       options: [
         {
           id: 't1-d2-a',
@@ -614,6 +717,7 @@ export const t1: T = {
       ],
     },
   ],
+  interrupts: [t1BranchCall],
   advisorHints: [
     {
       level: 1,
@@ -631,12 +735,208 @@ export const t1: T = {
 // ---------------------------------------------------------------------------------------------
 // T2 — 2023-07-06 (목) "합동 브리핑"
 // ---------------------------------------------------------------------------------------------
+
+/** 14:00 기자 확인 요청. 대사는 당시 보도 흐름을 바탕으로 한 **재구성**이며 실제 통화가 아니다. */
+const t2PressCall: Interrupt<BankState> = {
+  id: 't2-i1-press',
+  interrupt: true,
+  atTick: 2,
+  jitter: 1,
+  timeoutSec: 40,
+  defaultOptionId: 't2-i1-a',
+  scoreWeight: 0.5,
+  required: false,
+  title: '기자 확인 요청',
+  prompt: '마감 전 확인 요청입니다. 오늘 인출 규모를 지금 말하시겠습니까?',
+  dimensions: ['communication'],
+  source: { kind: 'call', caller: '경제지 기자', tone: 'concerned' },
+  lines: [
+    {
+      speaker: '기자',
+      text: '오늘 인출이 어제보다 크다는 제보가 있습니다. 오후 4시 마감 기사에 넣어야 해서 지금 확인이 필요합니다. 수치를 주시겠습니까, 아니면 "확인 불가"로 쓸까요.',
+    },
+  ],
+  options: [
+    {
+      id: 't2-i1-a',
+      label: '마감 집계 후 오후 브리핑에서 공식 수치로 답하겠다',
+      description:
+        '집계 중인 수치를 미리 주지 않되, 언제 어디서 답할지를 시각으로 약속한다. 브리핑 전 공백은 몇 시간뿐이다.',
+      effects: [flag('press_deferred_to_briefing')],
+      expert: {
+        rating: 70,
+        rationale:
+          '검증되지 않은 중간 집계를 흘리면 그 숫자가 공식 수치와 어긋나는 순간 모든 발표의 신뢰가 깎인다. 공백을 "언제 답하겠다"로 채우는 것이 FSB가 말하는 최소 요건이다.',
+        sourceRefs: [S.fsb],
+      },
+      consequences: '기자가 "오후 브리핑에서 공식 집계 발표 예정"으로 쓰겠다고 답했습니다.',
+      historical: true,
+      preview: [{ metric: 'confidence', direction: 'flat', magnitude: 1, note: '브리핑까지 보류' }],
+    },
+    {
+      id: 't2-i1-b',
+      label: '현재까지 집계치를 그대로 알려준다',
+      description:
+        '오후 2시 기준 중간 집계를 준다. 마감치와 달라지면 정정해야 하고, 정정은 은폐로 읽힌다.',
+      effects: [confidence(-2, '미확정 중간 집계 선공개')],
+      expert: {
+        rating: 35,
+        rationale:
+          '투명성처럼 보이지만 중간 집계는 확정치가 아니다. 같은 날 두 개의 숫자가 돌면 예금자는 큰 쪽을 믿는다.',
+        sourceRefs: [S.fsb],
+      },
+      consequences: '중간 집계가 15시 속보로 나갔습니다. 마감치와 차이가 날 경우 정정해야 합니다.',
+      preview: [{ metric: 'confidence', direction: 'down', magnitude: 1 }],
+    },
+    {
+      id: 't2-i1-c',
+      label: '"어제보다 크다는 것은 사실이 아니다"라고 부인',
+      description: '집계가 끝나기 전에 방향을 단정한다. 마감치가 반대로 나오면 되돌릴 수 없다.',
+      effects: [flag('press_denied')],
+      delayedEffects: [
+        {
+          afterTurns: 1,
+          description: '마감 집계가 부인과 어긋나 "정부가 축소했다" 보도 — 신뢰지수 −6, 증폭 ×1.3',
+          effects: [
+            confidence(-6, '부인과 마감 집계의 모순'),
+            bankFx.addAmplifier(1.3, '축소 발표 인식'),
+          ],
+        },
+      ],
+      expert: {
+        rating: 5,
+        rationale:
+          '검증이 예정된 사실을 부인하는 것은 가장 비싼 커뮤니케이션이다. 2011년 저축은행 사태의 "추가 영업정지 없다"가 이틀 만에 뒤집힌 것과 같은 구조다.',
+        sourceRefs: [S.sb2011, S.fsb],
+      },
+      consequences: '부인 코멘트가 나갔습니다. 기자는 "마감 집계를 받아 대조하겠다"고 했습니다.',
+      trap: true,
+      trapExplanation:
+        '오늘 한 줄 기사를 막는 대가로 내일 검증을 예약하는 선택이다. 인출 집계는 반드시 공표되므로 부인은 언제나 발각된다.',
+      preview: [
+        { metric: 'confidence', direction: 'down', magnitude: 3, note: '다음 턴 모순 판정' },
+      ],
+    },
+  ],
+}
+
+/**
+ * T2.D1 합동 브리핑 문안 협의 (3단계). 대사는 7/6 관계부처 합동 브리핑의 공개 기록을 바탕으로 한
+ * **재구성**이며 속기록이 아니다. 약속한 유동성 규모는 `pledgedSupport` 카운터로 이산화되고,
+ * 이행(당일 현금화 가능성) 여부는 다음 턴 지연효과가 판정한다 — `calibration.md` §10 참조.
+ */
+const t2BriefingSteps: DialogueStep<BankState>[] = [
+  {
+    id: 't2-d1-forum',
+    lines: [
+      {
+        speaker: '행안부 대변인실',
+        text: '오후 브리핑 형식을 지금 확정해야 자료가 나갑니다. 누가 단상에 서고, 무엇을 말하는 자리로 만들지 정해 주십시오.',
+      },
+    ],
+    replies: [
+      {
+        id: 'forum-joint',
+        label: '5개 기관 합동 브리핑으로 연다',
+        when: { flag: 'task_force' },
+        next: 't2-d1-support',
+        expert: {
+          rating: 85,
+          rationale:
+            '행안부 단독 수치는 시장이 검증하지 못한다. 금융위·금감원·한은이 같은 단상에 서는 것 자체가 검증 가능한 신호다.',
+        },
+      },
+      {
+        id: 'forum-mois',
+        label: '행안부 단독 메시지로 간다',
+        resolvesTo: 't2-d1-c',
+        expert: {
+          rating: 25,
+          rationale: '소관 부처의 안심 메시지는 "금융당국은 왜 빠졌나"를 남긴다.',
+        },
+      },
+      {
+        id: 'forum-silent',
+        label: '브리핑 없이 공시 자료와 FAQ만 게시한다',
+        resolvesTo: 't2-d1-d',
+        expert: { rating: 15, rationale: '정보 공백은 SNS와 언론이 채운다.' },
+      },
+    ],
+  },
+  {
+    id: 't2-d1-support',
+    lines: [
+      {
+        speaker: '기재부 차관보',
+        text: '"지금 당장 쓸 수 있는 돈이 얼마냐"가 첫 질문이 될 겁니다. 상환준비금 13.4조, 즉시 가용 현금·예치금까지 30.7조, 채권을 포함한 현금성자산 전체는 77.3조입니다. 어느 숫자를 단상에서 말하시겠습니까.',
+      },
+    ],
+    note: '여기서 말한 규모는 다음 날 "그중 오늘 현금이 되는 돈은 얼마입니까"로 검증됩니다.',
+    replies: commitReplies<BankState>('pledgedSupport', [13, 30, 77], {
+      unit: '조원',
+      label: (v) =>
+        v === 13
+          ? '상환준비금 13조원만 말한다'
+          : v === 30
+            ? '즉시 가용 현금·예치금까지 30조원으로 말한다'
+            : '현금성자산 전체 77조원으로 말한다',
+      next: 't2-d1-promise',
+      expert: (v) => ({
+        rating: v === 30 ? 85 : v === 13 ? 55 : 45,
+        rationale:
+          v === 30
+            ? '당일 지급에 실제로 쓸 수 있는 돈만 말한다. 다음 날 "그중 얼마가 현금이냐"는 질문에 같은 숫자로 답할 수 있는 유일한 값이다.'
+            : v === 13
+              ? '틀린 말은 아니지만 가진 여력을 과소 공표해 "그것뿐이냐"는 반문을 부른다.'
+              : '실제 브리핑이 쓴 숫자다. 다만 77.3조 중 60조는 채권이라 팔거나 RP로 넘겨야 현금이 되고, 담보차입 여력이 없으면 "언제 현금이 되느냐"에 답할 수 없다.',
+      }),
+    }),
+  },
+  {
+    id: 't2-d1-promise',
+    lines: [
+      {
+        speaker: '금융위 사무처',
+        text: '보장 범위가 남았습니다. 새마을금고법상 합병이면 5천만원 초과 원리금도 승계됩니다. 거기서 멈추시겠습니까, 아니면 "추가 부실 금고는 없다"까지 말하시겠습니까.',
+      },
+    ],
+    note: '특별검사 30개는 아직 진행 중입니다.',
+    replies: [
+      {
+        id: 'promise-legal',
+        label: '법이 보장하는 범위(합병 시 전액 승계)까지만 약속한다',
+        resolvesTo: 't2-d1-a',
+        expert: {
+          rating: 85,
+          rationale:
+            '약속의 범위를 법이 보장하는 곳에서 멈추면 이후 어떤 검사 결과가 나와도 발표가 뒤집히지 않는다.',
+        },
+      },
+      {
+        id: 'promise-no-more',
+        label: '"추가 부실 금고는 없다"까지 단언한다',
+        resolvesTo: 't2-d1-b',
+        expert: {
+          rating: 20,
+          rationale:
+            '오늘의 줄을 가장 빨리 줄이는 말이지만, 검사가 끝나지 않은 상태의 단언은 반드시 시험받는다.',
+        },
+        trap: true,
+        trapExplanation:
+          '2011년 2월 17일 금융위는 "과도한 예금인출이 없는 한 상반기 추가 영업정지는 없다"고 했고 이틀 뒤 4개를 추가 정지했다. 검증 불가능한 약속은 모순되는 순간 이전 발표의 신뢰까지 함께 무너뜨린다.',
+      },
+    ],
+  },
+]
+
 export const t2: T = {
   id: 't2',
   label: 'T2',
   timeLabel: '2023년 7월 6일 (목) 09:00 KST',
   title: '합동 브리핑',
   time: '2023-07-06T09:00:00+09:00',
+  ticks: 4,
+  tickLabels: QUEUE_TICK_LABELS,
   entryEffects: [
     {
       id: 't2-settle',
@@ -649,11 +949,32 @@ export const t2: T = {
       effects: [confidence(-3, '언론·SNS 확산(외생)'), bankFx.addAmplifier(1.2, 'SNS 바이럴')],
     },
     {
-      id: 't2-runoff',
-      description: '7/6 당일 인출',
-      effects: [mgFx.runoffDays({ days: 1, label: '7/6 인출' })],
+      id: 't2-market',
+      description: '개장 앵커: 원/달러 1,304.5원, 국고 2년 3.677%, 국고 3년 3.618% (7/5 종가)',
+      effects: [
+        op('market.fxUsdLocal', 'set', 1304.5, '7/6 시가'),
+        op('market.govt2yBp', 'set', 368, '국고 2년 7/5 종가 3.677%'),
+        op('market.custom.govt3y', 'set', 362, '국고 3년 7/5 종가 3.618%'),
+      ],
     },
   ],
+  eachTick: [
+    {
+      id: 't2-runoff-tick',
+      description: '7/6 창구 인출 (전국 확산 — 하루 종일)',
+      effects: [mgFx.runoffTicks({ profile: T2_QUEUE_PROFILE, label: '7/6 인출' })],
+    },
+  ],
+  ticker: {
+    series: [
+      // 원/달러 시가 1,304.5 · 고가 1,306.8 · 저가 1,300.1 · 종가 1,300.9 [ecos-731Y003]
+      { path: 'market.fxUsdLocal', mode: 'absolute', values: [1304.5, 1306.8, 1300.1, 1300.9] },
+      // 국고채 2년 3.677% → 3.732% (7/6 종가) [ecos-817Y002]
+      { path: 'market.govt2yBp', mode: 'absolute', values: [368, 369, 371, 373] },
+      // 국고채 3년 3.618% → 3.676% (7/6 종가) [ecos-817Y002]
+      { path: 'market.custom.govt3y', mode: 'absolute', values: [362, 364, 366, 368] },
+    ],
+  },
   events: [
     {
       id: 't2-news-spread',
@@ -699,6 +1020,7 @@ export const t2: T = {
       kind: 'call',
       when: { flag: 'task_force' },
       time: '10:00',
+      atTick: 1,
       caller: '기획재정부 차관보',
       callee: '범정부 대응단 담당관',
       agency: '기획재정부',
@@ -722,6 +1044,7 @@ export const t2: T = {
       when: { flag: 'mois_alone' },
       agency: '금융위원회',
       time: '10:00',
+      atTick: 1,
       headline: '금융위 "행안부 요청 없이는 브리핑 참여 어려움"',
       body: '행안부 단독 브리핑이 예정되어 있다. 시장은 "금융당국이 왜 빠졌나"를 묻고 있다.',
       tone: 'concerned',
@@ -744,11 +1067,14 @@ export const t2: T = {
       title: '브리핑 메시지',
       prompt: '오후 브리핑에서 무엇을 말하시겠습니까?',
       context:
-        '수치는 확인되었습니다. 문제는 어디까지 약속하느냐입니다. 법이 보장하는 것, 정부가 하겠다는 것, 그리고 하고 싶은 말은 다릅니다.',
+        '수치는 확인되었습니다. 문제는 어디까지 약속하느냐입니다. 법이 보장하는 것, 정부가 하겠다는 것, 그리고 하고 싶은 말은 다릅니다. 브리핑은 창구 마감 집계를 받은 뒤에 열립니다 — 오늘의 줄은 이미 끝났고, 이 메시지가 정하는 것은 내일 아침 줄의 길이입니다.',
       requiredConcepts: ['crisis-communication'],
       dimensions: ['communication', 'policy'],
       timeLimitSec: 150,
       defaultOptionId: 't2-d1-c',
+      availableFrom: 3,
+      select: { min: 1, max: 1 },
+      steps: t2BriefingSteps,
       options: [
         {
           id: 't2-d1-a',
@@ -763,6 +1089,23 @@ export const t2: T = {
             confidence(12, '"합병 시 5천만원 초과 전액 지급" 약속'),
             bankFx.setDampener(0.8, '인식된 보장 범위 확대(합병 시 전액 승계)'),
             flag('full_payment_promise'),
+          ],
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              when: {
+                all: [
+                  { counter: 'pledgedSupport', gte: 70 },
+                  { metric: 'facilityHeadroom', lt: 1 },
+                ],
+              },
+              description:
+                '"77조 중 오늘 현금이 되는 돈은 얼마입니까" — 담보차입 여력이 없어 즉시 지급 가능액을 대지 못함 → 신뢰지수 −5, 증폭 ×1.15',
+              effects: [
+                confidence(-5, '공표한 유동성 규모의 즉시 가용성 미입증'),
+                bankFx.addAmplifier(1.15, '공표 규모와 당일 가용액의 괴리'),
+              ],
+            },
           ],
           expert: {
             rating: 85,
@@ -796,6 +1139,21 @@ export const t2: T = {
             flag('conditional_reassurance'),
           ],
           delayedEffects: [
+            {
+              afterTurns: 1,
+              when: {
+                all: [
+                  { counter: 'pledgedSupport', gte: 70 },
+                  { metric: 'facilityHeadroom', lt: 1 },
+                ],
+              },
+              description:
+                '"77조 중 오늘 현금이 되는 돈은 얼마입니까" — 담보차입 여력이 없어 즉시 지급 가능액을 대지 못함 → 신뢰지수 −5, 증폭 ×1.15',
+              effects: [
+                confidence(-5, '공표한 유동성 규모의 즉시 가용성 미입증'),
+                bankFx.addAmplifier(1.15, '공표 규모와 당일 가용액의 괴리'),
+              ],
+            },
             {
               afterTurns: 2,
               description:
@@ -852,7 +1210,12 @@ export const t2: T = {
       id: 't2-d2',
       title: '중앙회 조달',
       prompt: '오늘 현금을 어떻게 확보하시겠습니까? (최대 2개)',
+      context:
+        '채권 매도와 RP 체결은 당일 결제를 받으려면 오후 장이 끝나기 전에 지시가 나가야 합니다.',
       select: { min: 1, max: 2 },
+      availableFrom: 0,
+      deadlineTick: 2,
+      defaultOptionId: 't2-d2-a',
       exclusive: [
         ['t2-d2-a', 't2-d2-b'],
         ['t2-d2-a', 't2-d2-d'],
@@ -973,6 +1336,7 @@ export const t2: T = {
       ],
     },
   ],
+  interrupts: [t2PressCall],
   advisorHints: [
     {
       level: 1,
@@ -1006,6 +1370,15 @@ export const t3: T = {
       id: 't3-settle',
       description: '익일 결제 RP 반영(해당 시)',
       effects: [bankFx.settlePendingCapacity()],
+    },
+    {
+      id: 't3-market',
+      description: '7/7 종가: 원/달러 1,305.0원, 국고 2년 3.780%, 국고 3년 3.735%',
+      effects: [
+        op('market.fxUsdLocal', 'set', 1305, '7/7 종가'),
+        op('market.govt2yBp', 'set', 378, '국고 2년 3.780%'),
+        op('market.custom.govt3y', 'set', 374, '국고 3년 3.735%'),
+      ],
     },
     {
       id: 't3-runoff',

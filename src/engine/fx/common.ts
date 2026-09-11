@@ -1,5 +1,5 @@
 import type { Draft } from 'immer'
-import type { Effect, EffectContext, GameState, InstitutionState } from '../types'
+import type { Effect, EffectContext, FeedChannel, GameState, InstitutionState } from '../types'
 import { clamp } from '../core/paths'
 
 type Params = Record<string, number | string | boolean>
@@ -55,11 +55,16 @@ export const regulator = (
   ...setOrAdd,
   reason,
 })
+/** Feed item effect. `channel` drives both the consequence-reel order and the log filter. */
 export const feed = (
   title: string,
   body: string,
   severity: 'info' | 'warning' | 'critical' | 'positive' = 'info',
-): Effect => ({ kind: 'feed', item: { kind: 'consequence', severity, title, body } })
+  channel?: FeedChannel,
+): Effect => ({
+  kind: 'feed',
+  item: { kind: 'consequence', severity, title, body, ...(channel ? { channel } : {}) },
+})
 
 /** Multiplies a counter used as an amplifier/dampener product (keeps ≥ 0). */
 export function multiplyCounter<S extends InstitutionState>(

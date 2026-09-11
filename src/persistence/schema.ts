@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 export const STORAGE_VERSION = 1
 
+/** Default real seconds per simulated tick at ×1 (설정에서 4~30초로 조정). */
+export const DEFAULT_CLOCK_TICK_SEC = 8
+
 export const decisionRecordSchema = z.object({
   turnIndex: z.number().int().nonnegative(),
   decisionId: z.string(),
@@ -10,6 +13,10 @@ export const decisionRecordSchema = z.object({
   timedOut: z.boolean().optional(),
   memo: z.string().optional(),
   hintsUsed: z.number().optional(),
+  /** Sub-turn tick the record was committed at (omitted when 0 — the legacy shape). */
+  tick: z.number().int().nonnegative().optional(),
+  /** Set when the record answers an `Interrupt`. */
+  interrupt: z.literal(true).optional(),
 })
 
 export const inProgressSchema = z.object({
@@ -19,6 +26,10 @@ export const inProgressSchema = z.object({
   scenarioVersion: z.number(),
   decisions: z.array(decisionRecordSchema),
   turnIndex: z.number().int().nonnegative(),
+  /** Sub-turn tick the run had reached inside `turnIndex` (absent ⇒ the turn's last tick). */
+  tick: z.number().int().nonnegative().optional(),
+  /** Volatility the run is being played at (absent ⇒ 0, the canonical stream). */
+  variance: z.number().min(0).max(1).optional(),
   rewinds: z.number().int().nonnegative(),
   hintPenalty: z.number().nonnegative(),
   hintsRevealed: z.record(z.string(), z.number()),
@@ -34,6 +45,8 @@ export const attemptSchema = z.object({
   mode: z.enum(['guided', 'standard', 'expert']),
   scenarioVersion: z.number(),
   decisions: z.array(decisionRecordSchema),
+  /** Volatility the attempt was played at (absent ⇒ 0). */
+  variance: z.number().min(0).max(1).optional(),
   rewinds: z.number(),
   hintPenalty: z.number(),
   total: z.number(),
@@ -93,6 +106,17 @@ export const settingsSchema = z.object({
   timersEnabled: z.boolean(),
   useSystemFont: z.boolean(),
   defaultMode: z.enum(['guided', 'standard', 'expert']),
+  /**
+   * Real seconds one simulated tick lasts at ×1. Absent ⇒ the mode default
+   * (안내 30초 · 표준 20초 · 전문가 12초).
+   */
+  clockTickSec: z.number().min(4).max(30).optional(),
+  /** Live-play volatility: 0 = 완전히 동일, 0.5 = 약간, 1 = 기본. */
+  variance: z.union([z.literal(0), z.literal(0.5), z.literal(1)]).optional(),
+  /** ISO timestamp set when the home screen intro is dismissed (`처음 안내 숨기기`). */
+  onboardingSeenAt: z.string().optional(),
+  /** Last role family picked on the home screen; pre-filters the catalog. */
+  roleFamily: z.enum(['bank', 'securities', 'pension', 'fund', 'policy']).optional(),
 })
 export type SettingsState = z.infer<typeof settingsSchema>
 
@@ -106,6 +130,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   timersEnabled: true,
   useSystemFont: false,
   defaultMode: 'standard',
+  clockTickSec: DEFAULT_CLOCK_TICK_SEC,
+  variance: 1,
 }
 
 export function emptyProgress(now: string): ProgressState {

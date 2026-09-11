@@ -1,9 +1,39 @@
-import type { BankState, Turn } from '../../engine/types'
+import type { BankState, Interrupt, Turn } from '../../engine/types'
 import { bankFx } from '../../engine/fx/bank'
-import { confidence, flag, fnEffect, op, ownStockMove, regulator } from '../../engine/fx/common'
+import {
+  confidence,
+  counter,
+  flag,
+  fnEffect,
+  op,
+  ownStockMove,
+  regulator,
+} from '../../engine/fx/common'
+import { commitReplies } from '../../engine/core/dialogue'
 import { clamp } from '../../engine/core/paths'
 
 type T = Turn<BankState>
+
+/**
+ * Re-decides whether an acquirer stays at the table once the negotiation ends. `overnightSale`
+ * (t5-b) already ran the baseline test on liquidity days and economic TCE; what the player promised
+ * in the conversation then moves it. Holding out for book value closes the only weekend window;
+ * a deep discount, or the supervisor in the room opening loss-sharing, keeps a buyer.
+ * Flags only — never cash — so the T5 closing-balance checkpoint is untouched by construction.
+ */
+function settleBuyer(joint: boolean) {
+  return fnEffect<BankState>('settleBuyer', { joint }, (d, ctx) => {
+    const haircut = d.counters.saleHaircutPct ?? 0
+    let exists = d.flags.buyer_exists === true
+    if (haircut <= 10) exists = false
+    else if (haircut >= 40 || joint) exists = true
+    d.flags.buyer_exists = exists
+    if (exists) d.flagTurns.buyer_exists ??= d.turnIndex
+    ctx.log(
+      `인수 후보 ${exists ? '유지' : '이탈'} (할인 ${haircut}%, 감독당국 동석 ${joint ? '있음' : '없음'})`,
+    )
+  })
+}
 
 const S = {
   fed: 'fed-svb-review-2023',
@@ -20,17 +50,111 @@ const S = {
   deloitte: 'deloitte-fra-23-2',
   fsb: 'fsb-depositor-2024',
   fred: 'fred-dgs2',
+  pacw10q: 'pacwest-10q-2023q1',
+  pacw8k: 'pacwest-8k-2023-03-22',
 }
 
 // ---------------------------------------------------------------------------------------------
-// T5 — 2023-03-09 (목) 17:00 PT "마감"
+// T5 — 2023-03-09 (목) 17:00 PT "마감"  (3틱: 17:00 / 20:00 / 23:00)
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * 기존 `t5-call-frbsf` 통화 이벤트를 인터럽트로 재배치한 것이다(재작성이 아니라 이관).
+ * 감독관 대사는 원 이벤트에서 그대로 가져왔고, CRO의 응답 대사("담보 목록과 FHLB 리엔 해제
+ * 요청서를 지금 보내겠습니다")는 옵션 A의 결과 문장으로 옮겼다. **재구성된 대사**이며 통화
+ * 녹취가 아니다(calibration.md §7).
+ */
+const t5FrbsfCall: Interrupt<BankState> = {
+  id: 't5-i1-frbsf',
+  interrupt: true,
+  atTick: 0,
+  when: { flag: 'regulator_engaged' },
+  timeoutSec: 45,
+  defaultOptionId: 't5-i1-send-now',
+  scoreWeight: 0.5,
+  required: false,
+  title: 'FRB 샌프란시스코 감독관 통화',
+  prompt: '야간 담보 이동이 허용되었습니다. 담보 목록과 리엔 해제 요청서를 언제 보내겠습니까?',
+  context:
+    '야간 창구 대출은 담보 목록이 접수되어야 준비가 시작됩니다. 개장까지 남은 시간이 그대로 여력이 됩니다.',
+  source: {
+    kind: 'regulator',
+    caller: 'FRB 샌프란시스코 감독관',
+    agency: 'Federal Reserve Bank of San Francisco',
+    tone: 'urgent',
+  },
+  lines: [
+    {
+      speaker: '감독관',
+      text: '오늘 낮에 말씀하신 대로 야간 담보 이동을 허용하겠습니다. 이동 가능한 담보 범위 내에서 창구 대출을 준비하십시오. 단, 내일 아침 대기열이 여력을 넘으면 우리도 선택지가 없습니다.',
+    },
+  ],
+  dimensions: ['compliance', 'timeliness'],
+  options: [
+    {
+      id: 't5-i1-send-now',
+      label: '담보 목록과 리엔 해제 요청서를 지금 전송',
+      description:
+        '리엔 해제와 담보 이관은 순차 처리다. 지금 접수되어야 야간에 실제로 움직일 수 있다.',
+      effects: [flag('collateral_list_sent'), counter('overnightPrepStarted', 1)],
+      expert: {
+        rating: 85,
+        rationale:
+          '3월 9일 밤의 제약은 의지가 아니라 처리 시간이었다. SVB는 담보 이동을 마감 전에 완료하지 못했고, 연준 검토와 GAO 보고서 모두 야간 이동에 필요한 준비 시간이 부족했다는 점을 실패 요인으로 기록한다. 채널이 열려 있을 때 즉시 접수시키는 것 외의 선택지는 없다.',
+        sourceRefs: [S.fed, S.gao],
+      },
+      preview: [
+        {
+          metric: 'facilityPending',
+          direction: 'flat',
+          magnitude: 1,
+          note: '준비된 익일 여력이 그대로 살아난다',
+        },
+      ],
+      consequences:
+        '"담보 목록과 FHLB 리엔 해제 요청서를 지금 보내겠습니다." 목록이 접수되어 야간 처리 대기열에 올랐습니다.',
+      historical: true,
+    },
+    {
+      id: 't5-i1-wait-morning',
+      label: '내일 아침 정리해서 전송',
+      description: '야간에 목록을 다듬어 개장 전에 한 번에 보낸다.',
+      effects: [flag('collateral_list_delayed')],
+      delayedEffects: [
+        {
+          afterTurns: 1,
+          when: { flag: 'collateral_list_delayed' },
+          description: '개장 전 접수로는 리엔 해제·담보 이관이 절반만 완료됨 → 익일 반영 여력 ×0.6',
+          effects: [op('institution.wholesale.cbFacilityPending', 'mul', 0.6, '야간 이관 미완')],
+        },
+      ],
+      expert: {
+        rating: 15,
+        rationale:
+          '야간 채널은 한 번 열리면 닫힌다. 아침에 보내면 리엔 해제와 담보 이관이 개장 대기열보다 늦고, 준비된 여력은 쓸 수 없는 여력이 된다(3월 10일 아침 cash letter 미결제의 직접 원인).',
+        sourceRefs: [S.fed, S.dfpi],
+      },
+      preview: [
+        { metric: 'facilityPending', direction: 'down', magnitude: 2, note: '익일 반영 여력 ×0.6' },
+      ],
+      consequences:
+        '목록 전송을 아침으로 미뤘습니다. 감독관은 "그러면 준비할 시간이 없습니다"라고 답했습니다.',
+      trap: true,
+      trapExplanation:
+        '서류를 "제대로" 정리하려는 본능이 야간 처리 시간을 통째로 소모한다. 위기 야간의 담보 이관은 완결성보다 접수 시각이 가치를 결정한다.',
+    },
+  ],
+}
+
 export const t5: T = {
   id: 't5',
   label: 'T5',
   timeLabel: '2023년 3월 9일 (목) 17:00 PT',
   title: '마감',
   time: '2023-03-09T17:00:00-08:00',
+  ticks: 3,
+  tickLabels: ['17:00', '20:00', '23:00'],
+  interrupts: [t5FrbsfCall],
   entryEffects: [
     {
       id: 't5-close-flag',
@@ -55,28 +179,6 @@ export const t5: T = {
       relatedMetrics: ['cash', 'dailyOutflow', 'facilityPending'],
     },
     {
-      id: 't5-call-frbsf',
-      kind: 'call',
-      when: { flag: 'regulator_engaged' },
-      time: '17:30',
-      caller: 'FRB 샌프란시스코 감독관',
-      callee: 'CRO/Treasurer',
-      agency: 'Federal Reserve Bank of San Francisco',
-      tone: 'urgent',
-      lines: [
-        {
-          speaker: '감독관',
-          text: '오늘 낮에 말씀하신 대로 야간 담보 이동을 허용하겠습니다. 이동 가능한 담보 범위 내에서 창구 대출을 준비하십시오. 단, 내일 아침 대기열이 여력을 넘으면 우리도 선택지가 없습니다.',
-        },
-        {
-          speaker: 'CRO',
-          text: '이해했습니다. 담보 목록과 FHLB 리엔 해제 요청서를 지금 보내겠습니다.',
-        },
-      ],
-      severity: 'warning',
-      sourceRefs: [S.fed],
-    },
-    {
       id: 't5-call-dfpi-cold',
       kind: 'call',
       when: { notFlag: 'regulator_engaged' },
@@ -99,6 +201,7 @@ export const t5: T = {
       kind: 'newswire',
       when: { flag: 'raise_failed' },
       outlet: 'CNBC',
+      atTick: 1,
       time: '18:20',
       headline: '퍼시픽밸리은행 증자 무산 임박 — 매각 대안 모색 보도',
       body: '복수의 소식통에 따르면 북빌딩이 목표에 크게 못 미쳤으며, 은행이 밤사이 인수자를 찾고 있다.',
@@ -108,6 +211,7 @@ export const t5: T = {
     {
       id: 't5-board',
       kind: 'board',
+      atTick: 1,
       time: '19:00',
       headline: '긴급 이사회 소집',
       body: '이사회는 (1) 야간 유동성 조달 가능성, (2) 매각 절차, (3) 감독당국과의 협의 상태를 보고받고 경영진에 결정 권한을 위임했습니다. "내일 아침 문을 열 수 있는가"가 유일한 안건입니다.',
@@ -122,6 +226,11 @@ export const t5: T = {
       context:
         '내일 아침 개장 전까지 현금 잔고가 양수가 되어야 합니다. 금요일 대기열은 오늘보다 훨씬 클 것으로 예상됩니다.',
       select: { min: 1, max: 2 },
+      // 감독관 통화(틱 0)가 먼저 오고, 야간 조치는 그 뒤에 결정한다. 개장 전(틱 1)까지가 시한이며
+      // T5에는 유출 창구가 없어 마감 틱이 잔고 보정에 영향을 주지 않는다.
+      availableFrom: 1,
+      deadlineTick: 1,
+      defaultOptionId: 't5-b',
       requiredConcepts: ['fdic-resolution-weekend'],
       dimensions: ['liquidity', 'compliance', 'timeliness'],
       options: [
@@ -244,6 +353,177 @@ export const t5: T = {
             sourceRefs: [S.fed],
           },
           consequences: 'GA 자금이 입금되었습니다. 서한에 대한 반응은 냉담합니다.',
+        },
+      ],
+    },
+    {
+      // 매각을 타진했을 때만 열리는 협상. `t5-d1`은 최대 2개 선택이라 대화를 직접 붙일 수 없어
+      // 별도 결정으로 분리했다. 현금에는 손대지 않고 인수자 성립 여부(flag)만 움직이므로
+      // T5 마감 잔고 체크포인트(−$958M)에 영향이 없다.
+      // 대사는 기록에 근거한 재구성이며 실제 협상록이 아니다(calibration.md §7.6).
+      id: 't5-d2',
+      title: '인수 협상',
+      prompt: '투자은행이 인수 후보를 연결했습니다. 어떻게 협상하시겠습니까?',
+      context:
+        '인수자는 주말 안에 실사를 끝내야 합니다. 실사 자료를 얼마나 여는지, 장부를 얼마나 깎아 내놓는지가 후보의 참여 여부를 가릅니다.',
+      when: { chose: { decision: 't5-d1', option: 't5-b' } },
+      required: false,
+      select: { min: 1, max: 1 },
+      // `t5-d1`을 답한 뒤(틱 1)에야 열리고, T5에는 유출 창구가 없어 마감 틱을 둘 이유가 없다.
+      // 마지막 틱에 마감을 두면 스윕이 그 다음 틱에 돌지 않아 자동 확정이 일어나지 않는다.
+      availableFrom: 1,
+      defaultOptionId: 't5-d2-b',
+      dimensions: ['solvency', 'communication', 'timeliness'],
+      steps: [
+        {
+          id: 't5-d2-dataroom',
+          lines: [
+            {
+              speaker: '인수 후보 CFO',
+              text: '주말 안에 끝내야 합니다. 대출 포트폴리오 원장과 증권 북 전체를 지금 볼 수 있습니까?',
+            },
+          ],
+          note: '실사 자료의 범위가 인수 후보의 참여 여부를 먼저 결정합니다.',
+          replies: [
+            {
+              id: 't5-d2-r-open',
+              label: '데이터룸을 지금 전면 개방',
+              effects: [flag('dataroom_open')],
+              next: 't5-d2-haircut',
+              expert: {
+                rating: 80,
+                rationale: '주말이 유일한 창이다. 자료 제한은 실사 시간을 늘려 창을 닫는다.',
+              },
+            },
+            {
+              id: 't5-d2-r-summary',
+              label: '요약 자료만 제공하고 원장은 내일 아침에',
+              next: 't5-d2-haircut',
+              expert: {
+                rating: 35,
+                rationale: '하루를 미루면 후보가 요구하는 실사 시간이 런이 허용한 시간을 넘는다.',
+              },
+            },
+            {
+              id: 't5-d2-r-stop',
+              label: '조건이 맞지 않는다고 보고 협상을 중단',
+              resolvesTo: 't5-d2-c',
+              expert: { rating: 20, rationale: '대안 없이 유일한 출구를 스스로 닫는다.' },
+            },
+          ],
+        },
+        {
+          id: 't5-d2-haircut',
+          lines: [
+            {
+              speaker: '인수 후보 CFO',
+              text: '장부가로는 못 삽니다. 증권·대출 북에 얼마를 깎아 주실 수 있습니까?',
+            },
+          ],
+          note: '여기서 부른 할인율이 후보의 참여 여부를 가릅니다. 깎을수록 팔리지만, 남는 것이 줄어듭니다.',
+          replies: commitReplies<BankState>('saleHaircutPct', [10, 25, 40], {
+            idPrefix: 't5-d2-haircut',
+            label: (v) =>
+              v <= 10
+                ? '10% — 장부가에 가깝게 고수'
+                : v <= 25
+                  ? '25% — 시장가 수준을 수용'
+                  : '40% — 주말 종결을 위해 대폭 양보',
+            next: 't5-d2-supervisor',
+            expert: (v) => ({
+              rating: v <= 10 ? 25 : v <= 25 ? 70 : 55,
+              rationale:
+                v <= 10
+                  ? '런 중인 은행의 장부가를 인정할 인수자는 없다. 후보가 이탈한다.'
+                  : v <= 25
+                    ? '시장가 수용은 후보를 붙잡되 주주 가치를 지나치게 버리지 않는다.'
+                    : '팔리기는 하지만 잔여 자본이 깎여 나간다. 대안이 없을 때만 정당화된다.',
+            }),
+            trap: (v) => v <= 10,
+            trapExplanation: (v) =>
+              v <= 10
+                ? '장부가 고수는 협상력을 지키는 것처럼 보이지만, 인수자에게는 매도 의사가 없다는 신호다. 주말이라는 유일한 창을 닫는다.'
+                : undefined,
+          }),
+        },
+        {
+          id: 't5-d2-supervisor',
+          lines: [
+            {
+              speaker: '인수 후보 CFO',
+              text: '감독당국이 이 자리에 함께 있습니까? 손실분담 없이는 이사회를 설득할 수 없습니다.',
+            },
+          ],
+          replies: [
+            {
+              id: 't5-d2-r-joint',
+              label: 'FRB SF·FDIC 동석을 요청',
+              // T4에서 선제 보고하지 않았다면 이 자리를 만들 채널 자체가 없다 — 응답을 숨긴다.
+              when: { flag: 'regulator_engaged' },
+              resolvesTo: 't5-d2-a',
+              expert: {
+                rating: 85,
+                rationale:
+                  '주말 매각은 감독당국이 손실분담 구조를 열어 줄 때만 성립한다. 사전 접촉이 없으면 이 자리를 만들 수 없다.',
+              },
+            },
+            {
+              id: 't5-d2-r-alone',
+              label: '단독으로 진행',
+              resolvesTo: 't5-d2-b',
+              expert: { rating: 40, rationale: '순수 민간 거래는 실사 시간과 가격 모두에서 불리하다.' },
+            },
+          ],
+        },
+      ],
+      options: [
+        {
+          id: 't5-d2-a',
+          label: '감독당국 동석 하에 협상',
+          description: '손실분담 구조를 전제로 후보와 협상한다. 사전 접촉이 있어야 자리가 열린다.',
+          requires: { flag: 'regulator_engaged' },
+          unavailableReason: '감독당국과 사전 접촉이 없어 동석을 요청할 채널이 없습니다 (T4).',
+          effects: [flag('sale_joint'), settleBuyer(true)],
+          expert: {
+            rating: 85,
+            rationale:
+              '2023년 3월의 실제 해법도 감독당국이 손실분담을 연 뒤에야 성립했다(퍼스트시티즌스). 야간에 그 자리를 만드는 것이 최선의 경로다.',
+            sourceRefs: [S.fed, S.gao],
+          },
+          consequences: '감독당국이 동석했습니다. 후보가 주말 실사에 착수합니다.',
+        },
+        {
+          id: 't5-d2-b',
+          label: '단독으로 협상 진행',
+          description: '민간 거래로만 진행한다. 후보는 더 긴 실사 시간과 더 큰 할인을 요구한다.',
+          effects: [settleBuyer(false)],
+          expert: {
+            rating: 40,
+            rationale:
+              'SVB의 실제 경로. 후보는 런이 허용한 시간보다 긴 실사를 요구했고 주말 안에 합의에 이르지 못했다.',
+            historicalNote: '3월 10일 아침까지 인수 합의에 도달하지 못했다.',
+            sourceRefs: [S.fed, S.gao],
+          },
+          consequences: '후보와 단독으로 협상 중입니다. 실사 일정에 대한 답이 오지 않았습니다.',
+          historical: true,
+        },
+        {
+          id: 't5-d2-c',
+          label: '협상 중단',
+          description: '조건이 맞지 않는다고 보고 자리를 정리한다.',
+          effects: [
+            fnEffect<BankState>('saleAbandoned', {}, (d, ctx) => {
+              d.flags.buyer_exists = false
+              ctx.log('매각 협상 중단 — 인수 후보 없음')
+            }),
+          ],
+          expert: {
+            rating: 20,
+            rationale: '증자도 매각도 없으면 남는 경로는 정리뿐이다.',
+            sourceRefs: [S.gao],
+          },
+          consequences: '협상을 중단했습니다.',
+          irreversible: true,
         },
       ],
     },
@@ -574,11 +854,18 @@ export const t7: T = {
           effects: [bankFx.insuredSweep({ share: 0.2 })],
           expert: {
             rating: 70,
-            rationale: '무보험 비중의 구조적 해법. PacWest는 보험 비중을 48%→71%로 높였다(3/20).',
-            sourceRefs: [S.bcbs],
+            rationale:
+              '무보험 비중의 구조적 해법. PacWest는 보험 예금 비중을 2022-12-31 48% → 2023-03-31 71%로 높였다 ' +
+              '(중간 경과: 3/16 62% 초과, 3/20 65% 초과).',
+            sourceRefs: [S.bcbs, S.pacw10q, S.pacw8k],
           },
           consequences: '스윕 프로그램이 개시되었습니다. 보험 예금 비중이 상승했습니다.',
-          calibrationNote: 'PacWest 2023-03-20 공시 [VERIFY]',
+          calibrationNote:
+            '원문 확인(2026-09). **"48%→71%"의 일자는 3/20이 아니라 3/31이다** — PacWest Bancorp Form 10-Q ' +
+            '(Q1 2023, 2023-05-11 제출): "the percentage of insured deposits to total deposits to increase ' +
+            'from 48% at December 31, 2022 to 71% of total deposits at March 31, 2023". 3월 중 경과는 8-K ' +
+            'Ex.99.1로 확인된다: 3/16 기준 "insured deposits exceed 62% of total deposits"(2023-03-20 제출), ' +
+            '3/20 기준 "FDIC-insured deposits exceeded 65% of total deposits"(2023-03-22 제출). [VERIFY] 해소.',
         },
         {
           id: 't7-d',

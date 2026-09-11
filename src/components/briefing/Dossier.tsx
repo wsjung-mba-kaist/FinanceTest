@@ -1,27 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getCard } from '../../content'
 import { createGame, latestSnapshot } from '../../engine'
-import type { BankState, Mode, ScenarioDefinition, ScoreDimension } from '../../engine/types'
+import type { BankState, ScenarioDefinition, ScoreDimension } from '../../engine/types'
 import { SCORE_DIMENSIONS } from '../../engine/types/common'
 import { formatCurrency, formatMetric } from '../../lib/format'
-import {
-  DIMENSION_LABELS,
-  DIMENSION_LABELS_EN,
-  MODE_DESCRIPTIONS,
-  MODE_LABELS,
-  SOURCE_KIND_LABELS,
-  shortDate,
-  turnProgressLabel,
-} from '../../lib/labels'
-import { useMediaQuery } from '../../lib/useScenario'
-import { useGameStore } from '../../store/gameStore'
+import { DIMENSION_LABELS, DIMENSION_LABELS_EN, SOURCE_KIND_LABELS } from '../../lib/labels'
 import { useProgressStore } from '../../store/progressStore'
-import { useSettingsStore } from '../../store/settingsStore'
 import { GlossaryTerm } from '../knowledge/GlossaryTerm'
 import { Markdown } from '../knowledge/Markdown'
-import { Badge, Button, ConfirmDialog, StatusBadge } from '../ui'
+import { Badge, StatusBadge } from '../ui'
+import { Icon } from '../ui/Icon'
 
+/**
+ * The full dossier. Every section is collapsed by default on every breakpoint — the executive
+ * summary above carries what a reader needs before starting, and this is the reference behind it.
+ * Mode selection and the start CTA live in the summary's start card, not here.
+ */
 export const DOSSIER_SECTIONS = [
   { id: 'situation', n: 1, title: '상황 개요' },
   { id: 'institution', n: 2, title: '기관 현황' },
@@ -30,18 +24,14 @@ export const DOSSIER_SECTIONS = [
   { id: 'regulation', n: 5, title: '규제·제도' },
   { id: 'concepts', n: 6, title: '핵심 개념' },
   { id: 'scoring', n: 7, title: '평가 기준' },
-  { id: 'mode', n: 8, title: '모드·시작' },
-  { id: 'sources', n: 9, title: '출처·단순화 노트' },
+  { id: 'sources', n: 8, title: '출처·단순화 노트' },
 ] as const
 export type DossierSectionId = (typeof DOSSIER_SECTIONS)[number]['id']
-
-const MODES: Mode[] = ['guided', 'standard', 'expert']
 
 function Section({
   id,
   n,
   title,
-  mobile,
   open,
   onToggle,
   viewed,
@@ -50,7 +40,6 @@ function Section({
   id: DossierSectionId
   n: number
   title: string
-  mobile: boolean
   open: boolean
   onToggle: () => void
   viewed: boolean
@@ -63,36 +52,23 @@ function Section({
       id={`sec-${id}`}
       data-section={id}
       aria-labelledby={headingId}
-      className="rounded-lg border border-border bg-surface scroll-mt-4"
+      className="scroll-mt-4 rounded-lg border border-border bg-surface"
     >
-      {mobile ? (
-        <h2 id={headingId} className="m-0">
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls={panelId}
-            onClick={onToggle}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] font-semibold"
-          >
-            <span className="text-muted num">{n}.</span>
-            <span className="flex-1">{title}</span>
-            {viewed && <span className="text-[11px] font-normal text-positive">열람</span>}
-            <span aria-hidden="true" className="text-muted">
-              {open ? '−' : '+'}
-            </span>
-          </button>
-        </h2>
-      ) : (
-        <h2
-          id={headingId}
-          className="m-0 flex items-center gap-2 border-b border-border px-4 py-3 text-[15px] font-semibold"
+      <h3 id={headingId} className="m-0">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+          className={`flex w-full items-center gap-2 px-4 py-3 text-left text-md font-semibold ${open ? 'border-b border-border' : ''}`}
         >
-          <span className="text-muted num">{n}.</span>
+          <span className="num text-muted">{n}.</span>
           <span className="flex-1">{title}</span>
-          {viewed && <span className="text-[11px] font-normal text-positive">열람</span>}
-        </h2>
-      )}
-      <div id={panelId} hidden={mobile && !open} className="px-4 py-4">
+          {viewed && <span className="text-xs font-normal text-positive">열람</span>}
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} className="text-muted" />
+        </button>
+      </h3>
+      <div id={panelId} hidden={!open} className="px-4 py-4">
         {children}
       </div>
     </section>
@@ -157,7 +133,7 @@ function BankBalanceSheet({ b, scenario }: { b: BankState; scenario: ScenarioDef
   ]
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-sm">
         <caption className="sr-only">T0 대차대조표 주요 항목</caption>
         <thead>
           <tr className="text-left text-muted border-b border-border">
@@ -194,7 +170,7 @@ function ConceptCard({
   const panelId = `card-${cardId}`
   if (!card) {
     return (
-      <div className="rounded-md border border-dashed border-border p-3 text-[12px] text-muted">
+      <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted">
         카드 <code className="font-mono">{cardId}</code> 을(를) 찾을 수 없습니다.
       </div>
     )
@@ -239,11 +215,7 @@ function ConceptCard({
 }
 
 export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
-  const navigate = useNavigate()
   const id = scenario.meta.id
-  const mobile = !useMediaQuery('(min-width: 1024px)')
-  const defaultMode = useSettingsStore((s) => s.defaultMode)
-  const timersEnabled = useSettingsStore((s) => s.timersEnabled)
   const progress = useProgressStore((s) => s.scenarios[id])
   const cardsViewed = useProgressStore((s) => s.learning.cardsViewed)
   const markBriefingSection = useProgressStore((s) => s.markBriefingSection)
@@ -252,15 +224,11 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
     () => new Set(progress?.briefingSectionsViewed ?? []),
     [progress?.briefingSectionsViewed],
   )
-  const inProgress = progress?.inProgress
 
-  const [mode, setMode] = useState<Mode>(defaultMode)
   const [openSections, setOpenSections] = useState<Set<DossierSectionId>>(
-    () => new Set<DossierSectionId>(['situation']),
+    () => new Set<DossierSectionId>(),
   )
   const [active, setActive] = useState<DossierSectionId>('situation')
-  const [confirmNew, setConfirmNew] = useState(false)
-  const [restoreError, setRestoreError] = useState<string | undefined>()
   const rootRef = useRef<HTMLDivElement>(null)
 
   const baseline = useMemo(() => {
@@ -292,14 +260,14 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
           const sid = e.target.getAttribute('data-section') as DossierSectionId | null
           if (!sid) continue
           setActive(sid)
-          if (!mobile || openSections.has(sid)) markViewed(sid)
+          if (openSections.has(sid)) markViewed(sid)
         }
       },
       { threshold: 0.2, rootMargin: '-15% 0px -55% 0px' },
     )
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
-  }, [markViewed, mobile, openSections])
+  }, [markViewed, openSections])
 
   const toggleSection = (sid: DossierSectionId) =>
     setOpenSections((s) => {
@@ -312,62 +280,45 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
       return next
     })
 
-  const startNew = () => {
-    useGameStore.getState().start(scenario, mode)
-    navigate(`/play/${id}`)
-  }
-  const resume = () => {
-    if (!inProgress) return
-    const g = useGameStore.getState()
-    if (g.run?.runId !== inProgress.runId) {
-      const ok = g.restore(scenario, inProgress)
-      if (!ok) {
-        setRestoreError(
-          '저장된 진행 상황이 현재 시나리오 버전과 맞지 않아 이어할 수 없습니다. 새로 시작해 주세요.',
-        )
-        return
-      }
-    }
-    navigate(`/play/${id}`)
-  }
-
   const kpiRows = scenario.kpis.map((k) => {
     const m = baseline.snapshot?.metrics[k.metric]
     return { k, m }
   })
   const objectives = scenario.meta.learningObjectives
   const goTo = (sid: DossierSectionId) => {
-    if (mobile) setOpenSections((s) => new Set(s).add(sid))
+    setOpenSections((s) => {
+      if (s.has(sid)) return s
+      markViewed(sid)
+      return new Set(s).add(sid)
+    })
     document.getElementById(`sec-${sid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
     <div ref={rootRef} className="grid gap-4 lg:grid-cols-[200px_1fr]">
-      {!mobile && (
-        <nav aria-label="브리핑 목차" className="sticky top-4 self-start">
-          <ol className="m-0 list-none space-y-0.5 border-l border-border p-0 text-[12px]">
-            {DOSSIER_SECTIONS.map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#sec-${s.id}`}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    goTo(s.id)
-                  }}
-                  aria-current={active === s.id ? 'location' : undefined}
-                  className={`-ml-px block border-l-2 px-3 py-1 no-underline ${active === s.id ? 'border-accent text-text font-medium' : 'border-transparent text-muted hover:text-text'}`}
-                >
-                  <span className="num">{s.n}.</span> {s.title}
-                  {viewedSections.has(s.id) && <span className="sr-only"> (열람함)</span>}
-                </a>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-3 px-3 text-[11px] text-muted num">
-            {viewedSections.size}/{DOSSIER_SECTIONS.length} 섹션 열람
-          </p>
-        </nav>
-      )}
+      <nav aria-label="브리핑 목차" className="sticky top-4 hidden self-start lg:block">
+        <ol className="m-0 list-none space-y-0.5 border-l border-border p-0 text-sm">
+          {DOSSIER_SECTIONS.map((s) => (
+            <li key={s.id}>
+              <a
+                href={`#sec-${s.id}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  goTo(s.id)
+                }}
+                aria-current={active === s.id ? 'location' : undefined}
+                className={`-ml-px block border-l-2 px-3 py-1 no-underline ${active === s.id ? 'border-accent text-text font-medium' : 'border-transparent text-muted hover:text-text'}`}
+              >
+                <span className="num">{s.n}.</span> {s.title}
+                {viewedSections.has(s.id) && <span className="sr-only"> (열람함)</span>}
+              </a>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 px-3 text-xs text-muted num">
+          {viewedSections.size}/{DOSSIER_SECTIONS.length} 섹션 열람
+        </p>
+      </nav>
 
       <div className="space-y-3 min-w-0">
         {DOSSIER_SECTIONS.map((s) => {
@@ -375,7 +326,6 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
             id: s.id,
             n: s.n,
             title: s.title,
-            mobile,
             open: openSections.has(s.id),
             onToggle: () => toggleSection(s.id),
             viewed: viewedSections.has(s.id),
@@ -385,9 +335,9 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
               return (
                 <Section key={s.id} {...common}>
                   <Markdown>{scenario.briefing.situation}</Markdown>
-                  <h3 className="mt-4 text-[13px] font-semibold">임무·권한 범위</h3>
+                  <h4 className="mt-4 text-base font-semibold">임무·권한 범위</h4>
                   <Markdown>{scenario.briefing.mandate}</Markdown>
-                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12px]">
+                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
                     <dt className="text-muted">역할</dt>
                     <dd>{scenario.meta.roleTitle}</dd>
                     <dt className="text-muted">시간 지평</dt>
@@ -400,8 +350,8 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                   </dl>
                   {objectives.length > 0 && (
                     <>
-                      <h3 className="mt-4 text-[13px] font-semibold">학습 목표</h3>
-                      <ul className="mt-1 space-y-1 text-[12px]">
+                      <h4 className="mt-4 text-base font-semibold">학습 목표</h4>
+                      <ul className="mt-1 space-y-1 text-sm">
                         {objectives.map((o) => (
                           <li key={o.id} className="flex gap-2">
                             <Badge tone="neutral" className="shrink-0">
@@ -419,12 +369,12 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
               return (
                 <Section key={s.id} {...common}>
                   <Markdown>{scenario.briefing.institutionProfile}</Markdown>
-                  <h3 className="mt-4 text-[13px] font-semibold">KPI 기준선 (T0)</h3>
+                  <h4 className="mt-4 text-base font-semibold">KPI 기준선 (T0)</h4>
                   {baseline.error ? (
-                    <p className="text-[12px] text-critical">기준선 계산 실패: {baseline.error}</p>
+                    <p className="text-sm text-critical">기준선 계산 실패: {baseline.error}</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-[12px]">
+                      <table className="w-full text-sm">
                         <caption className="sr-only">T0 KPI 기준선</caption>
                         <thead>
                           <tr className="text-left text-muted border-b border-border">
@@ -461,7 +411,7 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                   )}
                   {scenario.initialState.institution.kind === 'bank' && (
                     <>
-                      <h3 className="mt-4 text-[13px] font-semibold">대차대조표 주요 항목 (T0)</h3>
+                      <h4 className="mt-4 text-base font-semibold">대차대조표 주요 항목 (T0)</h4>
                       <BankBalanceSheet b={scenario.initialState.institution} scenario={scenario} />
                     </>
                   )}
@@ -478,8 +428,8 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                 <Section key={s.id} {...common}>
                   <ul className="grid gap-2 sm:grid-cols-2 list-none p-0 m-0">
                     {scenario.briefing.stakeholders.map((st) => (
-                      <li key={st.name} className="rounded-md border border-border p-3 text-[12px]">
-                        <div className="font-semibold text-[13px]">{st.name}</div>
+                      <li key={st.name} className="rounded-md border border-border p-3 text-sm">
+                        <div className="font-semibold text-base">{st.name}</div>
                         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
                           <dt className="text-muted">원하는 것</dt>
                           <dd>{st.wants}</dd>
@@ -501,9 +451,7 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
               return (
                 <Section key={s.id} {...common}>
                   {scenario.briefing.cardRefs.length === 0 ? (
-                    <p className="text-[12px] text-muted">
-                      이 시나리오에 연결된 개념 카드가 없습니다.
-                    </p>
+                    <p className="text-sm text-muted">이 시나리오에 연결된 개념 카드가 없습니다.</p>
                   ) : (
                     <div className="space-y-2">
                       {scenario.briefing.cardRefs.map((c) => (
@@ -521,7 +469,7 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
             case 'scoring':
               return (
                 <Section key={s.id} {...common}>
-                  <p className="text-[12px] text-muted mb-2">
+                  <p className="text-sm text-muted mb-2">
                     7개 차원의 가중 합산으로 종합 점수(0~100)를 계산합니다. 각 차원은 저작된 옵션
                     품질(전문가 평점)과 결과 지표를 함께 반영합니다.
                     {scenario.scoring.failureCap !== undefined ||
@@ -536,7 +484,7 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                     )}
                   </p>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[12px]">
+                    <table className="w-full text-sm">
                       <caption className="sr-only">평가 차원과 가중치</caption>
                       <thead>
                         <tr className="text-left text-muted border-b border-border">
@@ -569,97 +517,11 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                   </div>
                 </Section>
               )
-            case 'mode':
-              return (
-                <Section key={s.id} {...common}>
-                  {inProgress && (
-                    <div className="mb-4 rounded-md border border-info/40 bg-info-bg p-3 text-[12px]">
-                      <div className="font-medium text-info">진행 중인 플레이가 있습니다</div>
-                      <div className="mt-0.5 num">
-                        {turnProgressLabel(inProgress.turnIndex, scenario.meta.durationTurns)} ·{' '}
-                        {MODE_LABELS[inProgress.mode]} 모드 · 마지막 저장{' '}
-                        {shortDate(inProgress.updatedAt)}
-                        {inProgress.scenarioVersion !== scenario.meta.version && (
-                          <span className="text-warning">
-                            {' '}
-                            · 시나리오 버전이 변경되어 이어할 수 없습니다
-                          </span>
-                        )}
-                      </div>
-                      {restoreError && <p className="mt-1 text-critical">{restoreError}</p>}
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          variant="primary"
-                          onClick={resume}
-                          disabled={inProgress.scenarioVersion !== scenario.meta.version}
-                        >
-                          이어하기
-                        </Button>
-                        <Button variant="secondary" onClick={() => setConfirmNew(true)}>
-                          새로 시작
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    role="radiogroup"
-                    aria-label="플레이 모드"
-                    className="grid gap-2 sm:grid-cols-3"
-                  >
-                    {MODES.map((m) => {
-                      const checked = mode === m
-                      return (
-                        <label
-                          key={m}
-                          className={`cursor-pointer rounded-md border p-3 text-[12px] transition-colors ${checked ? 'border-accent bg-accent-soft' : 'border-border hover:border-muted'}`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="mode"
-                              value={m}
-                              checked={checked}
-                              onChange={() => setMode(m)}
-                              className="accent-accent"
-                            />
-                            <span className="text-[13px] font-semibold">{MODE_LABELS[m]}</span>
-                            {m === defaultMode && <Badge tone="neutral">기본</Badge>}
-                          </span>
-                          <ul className="mt-2 space-y-0.5 pl-5 list-disc text-muted">
-                            {MODE_DESCRIPTIONS[m].map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  {!timersEnabled && (
-                    <p className="mt-2 text-[12px] text-muted">
-                      설정에서 타이머가 꺼져 있어 결정 시간 제한은 적용되지 않습니다.
-                    </p>
-                  )}
-                  <div className="mt-4 flex items-center gap-2">
-                    {inProgress ? (
-                      <Button variant="secondary" size="lg" onClick={() => setConfirmNew(true)}>
-                        {MODE_LABELS[mode]} 모드로 새로 시작
-                      </Button>
-                    ) : (
-                      <Button variant="primary" size="lg" onClick={startNew}>
-                        {MODE_LABELS[mode]} 모드로 시작
-                      </Button>
-                    )}
-                    <span className="text-[12px] text-muted num">
-                      예상 소요 약 {scenario.meta.estMinutes}분
-                    </span>
-                  </div>
-                </Section>
-              )
             case 'sources':
               return (
                 <Section key={s.id} {...common}>
-                  <h3 className="text-[13px] font-semibold">출처</h3>
-                  <ol className="mt-1 space-y-1 pl-5 text-[12px]">
+                  <h4 className="text-base font-semibold">출처</h4>
+                  <ol className="mt-1 space-y-1 pl-5 text-sm">
                     {scenario.meta.sources.map((src) => (
                       <li key={src.id}>
                         <span className="font-medium">{src.title}</span>
@@ -683,14 +545,14 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
                       </li>
                     ))}
                   </ol>
-                  <h3 className="mt-4 text-[13px] font-semibold">단순화 노트</h3>
-                  <ul className="mt-1 space-y-1 pl-5 list-disc text-[12px]">
+                  <h4 className="mt-4 text-base font-semibold">단순화 노트</h4>
+                  <ul className="mt-1 space-y-1 pl-5 list-disc text-sm">
                     {scenario.briefing.simplificationNotes.map((n, i) => (
                       <li key={i}>{n}</li>
                     ))}
                   </ul>
                   {scenario.briefing.disclaimer && (
-                    <p className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-[12px] text-muted">
+                    <p className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-sm text-muted">
                       {scenario.briefing.disclaimer}
                     </p>
                   )}
@@ -701,19 +563,6 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
           }
         })}
       </div>
-
-      <ConfirmDialog
-        open={confirmNew}
-        title="새로 시작할까요?"
-        body="진행 중인 플레이 저장분이 삭제되고 처음부터 다시 시작합니다. 완료된 기록은 유지됩니다."
-        confirmLabel="새로 시작"
-        destructive
-        onCancel={() => setConfirmNew(false)}
-        onConfirm={() => {
-          setConfirmNew(false)
-          startNew()
-        }}
-      />
     </div>
   )
 }

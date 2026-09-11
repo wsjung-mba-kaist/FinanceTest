@@ -162,7 +162,7 @@ describe('buildConditionContext', () => {
     expect(ctx.metricHistory('confidence')).toEqual([72])
   })
 
-  it('chose reflects recorded decisions; metricHistory is most-recent-first and skips na/NaN', () => {
+  it('chose reflects recorded decisions; metricHistory is most-recent-first and skips non-finite', () => {
     const s1 = applyDecision(createGame(miniBank, 1), miniBank, 'd0_disclosure', [
       'opt_b_unbackstopped',
     ])
@@ -194,7 +194,10 @@ describe('buildConditionContext', () => {
     })
     const c2 = buildConditionContext(faked)
     expect(c2.metricHistory('confidence')).toEqual([30, 40, 52])
-    const naOnly = produce(faked, (d) => {
+    // `status: 'na'` only means "no threshold band to judge this against" — it is a display
+    // concept. A condition must still see the number, or every rule reading a metric a scenario
+    // routes through `institution.custom` silently becomes false.
+    const naButFinite = produce(faked, (d) => {
       d.metricsHistory.push({
         turnIndex: 4,
         metrics: {
@@ -202,7 +205,20 @@ describe('buildConditionContext', () => {
         },
       })
     })
-    expect(buildConditionContext(naOnly).metric('confidence')).toBeUndefined()
+    expect(buildConditionContext(naButFinite).metric('confidence')).toBe(10)
+    expect(buildConditionContext(naButFinite).metricHistory('confidence')).toEqual([
+      10, 30, 40, 52,
+    ])
+
+    const nonFinite = produce(faked, (d) => {
+      d.metricsHistory.push({
+        turnIndex: 4,
+        metrics: {
+          confidence: { key: 'confidence', value: Infinity, unit: 'index', status: 'ok', label: 'CI' },
+        },
+      })
+    })
+    expect(buildConditionContext(nonFinite).metric('confidence')).toBeUndefined()
   })
 })
 

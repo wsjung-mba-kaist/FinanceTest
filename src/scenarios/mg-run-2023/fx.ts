@@ -1,5 +1,6 @@
 import type { BankState, Effect } from '../../engine/types'
 import { clamp } from '../../engine/core/paths'
+import { DEFAULT_NOISE, noiseFactor } from '../../engine/core/noise'
 import { fnEffect } from '../../engine/fx/common'
 import {
   projectRunoff,
@@ -81,6 +82,81 @@ export const mgFx = {
         )
         if (!d.flags.persistentAmplifier) d.counters.amplifier = 1
         d.counters.networkAmplifier = 1
+      },
+      p.label,
+    )
+  },
+
+  /**
+   * `runoffDays({ days: 1 })`의 **틱 분할판**. 창구가 열려 있는 하루를 `profile`(합 = 1)대로 나눠
+   * 슬라이스마다 인출을 적용한다. 슬라이스는 줄어드는 잔액이 아니라 **개점 시점 잔액**(`windowBase`)에
+   * 투영되므로, `projectRunoff`가 `windowFraction`에 선형이라는 성질 덕분에 variance 0에서 슬라이스
+   * 합계가 단일 호출 결과와 (부동소수점 오차 범위에서) 정확히 일치한다 — 기존 체크포인트가 그대로 산다.
+   *
+   * 반면 비율 입력(CI → 런 상태, 증폭, 완화)은 **매 틱 실시간으로** 읽는다. 틱 중간에 확정된 결정의
+   * 완화 계수는 남은 슬라이스에만 걸리고, 증폭기는 마지막 틱에서 리셋된다(`runoffDays`와 동일).
+   * 크기 노이즈(`noise.runoffSigma`)는 variance > 0에서만 draw한다.
+   */
+  runoffTicks(p: { profile: number[]; label?: string }): Effect<BankState> {
+    return fnEffect<BankState>(
+      'runoffTicks',
+      { profile: p.profile.join('/') },
+      (d, ctx) => {
+        const b = d.institution
+        const share = p.profile[ctx.tick] ?? 0
+        if (ctx.tick === 0) for (const seg of b.deposits) seg.windowBase = seg.balance
+        const amp = d.counters.amplifier || 1
+        const damp = Math.max(0.3, d.counters.dampener || 1)
+        if (d.counters.startDeposits === undefined) d.counters.startDeposits = totalDeposits(b)
+        const runState = runStateFromCi(d.confidence.index)
+        const noise = noiseFactor(
+          ctx,
+          ctx.noise?.runoffSigma ?? DEFAULT_NOISE.runoffSigma,
+          ctx.noise?.runoffCap ?? DEFAULT_NOISE.runoffCap,
+        )
+        const projected = projectRunoff({
+          segments: b.deposits.map((seg) => ({ ...seg, balance: seg.windowBase ?? seg.balance })),
+          runState,
+          amplifier: amp,
+          dampener: damp,
+          networkAmplifier: d.counters.networkAmplifier || 1,
+          windowFraction: share * noise,
+        })
+        for (const seg of b.deposits) {
+          const row = projected.bySegment.find((r) => r.id === seg.id)
+          if (row) seg.balance = Math.max(0, seg.balance - Math.min(seg.balance, row.outflow))
+        }
+        const out = projected.total
+        const dayTotal = ctx.tick === 0 ? out : (d.counters.lastOutflow ?? 0) + out
+        d.counters.lastOutflow = dayTotal
+        d.counters.windowOutflow = dayTotal
+        d.counters.cumulativeOutflow = (d.counters.cumulativeOutflow ?? 0) + out
+        d.counters.peakDailyOutflow = Math.max(d.counters.peakDailyOutflow ?? 0, dayTotal)
+        const cashBefore = b.cash
+        b.cash -= out
+        if (b.cash < 0 && b.wholesale.cbFacilityCapacity > 0) {
+          const auto = Math.min(-b.cash, b.wholesale.cbFacilityCapacity)
+          b.wholesale.cbFacilityCapacity -= auto
+          b.wholesale.cbAdvances += auto
+          b.cash += auto
+          d.counters.fundingDrawn = (d.counters.fundingDrawn ?? 0) + auto
+          ctx.log(`은행 RP 라인 자동 인출 ${auto.toFixed(2)}조 (결제 부족분 충당)`)
+        }
+        const shortfall = b.cash < 0 ? -b.cash : 0
+        d.counters.settlementShortfall = shortfall
+        if (shortfall > 0)
+          d.log.push(
+            `[T${d.turnIndex}] 지급 부족: ${shortfall.toFixed(2)}조 (상환준비금·가용현금 소진)`,
+          )
+        b.leverageExposure = Math.max(0, b.leverageExposure - Math.min(cashBefore, out))
+        ctx.log(
+          `창구 인출 슬라이스 ${(share * 100).toFixed(0)}% → ${out.toFixed(2)}조 (당일 누계 ${dayTotal.toFixed(2)}조) [${['S0', 'S1', 'S2', 'S3'][runState]} × 증폭 ${amp.toFixed(2)} × 완화 ${damp.toFixed(2)}]`,
+        )
+        if (ctx.isLastTick) {
+          for (const seg of b.deposits) delete seg.windowBase
+          if (!d.flags.persistentAmplifier) d.counters.amplifier = 1
+          d.counters.networkAmplifier = 1
+        }
       },
       p.label,
     )

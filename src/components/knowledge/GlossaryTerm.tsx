@@ -54,7 +54,7 @@ export function GlossaryTerm({
         <span
           role="tooltip"
           id={tipId}
-          className="absolute z-40 left-0 top-full mt-1 w-72 max-w-[80vw] rounded-md border border-border bg-surface p-2 text-[12px] leading-snug shadow-lg text-text"
+          className="absolute z-40 left-0 top-full mt-1 w-72 max-w-[80vw] rounded-md border border-border bg-surface p-2 text-sm leading-snug shadow-lg text-text"
         >
           <span className="block font-semibold">
             {term.term.ko} <span className="text-muted font-normal">({term.term.en})</span>

@@ -62,7 +62,7 @@ export const svbInitialBank: BankState = {
     repoL1: 0,
     repoL2A: 0,
     repoOther: 0,
-    cbAdvances: 15, // FHLB 차입 ≈$15B [CBO 2024, 2차]
+    cbAdvances: 15, // FHLB 차입 $15.0B = 단기 13.0 + 장기 2.0 [svb-10k-2022 Note 15]
     // 당일 인출 가능한 기설정 담보 여력. [CAL] 역사 경로가 3/9 마감 잔고 −$0.96B(DFPI 명령)를 재현하도록 역산.
     // Davis Polk 기조연설의 "연준 예치 담보 $5B 남짓"과 같은 자릿수.
     cbFacilityCapacity: 6.4,
@@ -70,8 +70,8 @@ export const svbInitialBank: BankState = {
   },
   committed: { creditToCorporates: 60, liquidityToFIs: 0 }, // 미인출 약정 [STYLIZED]
   otherLiabilities: 2.2,
-  capital: { cet1: 12.7, at1: 3.6, tier2: 0, aociInCet1: false }, // 보통주 ≈12.7, 우선주 ≈3.6; Cat IV AOCI 옵트아웃
-  rwa: 105, // CET1 12.05% 역산 [svb-10k-2022]
+  capital: { cet1: 13.7, at1: 3.6, tier2: 0, aociInCet1: false }, // CET1 13,697 · 우선주 3,646(규제 AT1 3,807) [svb-10k-2022 p.84]; Cat IV AOCI 옵트아웃
+  rwa: 113.6, // 위험가중자산 113,628 (은행 111,353) [svb-10k-2022 p.84] — 13.697/113.628 = 12.05%
   leverageExposure: 212,
   fireSaleDiscount: 0.015, // $20B agency MBS/일 ≈ 1.5% [CAL]
   taxRate: 0.25, // [STYLIZED]

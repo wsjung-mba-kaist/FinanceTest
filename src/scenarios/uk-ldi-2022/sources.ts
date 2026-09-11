@@ -72,6 +72,20 @@ export const LDI_SOURCES: Source[] = [
     note: '11:00 발표: 9/28~10/14 장기 길트 임시 매입, 금융안정 목적, APF 길트 매각 10/31로 연기',
   },
   {
+    id: 'boe-cunliffe-letter-2022-10-05',
+    title: 'Letter from Sir Jon Cunliffe to Rt Hon Mel Stride MP, Chair of the Treasury Committee',
+    publisher: 'Bank of England (Deputy Governor, Financial Stability)',
+    date: '2022-10-05',
+    kind: 'primary',
+    url: 'https://www.bankofengland.co.uk/-/media/boe/files/letter/2022/october/letter-from-jon-cunliffe-ldi-5-october-2022',
+    note:
+      '일자별 30년 길트 수치의 1차 원문. 9/22 "장기 길트 약 20bp 상승" · 9/23 "30년이 하루 동안 30bp 상승" · ' +
+      '9/26 "30년이 약 50bp 상승해 9/23 개장 대비 80bp 초과" · 9/27 "오전 20bp 하락 후 저녁까지 그날 오전 대비 67bp 상승" · ' +
+      '9/28 발표로 "그날 30년이 100bp 넘게 하락". **9/28 일중 변동폭 127bp**("the intraday range of the yield on ' +
+      '30 year gilts of 127 basis points")와 "2000년 이후 최대 일간 상승 29bp·최대 일간 하락 30bp", ' +
+      '"일간 35bp 초과 상승 2회", LDI 매니저 시장정보 기준 장기 길트 추가 매도 최소 £50bn(평시 일평균 거래 £12bn)',
+  },
+  {
     id: 'boe-pr-2022-10-10',
     title: 'Bank of England announces additional measures to support market functioning',
     publisher: 'Bank of England',

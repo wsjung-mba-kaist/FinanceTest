@@ -26,12 +26,13 @@ interface Point {
   decided: boolean
 }
 
+/** `status: 'na'` means "no threshold band", not "no value" — only finiteness may reject a point. */
 function seriesOf(state: GameState | undefined, metric: string): Map<number, number> {
   const out = new Map<number, number>()
   if (!state) return out
   for (const snap of state.metricsHistory) {
     const m = snap.metrics[metric]
-    if (m && m.status !== 'na' && Number.isFinite(m.value)) out.set(snap.turnIndex, m.value)
+    if (m && Number.isFinite(m.value)) out.set(snap.turnIndex, m.value)
   }
   return out
 }
@@ -42,18 +43,22 @@ export function DebriefTimeline({
   historical,
   expert,
   onMarkerClick,
+  forceTable,
 }: {
   scenario: ScenarioDefinition
   state: GameState
   historical: GameState | undefined
   expert: GameState | undefined
   onMarkerClick?: (turnIndex: number) => void
+  /** Printing: render the table so the chart is never measured at zero width. */
+  forceTable?: boolean
 }) {
   const kpis = scenario.kpis
   const [metric, setMetric] = useState(
     () => kpis.find((k) => k.primary)?.metric ?? kpis[0]?.metric ?? 'confidence',
   )
   const [table, setTable] = useState(false)
+  const showTable = forceTable || table
   const selectId = useId()
   const kpi: KpiSpec = kpis.find((k) => k.metric === metric) ?? {
     metric,
@@ -87,7 +92,7 @@ export function DebriefTimeline({
   const TimelineTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
     if (!active || !payload?.length) return null
     return (
-      <div className="rounded-md border border-border bg-surface p-2 text-[12px] shadow-lg">
+      <div className="rounded-md border border-border bg-surface p-2 text-sm shadow-lg">
         <div className="font-semibold">{label}</div>
         {payload.map((p) => (
           <div key={String(p.dataKey)} className="flex justify-between gap-3">
@@ -102,16 +107,16 @@ export function DebriefTimeline({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold">경로 비교</h3>
+        <h3 className="text-base font-semibold">경로 비교</h3>
         <div className="flex items-center gap-2">
-          <label htmlFor={selectId} className="text-[12px] text-muted">
+          <label htmlFor={selectId} className="text-sm text-muted">
             지표
           </label>
           <select
             id={selectId}
             value={metric}
             onChange={(e) => setMetric(e.target.value)}
-            className="rounded border border-border bg-bg px-2 py-1 text-[12px]"
+            className="rounded border border-border bg-bg px-2 py-1 text-sm"
           >
             {kpis.map((k) => (
               <option key={k.metric} value={k.metric}>
@@ -119,20 +124,22 @@ export function DebriefTimeline({
               </option>
             ))}
           </select>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-pressed={table}
-            onClick={() => setTable((v) => !v)}
-          >
-            {table ? '차트로 보기' : '표로 보기'}
-          </Button>
+          {!forceTable && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-pressed={table}
+              onClick={() => setTable((v) => !v)}
+            >
+              {table ? '차트로 보기' : '표로 보기'}
+            </Button>
+          )}
         </div>
       </div>
 
-      {table ? (
+      {showTable ? (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-sm">
             <caption className="sr-only">{kpi.label} 턴별 비교</caption>
             <thead>
               <tr className="text-left text-muted border-b border-border">
@@ -277,7 +284,7 @@ export function DebriefTimeline({
           </figure>
           {markers.length > 0 && (
             <div
-              className="mt-1 flex flex-wrap items-center gap-1 text-[12px]"
+              className="mt-1 flex flex-wrap items-center gap-1 text-sm"
               role="group"
               aria-label="결정 지점"
             >

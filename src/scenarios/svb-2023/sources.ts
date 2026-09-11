@@ -233,4 +233,66 @@ export const SVB_SOURCES: Source[] = [
     url: 'https://www.bis.org/publ/bcbs144.pdf',
     note: '원칙 11 비상자금조달계획',
   },
+  {
+    id: 'bcbs-248',
+    title: 'Monitoring tools for intraday liquidity management',
+    publisher: 'Basel Committee on Banking Supervision',
+    date: '2013-04',
+    kind: 'regulatory',
+    url: 'https://www.bis.org/publ/bcbs248.pdf',
+    note: '일중 유동성 모니터링 도구(일중 최대 순유출, 시간대별 결제 처리) — T4 결제데스크 인터럽트',
+  },
+  {
+    id: 'ssga-kre',
+    title: 'SPDR S&P Regional Banking ETF (KRE) — 펀드 개요·구성종목',
+    publisher: 'State Street Global Advisors',
+    date: '2023',
+    kind: 'data',
+    url: 'https://www.ssga.com/us/en/intermediary/etfs/spdr-sp-regional-banking-etf-kre',
+    note: '지수 구성과 섹터 정의의 근거. 일별 종가는 아래 시세 출처를 쓴다',
+  },
+  {
+    id: 'pacwest-10q-2023q1',
+    title: 'PacWest Bancorp, Form 10-Q for the quarterly period ended March 31, 2023',
+    publisher: 'SEC EDGAR',
+    date: '2023-05-11',
+    kind: 'primary',
+    url: 'https://www.sec.gov/Archives/edgar/data/1102112/000162828023017382/pacw-20230331.htm',
+    note:
+      '원문: "Most of the decrease in deposits was from uninsured deposits, which resulted in the ' +
+      'percentage of insured deposits to total deposits to increase from 48% at December 31, 2022 to ' +
+      '71% of total deposits at March 31, 2023." 1분기 예금 −57억 달러(−16.9%), 벤처뱅킹 113억 → 66억',
+  },
+  {
+    id: 'pacwest-8k-2023-03-22',
+    title: 'Pacific Western Bank — 3월 중간 업데이트 (Form 8-K Ex. 99.1, 2023-03-17 및 2023-03-22)',
+    publisher: 'SEC EDGAR',
+    date: '2023-03-22',
+    kind: 'primary',
+    url: 'https://www.sec.gov/Archives/edgar/data/1102112/000110465923035404/tm239469d2_ex99-1.htm',
+    note:
+      '3/17자 보도자료(3/20 제출, accession 0001104659-23-034107): "As of March 16, 2023, insured deposits ' +
+      'exceed 62% of total deposits, including accounts eligible for pass-through insurance", 가용현금 ' +
+      '108억 달러. 3/22자 보도자료: "as of March 20, 2023, FDIC-insured deposits exceeded 65% of total ' +
+      'deposits", 가용현금 114억 vs 무보험예금 95억, FHLB 37억·재할인창구 105억·BTFP 21억 차입, ' +
+      'ATLAS SP 14억 ABS 조달. **"48%→71%"는 이 3월 공시가 아니라 1분기 10-Q(3/31 기준)의 수치다.**',
+  },
+  {
+    id: 'kre-close-2023-03-09',
+    title: '2023-03-09 미국 은행주 일간 하락폭 — KRE −8.1%, KBWB −7.6%, KBE −7.3%, BKX −7.7%',
+    publisher: '시세 이력(ETF 종가) 및 당일 시장 보도',
+    date: '2023-03-09',
+    kind: 'data',
+    note:
+      'KRE는 2021년 1월 이후 최저 종가. 널리 인용되는 −7.7%는 KBW 나스닥 은행지수(BKX)의 ' +
+      '수치로, 2020년 6월 이후 최대 일간 낙폭이다 — 두 값을 혼동하지 않도록 병기한다',
+  },
+  {
+    id: 'sivb-close-2023-03-09',
+    title: 'SVB Financial Group(SIVB) 2023-03-09 종가 $106.04, 전일 대비 −60.41%',
+    publisher: '시세 이력(나스닥 상장 종가)',
+    date: '2023-03-09',
+    kind: 'data',
+    note: '20년래 최대 일간 낙폭. 3/10 개장 전 −60% 추가 하락 후 거래정지·폐쇄',
+  },
 ]

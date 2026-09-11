@@ -1,16 +1,27 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CatalogFilters, type FilterKey, type Filters } from '../components/catalog/CatalogFilters'
 import { ScenarioCard } from '../components/catalog/ScenarioCard'
-import { CATALOG_STATUS_LABELS, catalogStatusOf, type CatalogStatus } from '../lib/catalog'
+import { RoleChooser } from '../components/onboarding/RoleChooser'
+import { Welcome } from '../components/onboarding/Welcome'
 import { Button, ConfirmDialog, EmptyState } from '../components/ui'
+import { roleFamilyOf, type RoleFamily } from '../content/roleFrames'
 import type { Competency, Difficulty, Region, ScenarioSummary } from '../engine/types'
 import type { InProgressSave } from '../persistence/schema'
+import {
+  CATALOG_STATUS_LABELS,
+  catalogStatusOf,
+  sortCatalog,
+  type CatalogSort,
+  type CatalogStatus,
+} from '../lib/catalog'
 import {
   COMPETENCIES,
   DIFFICULTY_LABELS,
   DIMENSION_LABELS,
   MODE_LABELS,
   REGION_LABELS,
+  ROLE_FAMILY_LABELS,
   ROLE_GROUPS,
   decadeOf,
   shortDate,
@@ -18,9 +29,9 @@ import {
 } from '../lib/labels'
 import { SCENARIOS } from '../scenarios'
 import { useProgressStore } from '../store/progressStore'
+import { useSettingsStore } from '../store/settingsStore'
 
-type FilterKey = 'role' | 'region' | 'decade' | 'difficulty' | 'competency' | 'status'
-type Filters = Record<FilterKey, Set<string>>
+const STATUS_FILTERS: CatalogStatus[] = ['available', 'in-progress', 'completed']
 
 const emptyFilters = (): Filters => ({
   role: new Set(),
@@ -31,45 +42,21 @@ const emptyFilters = (): Filters => ({
   status: new Set(),
 })
 
-function ChipGroup({
-  label,
-  options,
-  selected,
-  onToggle,
-}: {
-  label: string
-  options: { id: string; label: string }[]
-  selected: Set<string>
-  onToggle: (id: string) => void
-}) {
-  if (options.length === 0) return null
-  return (
-    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={`${label} 필터`}>
-      <span className="text-[11px] text-muted mr-1 w-10">{label}</span>
-      {options.map((o) => {
-        const on = selected.has(o.id)
-        return (
-          <button
-            key={o.id}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onToggle(o.id)}
-            className={`rounded-full border px-2.5 py-0.5 text-[12px] transition-colors ${on ? 'bg-accent text-white border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function HomePage() {
   const scenarios = useProgressStore((s) => s.scenarios)
   const setInProgress = useProgressStore((s) => s.setInProgress)
+  const onboardingSeenAt = useSettingsStore((s) => s.onboardingSeenAt)
+  const roleFamily = useSettingsStore((s) => s.roleFamily)
+  const updateSettings = useSettingsStore((s) => s.update)
+
   const [filters, setFilters] = useState<Filters>(emptyFilters)
-  const [sortDesc, setSortDesc] = useState(false)
+  const [sort, setSort] = useState<CatalogSort>('recommended')
+  const [includePlanned, setIncludePlanned] = useState(false)
   const [discardId, setDiscardId] = useState<string | undefined>()
+  const [introReopened, setIntroReopened] = useState(false)
+
+  const engaged = Object.keys(scenarios).length > 0
+  const showIntro = introReopened || !onboardingSeenAt || !engaged
 
   const toggle = (key: FilterKey, id: string) =>
     setFilters((f) => {
@@ -78,10 +65,22 @@ export default function HomePage() {
       else next.add(id)
       return { ...f, [key]: next }
     })
-  const anyFilter = (Object.keys(filters) as FilterKey[]).some((k) => filters[k].size > 0)
+
+  const progressOf = useCallback((id: string) => scenarios[id], [scenarios])
+
+  const all = useMemo(() => SCENARIOS.map((e) => e.summary), [])
+  const plannedCount = useMemo(() => all.filter((s) => s.status === 'planned').length, [all])
+
+  const familyCounts = useMemo(() => {
+    const out: Record<RoleFamily, number> = { bank: 0, securities: 0, pension: 0, fund: 0, policy: 0 }
+    for (const s of all) {
+      if (s.status !== 'available') continue
+      out[roleFamilyOf(s.role)] += 1
+    }
+    return out
+  }, [all])
 
   const options = useMemo(() => {
-    const all = SCENARIOS.map((s) => s.summary)
     const uniq = <T,>(xs: T[]) => [...new Set(xs)]
     return {
       role: uniq(all.map((s) => ROLE_GROUPS[s.role])).map((g) => ({ id: g, label: g })),
@@ -94,15 +93,15 @@ export default function HomePage() {
         label: DIFFICULTY_LABELS[d],
       })),
       competency: COMPETENCIES.map((c) => ({ id: c, label: DIMENSION_LABELS[c] })),
-      status: (['available', 'in-progress', 'completed', 'planned'] as CatalogStatus[]).map(
-        (s) => ({ id: s, label: CATALOG_STATUS_LABELS[s] }),
-      ),
+      status: STATUS_FILTERS.map((s) => ({ id: s, label: CATALOG_STATUS_LABELS[s] })),
     }
-  }, [])
+  }, [all])
 
   const visible = useMemo(() => {
-    const list = SCENARIOS.map((e) => e.summary).filter((s) => {
-      const p = scenarios[s.id]
+    const list = all.filter((s) => {
+      const planned = s.status === 'planned'
+      if (planned && !includePlanned) return false
+      if (roleFamily && roleFamilyOf(s.role) !== roleFamily) return false
       if (filters.role.size && !filters.role.has(ROLE_GROUPS[s.role])) return false
       if (filters.region.size && !filters.region.has(s.region)) return false
       if (filters.decade.size && !filters.decade.has(decadeOf(s.year))) return false
@@ -112,54 +111,69 @@ export default function HomePage() {
         ![...filters.competency].some((c) => (s.competencies[c as Competency] ?? 0) > 0)
       )
         return false
-      if (filters.status.size && !filters.status.has(catalogStatusOf(s, p))) return false
+      if (filters.status.size && !filters.status.has(catalogStatusOf(s, scenarios[s.id])))
+        return false
       return true
     })
-    return list.sort((a, b) => {
-      const d = sortDesc ? b.year - a.year : a.year - b.year
-      return d !== 0 ? d : a.era.localeCompare(b.era)
-    })
-  }, [filters, scenarios, sortDesc])
+    return sortCatalog(list, sort, progressOf)
+  }, [all, filters, includePlanned, progressOf, roleFamily, scenarios, sort])
 
   const inProgress = useMemo(() => {
-    const out: { summary: ScenarioSummary; run: InProgressSave }[] = []
-    for (const e of SCENARIOS) {
-      const run = scenarios[e.summary.id]?.inProgress
-      if (run) out.push({ summary: e.summary, run })
+    const out: { summary: ScenarioSummary; run: InProgressSave; stale: boolean }[] = []
+    for (const s of all) {
+      const run = scenarios[s.id]?.inProgress
+      if (run) out.push({ summary: s, run, stale: run.scenarioVersion !== s.version })
     }
     return out.sort((a, b) => b.run.updatedAt.localeCompare(a.run.updatedAt))
-  }, [scenarios])
+  }, [all, scenarios])
   const discardTarget = inProgress.find((x) => x.summary.id === discardId)
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">시나리오 카탈로그</h1>
-        <p className="text-muted mt-1">
-          리스크·자금 팀을 위한 훈련 시뮬레이터 — 실제 위기 기록을 바탕으로 의사결정을 훈련합니다.
-        </p>
-      </header>
+    <div className="space-y-6">
+      {!showIntro && <h1 className="sr-only">시나리오 카탈로그</h1>}
+      <Welcome
+        expanded={showIntro}
+        onHide={() => {
+          setIntroReopened(false)
+          updateSettings({ onboardingSeenAt: new Date().toISOString() })
+        }}
+        onShow={() => setIntroReopened(true)}
+      />
 
       {inProgress.length > 0 && (
         <section
           aria-label="이어하기"
-          className="rounded-lg border border-info/40 bg-info-bg p-3 space-y-2"
+          className="space-y-2 rounded-lg border border-info/40 bg-info-bg p-3"
         >
-          {inProgress.map(({ summary, run }) => (
+          {inProgress.map(({ summary, run, stale }) => (
             <div key={summary.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-[12px] font-medium text-info">진행 중</span>
+              <span className="text-sm font-medium text-info">진행 중</span>
               <span className="font-medium">{summary.title}</span>
-              <span className="text-[12px] text-muted num">
+              <span className="num text-sm text-muted">
                 {turnProgressLabel(run.turnIndex, summary.durationTurns)} · {MODE_LABELS[run.mode]}{' '}
                 모드 · 마지막 저장 {shortDate(run.updatedAt)}
               </span>
+              {stale && (
+                <span className="text-sm text-warning">
+                  시나리오가 갱신되어 이어할 수 없습니다 — 새로 시작해 주세요
+                </span>
+              )}
               <span className="ml-auto flex gap-1">
-                <Link
-                  to={`/play/${summary.id}`}
-                  className="inline-flex items-center rounded-md border border-accent bg-accent px-3 py-1 text-[12px] font-medium text-white no-underline hover:opacity-90"
-                >
-                  이어하기
-                </Link>
+                {stale ? (
+                  <Link
+                    to={`/scenarios/${summary.id}`}
+                    className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1 text-sm font-medium text-text no-underline hover:bg-surface-2"
+                  >
+                    브리핑 열기
+                  </Link>
+                ) : (
+                  <Link
+                    to={`/play/${summary.id}`}
+                    className="inline-flex items-center rounded-md border border-accent bg-accent px-3 py-1 text-sm font-medium text-accent-fg no-underline hover:opacity-90"
+                  >
+                    이어하기
+                  </Link>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setDiscardId(summary.id)}>
                   버리기
                 </Button>
@@ -169,82 +183,63 @@ export default function HomePage() {
         </section>
       )}
 
-      <section
-        aria-label="필터"
-        className="rounded-lg border border-border bg-surface p-3 space-y-2"
-      >
-        <ChipGroup
-          label="역할"
-          options={options.role}
-          selected={filters.role}
-          onToggle={(id) => toggle('role', id)}
+      <RoleChooser
+        value={roleFamily}
+        counts={familyCounts}
+        onChange={(next) => updateSettings({ roleFamily: next })}
+      />
+
+      <section aria-labelledby="catalog-h" className="space-y-3">
+        <h2 id="catalog-h" className="text-md font-semibold">
+          시나리오
+          {roleFamily && (
+            <span className="ml-1 font-normal text-muted">— {ROLE_FAMILY_LABELS[roleFamily]}</span>
+          )}
+        </h2>
+        <CatalogFilters
+          options={options}
+          filters={filters}
+          onToggle={toggle}
+          onClear={() => setFilters(emptyFilters())}
+          sort={sort}
+          onSort={setSort}
+          includePlanned={includePlanned}
+          onIncludePlanned={setIncludePlanned}
+          visibleCount={visible.length}
+          totalCount={all.length}
+          plannedCount={plannedCount}
         />
-        <ChipGroup
-          label="지역"
-          options={options.region}
-          selected={filters.region}
-          onToggle={(id) => toggle('region', id)}
-        />
-        <ChipGroup
-          label="시대"
-          options={options.decade}
-          selected={filters.decade}
-          onToggle={(id) => toggle('decade', id)}
-        />
-        <ChipGroup
-          label="난이도"
-          options={options.difficulty}
-          selected={filters.difficulty}
-          onToggle={(id) => toggle('difficulty', id)}
-        />
-        <ChipGroup
-          label="역량"
-          options={options.competency}
-          selected={filters.competency}
-          onToggle={(id) => toggle('competency', id)}
-        />
-        <ChipGroup
-          label="상태"
-          options={options.status}
-          selected={filters.status}
-          onToggle={(id) => toggle('status', id)}
-        />
-        <div className="flex items-center justify-between pt-1 text-[12px] text-muted">
-          <span>
-            {visible.length}개 표시 / 전체 {SCENARIOS.length}개
-            {anyFilter && (
+
+        {visible.length === 0 ? (
+          <EmptyState title="조건에 맞는 시나리오가 없습니다">
+            <div className="flex flex-wrap justify-center gap-2">
               <Button
                 size="sm"
-                variant="ghost"
-                className="ml-2"
-                onClick={() => setFilters(emptyFilters())}
+                variant="secondary"
+                onClick={() => {
+                  setFilters(emptyFilters())
+                  updateSettings({ roleFamily: undefined })
+                }}
               >
-                필터 지우기
+                필터·역할 지우기
               </Button>
-            )}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={`연도 정렬: ${sortDesc ? '최신순' : '오래된순'}`}
-            onClick={() => setSortDesc((v) => !v)}
-          >
-            연도 {sortDesc ? '↓ 최신순' : '↑ 오래된순'}
-          </Button>
-        </div>
+              {!includePlanned && plannedCount > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setIncludePlanned(true)}>
+                  준비 중 {plannedCount}편 보기
+                </Button>
+              )}
+            </div>
+          </EmptyState>
+        ) : (
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {visible.map((s) => (
+              <li key={s.id}>
+                <ScenarioCard summary={s} progress={scenarios[s.id]} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
-
-      {visible.length === 0 ? (
-        <EmptyState title="조건에 맞는 시나리오가 없습니다">필터를 조정해 보세요.</EmptyState>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 list-none p-0 m-0">
-          {visible.map((s) => (
-            <li key={s.id}>
-              <ScenarioCard summary={s} progress={scenarios[s.id]} />
-            </li>
-          ))}
-        </ul>
-      )}
 
       <ConfirmDialog
         open={Boolean(discardTarget)}

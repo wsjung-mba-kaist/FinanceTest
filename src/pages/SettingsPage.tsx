@@ -1,8 +1,15 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Button, ConfirmDialog } from '../components/ui'
 import { downloadJson, stampedFilename } from '../lib/download'
-import { MODE_DESCRIPTIONS, MODE_LABELS } from '../lib/labels'
-import type { SettingsState } from '../persistence/schema'
+import { MODE_DESCRIPTIONS, MODE_LABELS, shortDate } from '../lib/labels'
+import {
+  DEFAULT_CLOCK_TICK_SEC,
+  progressStateSchema,
+  type ProgressState,
+  type SettingsState,
+} from '../persistence/schema'
+import { SCENARIOS } from '../scenarios'
 import { useProgressStore } from '../store/progressStore'
 import { useSettingsStore } from '../store/settingsStore'
 
@@ -11,9 +18,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div className="grid gap-1 border-b border-border py-3 last:border-0 sm:grid-cols-[220px_1fr] sm:gap-4">
       <div>
         <div className="font-medium">{label}</div>
-        {hint && <div className="text-[11px] text-muted">{hint}</div>}
+        {hint && <div className="text-xs text-muted">{hint}</div>}
       </div>
-      <div className="text-[12px]">{children}</div>
+      <div className="text-sm">{children}</div>
     </div>
   )
 }
@@ -88,12 +95,56 @@ export default function SettingsPage() {
   const lastSaveResult = useProgressStore((p) => p.lastSaveResult)
   const resetAll = useProgressStore((p) => p.resetAll)
   const exportState = useProgressStore((p) => p.export)
+  const importState = useProgressStore((p) => p.importState)
+  const clearScenario = useProgressStore((p) => p.clearScenario)
+  const scenarioProgress = useProgressStore((p) => p.scenarios)
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetDone, setResetDone] = useState(false)
+  const [pendingImport, setPendingImport] = useState<ProgressState | undefined>()
+  const [importError, setImportError] = useState<string | undefined>()
+  const [importOk, setImportOk] = useState(false)
+  const [clearId, setClearId] = useState<string | undefined>()
+  const fileRef = useRef<HTMLInputElement>(null)
   const fontId = useId()
   const motionId = useId()
   const timerId = useId()
   const sysFontId = useId()
+  const clockId = useId()
+
+  const recorded = useMemo(
+    () =>
+      SCENARIOS.map((e) => e.summary).filter(
+        (s) =>
+          (scenarioProgress[s.id]?.attempts.length ?? 0) > 0 || scenarioProgress[s.id]?.inProgress,
+      ),
+    [scenarioProgress],
+  )
+
+  const onExport = () => downloadJson(stampedFilename('fcs-progress'), exportState())
+
+  const onFile = (file: File | undefined) => {
+    setImportError(undefined)
+    setImportOk(false)
+    if (!file) return
+    file
+      .text()
+      .then((text) => {
+        const parsed = progressStateSchema.safeParse(JSON.parse(text))
+        if (!parsed.success) {
+          setImportError(
+            `형식이 올바르지 않습니다: ${parsed.error.issues[0]?.path.join('.') ?? ''} ${parsed.error.issues[0]?.message ?? ''}`,
+          )
+          return
+        }
+        setPendingImport(parsed.data)
+      })
+      .catch((e: unknown) =>
+        setImportError(`파일을 읽을 수 없습니다: ${e instanceof Error ? e.message : String(e)}`),
+      )
+      .finally(() => {
+        if (fileRef.current) fileRef.current.value = ''
+      })
+  }
 
   const set = <K extends keyof Omit<SettingsState, 'version'>>(key: K, value: SettingsState[K]) =>
     update({ [key]: value } as Partial<Omit<SettingsState, 'version'>>)
@@ -101,13 +152,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">설정</h1>
+        <h1 className="text-xl font-semibold tracking-tight">설정</h1>
         <p className="text-muted">설정은 이 브라우저에 저장됩니다.</p>
       </header>
 
       {(progressCorrupt || settingsCorrupt) && (
         <p
-          className="rounded-md border border-warning/40 bg-warning-bg p-2 text-[12px] text-warning"
+          className="rounded-md border border-warning/40 bg-warning-bg p-2 text-sm text-warning"
           role="alert"
         >
           저장된{' '}
@@ -122,7 +173,7 @@ export default function SettingsPage() {
       )}
       {lastSaveResult !== 'ok' && (
         <p
-          className="rounded-md border border-critical/40 bg-critical-bg p-2 text-[12px] text-critical"
+          className="rounded-md border border-critical/40 bg-critical-bg p-2 text-sm text-critical"
           role="alert"
         >
           {lastSaveResult === 'quota'
@@ -135,7 +186,7 @@ export default function SettingsPage() {
         aria-labelledby="st-display"
         className="rounded-lg border border-border bg-surface px-4"
       >
-        <h2 id="st-display" className="pt-3 text-[14px] font-semibold">
+        <h2 id="st-display" className="pt-3 text-base font-semibold">
           표시
         </h2>
         <Field label="테마">
@@ -204,7 +255,7 @@ export default function SettingsPage() {
         aria-labelledby="st-play"
         className="rounded-lg border border-border bg-surface px-4"
       >
-        <h2 id="st-play" className="pt-3 text-[14px] font-semibold">
+        <h2 id="st-play" className="pt-3 text-base font-semibold">
           플레이
         </h2>
         <Field label="기본 모드" hint="브리핑에서 미리 선택되는 모드">
@@ -246,12 +297,128 @@ export default function SettingsPage() {
       </section>
 
       <section
+        aria-labelledby="st-sim"
+        className="rounded-lg border border-border bg-surface px-4"
+      >
+        <h2 id="st-sim" className="pt-3 text-base font-semibold">
+          시뮬레이션
+        </h2>
+        <p className="pt-1 text-sm text-muted">
+          일부 시나리오는 한 턴이 여러 시각(틱)으로 나뉘어 시계가 실제로 흐릅니다. 아래 설정은 그런
+          턴에만 영향을 줍니다.
+        </p>
+        <Field
+          label="시계 속도"
+          hint="한 틱이 몇 초인지 (×1 기준). 짧을수록 시간 압박이 커집니다."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id={clockId}
+              type="range"
+              min={4}
+              max={30}
+              step={1}
+              value={s.clockTickSec ?? DEFAULT_CLOCK_TICK_SEC}
+              onChange={(e) => set('clockTickSec', Number(e.target.value))}
+              aria-label="한 틱의 길이(초)"
+              className="w-48 accent-accent"
+            />
+            <output htmlFor={clockId} className="num w-20">
+              {s.clockTickSec !== undefined ? `${s.clockTickSec}초` : '모드 기본'}
+            </output>
+            <Button size="sm" variant="ghost" onClick={() => set('clockTickSec', undefined)}>
+              모드 기본
+            </Button>
+            <span className="text-xs text-muted">
+              모드 기본: 안내 30초 · 표준 20초 · 전문가 12초
+            </span>
+          </div>
+        </Field>
+        <Field
+          label="변동성"
+          hint="같은 선택도 매번 조금씩 다르게 전개됩니다. 0이면 완전히 동일 — 검증·재현용입니다."
+        >
+          <RadioRow
+            name="변동성"
+            value={String(s.variance ?? 1)}
+            options={[
+              { id: '0', label: '없음 (0)', hint: '같은 시드·같은 선택이면 항상 같은 결과' },
+              { id: '0.5', label: '약간 (0.5)', hint: '유출·시세에 절반 크기의 흔들림' },
+              { id: '1', label: '기본 (1)', hint: '실제 플레이 권장값' },
+            ]}
+            onChange={(v) => set('variance', Number(v) as 0 | 0.5 | 1)}
+          />
+        </Field>
+      </section>
+
+      <section
         aria-labelledby="st-data"
         className="rounded-lg border border-border bg-surface px-4 pb-3"
       >
-        <h2 id="st-data" className="pt-3 text-[14px] font-semibold">
+        <h2 id="st-data" className="pt-3 text-base font-semibold">
           데이터
         </h2>
+        {importError && (
+          <p
+            className="mt-2 rounded-md border border-critical/40 bg-critical-bg p-2 text-sm text-critical"
+            role="alert"
+          >
+            {importError}
+          </p>
+        )}
+        {importOk && (
+          <p
+            className="mt-2 rounded-md border border-positive/40 bg-positive-bg p-2 text-sm text-positive"
+            role="status"
+          >
+            진행 데이터를 가져왔습니다. <Link to="/progress">진행 현황 보기</Link>
+          </p>
+        )}
+        <Field label="진행 데이터 내보내기" hint="점수·시도 기록·열람 기록을 JSON 파일로">
+          <Button variant="secondary" onClick={onExport}>
+            내보내기 (JSON)
+          </Button>
+        </Field>
+        <Field label="진행 데이터 가져오기" hint="현재 브라우저의 데이터를 파일 내용으로 대체">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+              가져오기 (JSON)
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              aria-label="진행 데이터 파일 선택"
+              onChange={(e) => onFile(e.target.files?.[0])}
+            />
+          </div>
+        </Field>
+        <Field label="시나리오별 기록 삭제" hint="최고 점수·시도·진행 중 플레이·퀴즈 결과">
+          {recorded.length === 0 ? (
+            <p className="text-muted">아직 기록이 없습니다.</p>
+          ) : (
+            <ul className="m-0 list-none space-y-1 p-0">
+              {recorded.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{s.title}</span>
+                  <span className="num text-muted">
+                    시도 {scenarioProgress[s.id]?.attempts.length ?? 0}회
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => setClearId(s.id)}
+                    aria-label={`${s.title} 기록 삭제`}
+                  >
+                    삭제
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Field>
         <Field label="설정 초기화" hint="표시·플레이 설정을 기본값으로">
           <Button variant="secondary" onClick={resetSettings}>
             설정 기본값 복원
@@ -300,6 +467,42 @@ export default function SettingsPage() {
           resetAll()
           setConfirmReset(false)
           setResetDone(true)
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingImport)}
+        title="진행 데이터를 가져올까요?"
+        body={
+          pendingImport ? (
+            <>
+              현재 브라우저의 진행 데이터가 파일 내용으로 <b>대체</b>됩니다. 파일: 시나리오{' '}
+              {Object.keys(pendingImport.scenarios).length}개, 생성일{' '}
+              {shortDate(pendingImport.meta.createdAt)}. 먼저 현재 데이터를 내보내 두는 것을
+              권장합니다.
+            </>
+          ) : null
+        }
+        confirmLabel="가져오기"
+        destructive
+        onCancel={() => setPendingImport(undefined)}
+        onConfirm={() => {
+          if (pendingImport) {
+            importState(pendingImport)
+            setImportOk(true)
+          }
+          setPendingImport(undefined)
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(clearId)}
+        title="이 시나리오의 기록을 삭제할까요?"
+        body="최고 점수, 시도 기록, 진행 중인 플레이, 퀴즈 결과가 모두 삭제됩니다."
+        confirmLabel="삭제"
+        destructive
+        onCancel={() => setClearId(undefined)}
+        onConfirm={() => {
+          if (clearId) clearScenario(clearId)
+          setClearId(undefined)
         }}
       />
     </div>

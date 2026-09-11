@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Markdown } from '../components/knowledge/Markdown'
-import { Badge, EmptyState } from '../components/ui'
+import { Badge, Button, EmptyState } from '../components/ui'
 import { CARDS, FRAMEWORKS, GLOSSARY, READING_LIST } from '../content'
 import type { KnowledgeCard } from '../content/types'
 import { useProgressStore } from '../store/progressStore'
@@ -45,7 +45,7 @@ function CardItem({
       <div id={panelId} hidden={!open} className="border-t border-border px-3 py-3">
         <Markdown>{card.body}</Markdown>
         {card.relatedMetrics.length > 0 && (
-          <p className="mt-2 text-[11px] text-muted">
+          <p className="mt-2 text-xs text-muted">
             관련 지표: <span className="font-mono">{card.relatedMetrics.join(', ')}</span>
           </p>
         )}
@@ -111,9 +111,9 @@ export default function KnowledgeIndexPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-[22px] font-semibold tracking-tight">지식 베이스</h1>
+        <h1 className="text-xl font-semibold tracking-tight">지식 베이스</h1>
         <p className="text-muted">프레임워크 문서, 개념 카드, 용어집, 읽을거리를 모았습니다.</p>
-        <nav aria-label="지식 베이스 하위 메뉴" className="mt-2 flex flex-wrap gap-2 text-[12px]">
+        <nav aria-label="지식 베이스 하위 메뉴" className="mt-2 flex flex-wrap gap-2 text-sm">
           <Link
             to="/knowledge/glossary"
             className="rounded-md border border-border bg-surface px-3 py-1 no-underline text-text hover:border-accent"
@@ -130,11 +130,13 @@ export default function KnowledgeIndexPage() {
       </header>
 
       <section aria-labelledby="kb-frameworks">
-        <h2 id="kb-frameworks" className="mb-2 text-[16px] font-semibold">
+        <h2 id="kb-frameworks" className="mb-2 text-lg font-semibold">
           프레임워크
         </h2>
         {FRAMEWORKS.length === 0 ? (
-          <EmptyState title="프레임워크 문서가 아직 없습니다" />
+          <EmptyState title="프레임워크 문서가 아직 없습니다">
+            <Link to="/knowledge/reading">읽을거리 목록 보기</Link>
+          </EmptyState>
         ) : (
           <ul className="grid list-none gap-2 p-0 m-0 sm:grid-cols-2 lg:grid-cols-3">
             {FRAMEWORKS.map((f) => (
@@ -144,7 +146,7 @@ export default function KnowledgeIndexPage() {
                   className="block h-full rounded-md border border-border bg-surface p-3 no-underline text-text hover:border-accent"
                 >
                   <div className="font-medium">{f.title}</div>
-                  {f.titleEn && <div className="text-[12px] text-muted">{f.titleEn}</div>}
+                  {f.titleEn && <div className="text-sm text-muted">{f.titleEn}</div>}
                   {f.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {f.tags.map((t) => (
@@ -162,8 +164,8 @@ export default function KnowledgeIndexPage() {
       </section>
 
       <section aria-labelledby="kb-cards">
-        <h2 id="kb-cards" className="mb-2 text-[16px] font-semibold">
-          개념 카드 <span className="num text-muted text-[13px] font-normal">({CARDS.length})</span>
+        <h2 id="kb-cards" className="mb-2 text-lg font-semibold">
+          개념 카드 <span className="num text-muted text-base font-normal">({CARDS.length})</span>
         </h2>
         {tags.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="태그 필터">
@@ -171,7 +173,7 @@ export default function KnowledgeIndexPage() {
               type="button"
               aria-pressed={!tag}
               onClick={() => setTag(undefined)}
-              className={`rounded-full border px-2.5 py-0.5 text-[12px] ${!tag ? 'bg-accent text-white border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
+              className={`rounded-full border px-2.5 py-0.5 text-sm ${!tag ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
             >
               전체
             </button>
@@ -181,7 +183,7 @@ export default function KnowledgeIndexPage() {
                 type="button"
                 aria-pressed={tag === t}
                 onClick={() => setTag(tag === t ? undefined : t)}
-                className={`rounded-full border px-2.5 py-0.5 text-[12px] ${tag === t ? 'bg-accent text-white border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
+                className={`rounded-full border px-2.5 py-0.5 text-sm ${tag === t ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
               >
                 {t} <span className="num opacity-70">{n}</span>
               </button>
@@ -189,12 +191,20 @@ export default function KnowledgeIndexPage() {
           </div>
         )}
         {groups.length === 0 ? (
-          <EmptyState title="개념 카드가 아직 없습니다" />
+          <EmptyState title={tag ? `#${tag} 태그의 카드가 없습니다` : '개념 카드가 아직 없습니다'}>
+            {tag ? (
+              <Button size="sm" variant="secondary" onClick={() => setTag(undefined)}>
+                전체 카드 보기
+              </Button>
+            ) : (
+              <Link to="/knowledge/glossary">용어집 보기</Link>
+            )}
+          </EmptyState>
         ) : (
           <div className="space-y-4">
             {groups.map(([g, cards]) => (
               <div key={g}>
-                <h3 className="mb-1 text-[13px] font-semibold text-muted">#{g}</h3>
+                <h3 className="mb-1 text-base font-semibold text-muted">#{g}</h3>
                 <ul className="m-0 list-none space-y-1.5 p-0">
                   {cards.map((c) => (
                     <CardItem

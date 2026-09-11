@@ -35,8 +35,7 @@ export const LEHMAN_FACTS: FactRow[] = [
     unit: '$B',
     asOf: Q3,
     sourceId: 'valukas-report-2010',
-    tag: 'VERIFY',
-    note: '유동성 풀에 포함된 JPM 담보 ≈$5.5B + 씨티 comfort deposit $2B (2차 인용)',
+    note: '유동성 풀에 포함된 JPM 담보 ≈$5.5B + 씨티 comfort deposit $2B. **1차 확인**: Valukas 보고서 Vol. 4 §III.A.5(Secured Lenders) 목차 항목 (5)(b), p.1455 — "Lehman Did Not Disclose in Its Second Quarter 2008 10-Q, Filed July 10, 2008, That It Was Including Both the $2 Billion Citibank \'Comfort Deposit\' and Approximately $5.5 Billion of Securities Collateral Pledged to JPMorgan in Its Liquidity Pool". 같은 절은 이 밖에 BofA $500m·HSBC ≈$1B·9월 합의서에 따른 JPM 추가 $8B도 풀에 포함되어 있었다고 적는다',
   },
   {
     path: 'institution.securities.afs.marketValue',
@@ -170,8 +169,10 @@ export const LEHMAN_FACTS: FactRow[] = [
     unit: '$B',
     asOf: Q2,
     sourceId: 'lehman-10q-2q08',
-    tag: 'VERIFY',
-    note: '총자산 $639.4B(5/31 10-Q; 파산 신청서 인용). 도시에 [2차] 태그 유지 — 10-Q(1차)로 해소 가능',
+    tag: 'STYLIZED',
+    note:
+      '10-Q 원문 확인: 5/31 총자산 $639,432M · 총부채 $613,156M · 자기자본 $26,276M. 합성 대차대조표가 ' +
+      '정수로 맞아떨어지도록 640으로 반올림(+0.6)했다',
   },
   // ───────────── 조달 세그먼트 ─────────────
   {
@@ -400,7 +401,7 @@ export const LEHMAN_FACTS: FactRow[] = [
     asOf: '2008-09-09',
     sourceId: 'press-nb-carlyle-2008-09',
     tag: 'VERIFY',
-    note: '칼라일 제안 ≈$7B(파산 전); 중순 입찰 ≈$5B; 최종 $2.15B(8-K 9/29, 1차)',
+    note: '칼라일 제안 ≈$7B(파산 전); 중순 입찰 ≈$5B; 최종 $2.15B(8-K 9/29, 1차). 파산 전 입찰가를 수치로 적은 1차 문서를 찾지 못했다 — **Valukas 보고서 Vol. 2 §III.A.2(Survival)의 IMD 매각 절차 서술에는 칼라일 제안 금액이 없음을 본문 검색으로 확인했다.** 해소 문서: LBHI 파산사건 기록(Bankr. S.D.N.Y. No. 08-13555) 중 IMD(뉴버거버먼) 매각 승인 신청서와 그 증거자료(2008-10-06 제출분 및 후속 매각절차 명령), 또는 Valukas 보고서 Vol. 6~9 부록의 IMD 매각 관련 증거(Appendix 소장 문서 목록)',
   },
   {
     path: 'institution.custom.repoRollRate',
@@ -444,60 +445,66 @@ export const LEHMAN_FACTS: FactRow[] = [
   },
   {
     path: 'market.govt2yBp',
-    value: 225,
+    value: 223,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
-    tag: 'VERIFY',
+    sourceId: 'frb-h15-treasury-2008',
+    note: 'DGS2 2008-09-09 종가 2.23%',
   },
   {
     path: 'market.govt10yBp',
-    value: 360,
+    value: 362,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
-    tag: 'VERIFY',
+    sourceId: 'frb-h15-treasury-2008',
+    note: 'DGS10 2008-09-09 종가 3.62%',
   },
   {
     path: 'market.govt30yBp',
     value: 420,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
-    tag: 'VERIFY',
+    sourceId: 'frb-h15-treasury-2008',
+    note: 'DGS30 2008-09-09 종가 4.20%',
   },
   {
     path: 'market.creditSpreadIgBp',
     value: 300,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
+    sourceId: 'fcic-report-2011',
     tag: 'VERIFY',
+    note:
+      '**해소 문서**: `api.stlouisfed.org/fred/series/observations?series_id=BAMLC0A0CM&observation_date=2008-09-09` ' +
+      '(무료 FRED API 키 필요). 익명 CSV(`fredgraph.csv?id=BAMLC0A0CM`)는 날짜 파라미터를 붙여도 최근 3년만 ' +
+      '반환한다(docs/research/data-sources-global.md §2). 교차 확인(공개 계열로 직접 조회): 2008-09-09 ' +
+      'DBAA 6.97% · DAAA 5.37% · DGS10 3.62% → Baa−10y 335bp, Aaa−10y 175bp — 300bp는 그 사이에 든다',
   },
   {
     path: 'market.creditSpreadHyBp',
     value: 850,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
+    sourceId: 'fcic-report-2011',
     tag: 'VERIFY',
+    note:
+      '**해소 문서**: `api.stlouisfed.org/fred/series/observations?series_id=BAMLH0A0HYM2&observation_date=2008-09-09` ' +
+      '(무료 FRED API 키 필요). 익명 접근의 제약은 IG와 동일하다(docs/research/data-sources-global.md §2)',
   },
   {
     path: 'market.fundingStressBp',
-    value: 115,
+    value: 119,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'fcic-report-2011',
-    tag: 'VERIFY',
-    note: 'TED ≈1.1~1.2%; 10/10 4.58% 정점(도시에 검증)',
+    sourceId: 'fred-tedrate-2008',
+    note: 'TED 2008-09-09 1.19%; 9/12 1.36 → 9/15 1.79; 10/10 4.58% 정점 [fcic-report-2011]',
   },
   {
     path: 'market.custom.tedBp',
-    value: 115,
+    value: 119,
     unit: 'bp',
     asOf: '2008-09-09',
-    sourceId: 'fcic-report-2011',
-    tag: 'VERIFY',
+    sourceId: 'fred-tedrate-2008',
   },
   {
     path: 'market.equityIndex',
@@ -509,11 +516,11 @@ export const LEHMAN_FACTS: FactRow[] = [
   },
   {
     path: 'market.volIndex',
-    value: 25,
+    value: 25.5,
     unit: 'index',
     asOf: '2008-09-09',
-    sourceId: 'press-kdb-2008-09-09',
-    tag: 'VERIFY',
+    sourceId: 'cboe-vix-2008',
+    note: 'VIX 2008-09-09 종가 25.47',
   },
   {
     path: 'market.fxUsdLocal',
@@ -538,6 +545,7 @@ export const LEHMAN_FACTS: FactRow[] = [
     asOf: '2008-09-09',
     sourceId: 'press-kdb-2008-09-09',
     tag: 'VERIFY',
+    note: '리먼 5년 CDS 2008-09-09. Markit 일별 스프레드는 공개 접근이 불가해 미확인. **해소 문서**: FCIC 자료실(fcic.law.stanford.edu)의 위원회 수집 데이터 파일 중 Markit CDS 스프레드 계열, 또는 Markit/IHS 라이선스 데이터. **본 점검에서 확인한 사실**: Valukas 보고서 Vol. 1·2·4 본문에는 리먼 CDS 스프레드의 bp 수치가 없다(전문 검색). 따라서 종전 주석이 적던 "Valukas Vol.4 담보·CDS 절"은 해소 경로가 아니다',
   },
   // ───────────── 신뢰 ─────────────
   {
@@ -612,8 +620,7 @@ export const LEHMAN_FACTS: FactRow[] = [
     unit: '$B',
     asOf: '2008-09-12',
     sourceId: 'valukas-report-2010',
-    tag: 'VERIFY',
-    note: 'JPM 2차 추가 담보 요구 $5B (9/11 요구 → 9/12 현금 이행) — Examiner 보고서 인용, 페이지 미확인',
+    note: 'JPM 2차 추가 담보 요구 $5B (9/11 요구 → 9/12 현금 이행). **1차 확인**: Valukas 보고서 Vol. 4 §III.A.5(Secured Lenders) — "JPMorgan demanded $5 billion more in cash collateral on September 11, 2008, which Lehman provided by the afternoon of September 12." 같은 절의 요약은 청산은행 담보의 세 축을 (i) 2008년 중 청산 관련 마진 누적 ≈$8B, (ii) 9/9 요구 $5B, (iii) 9/11 요구 현금 $5B로 적는다',
   },
   {
     path: 'event.t0.pdcfPrepositionCapacity',
@@ -639,17 +646,15 @@ export const LEHMAN_FACTS: FactRow[] = [
     unit: '$B',
     asOf: '2008-03-10',
     sourceId: 'sec-cox-basel-2008-03-20',
-    tag: 'VERIFY',
-    note: '도시에 [미확인] 태그 유지. SEC Cox 서한: 3/10 $18.1B → 3/11 $11.5B → 3/12 $12.4B → 3/13 급감(≈$2B는 2차) — 도시에 갱신 시 해소 가능',
+    note: '**1차 확인**: SEC 위원장 Cox가 바젤위원회에 보낸 2008-03-20 서한(SEC Press Release 2008-48) 본문의 베어스턴스 지주 유동성 풀 표 — 3/10 $18.1B(고객자산보호규칙 조정 시 15.1) → 3/11 $11.5B → 3/12 $12.4B → 3/13 $2B. 서한은 "On Tuesday, March 11, the holding company liquidity pool declined from $18.1 billion to $11.5 billion"이라고 적는다',
   },
   {
     path: 'anchor.lehman.usablePoolFriday',
-    value: 2,
+    value: 2.4,
     unit: '$B',
     asOf: '2008-09-12',
     sourceId: 'valukas-report-2010',
-    tag: 'VERIFY',
-    note: '9/12(금) 즉시 현금화 가능 자산 <$2B (Examiner). 역사 경로 체크포인트: 9/12 누적 유출 ≥35(기대 38), 풀 ≈2',
+    note: '9/12(금) 즉시 현금화 가능 자산 **$2.4B**. **1차 확인**: Valukas 보고서 Vol. 4 §III.A.5 — 리먼은 전주 말 보고유동성 $42.1B(고현금화 가능 $33.8B)로 마쳤고, 9/10 $37.6B(저현금화 $27.3B), 9/12에는 보고유동성 $32.5B 중 $30.1B가 "low ability to monetize"로 분류되었다. "In other words, only $2.4 billion of Lehman\'s $32.5 billion liquidity pool was readily convertible to cash on September 12." 종전 값 2(「<$2B」)는 2차 인용이었다. 이 정정에 맞추어 t3 `cash` 체크포인트의 기대값도 2 → 2.4로 옮겼다(허용오차 1.0은 그대로)',
   },
   {
     path: 'anchor.lehman.chapter11Assets',
@@ -657,7 +662,112 @@ export const LEHMAN_FACTS: FactRow[] = [
     unit: '$B',
     asOf: '2008-09-15',
     sourceId: 'lehman-10q-2q08',
+    note: '파산 신청서가 인용한 $639B는 5/31 10-Q 총자산 $639,432M(원문 확인)',
+  },
+  // ───────────── 9/11·9/12 일중 티커 앵커 (L2-c 서브턴 틱) ─────────────
+  // 앵커는 전부 "그날의 종가"이고 일중 분포는 [STYLIZED]다. FRED 계열은 등록 없이 받을 수 있으며
+  // (docs/research/data-sources-global.md §1) 아래 값은 fredgraph.csv 에서 직접 확인했다.
+  {
+    path: 'anchor.tedBp.2008-09-10',
+    value: 120,
+    unit: 'bp',
+    asOf: '2008-09-10',
+    sourceId: 'fred-tedrate-2008',
+    note: 'TEDRATE 9/10 종가 1.20%. T2 티커의 틱 0 앵커 (T2 entryEffects가 이 값으로 앵커를 세운다)',
+  },
+  {
+    path: 'anchor.tedBp.2008-09-11',
+    value: 124,
+    unit: 'bp',
+    asOf: '2008-09-11',
+    sourceId: 'fred-tedrate-2008',
+    note: 'TEDRATE 9/11 종가 1.24%. T2 티커의 종착점이자 T3 티커의 틱 0 앵커',
+  },
+  {
+    path: 'anchor.tedBp.2008-09-12',
+    value: 136,
+    unit: 'bp',
+    asOf: '2008-09-12',
+    sourceId: 'fred-tedrate-2008',
+    note: 'TEDRATE 9/12 종가 1.36%. T3 티커의 종착점 (9/15 1.79 → 10/10 4.58 정점)',
+  },
+  {
+    path: 'anchor.vix.2008-09-11',
+    value: 24.39,
+    unit: 'index',
+    asOf: '2008-09-11',
+    sourceId: 'cboe-vix-2008',
+    note:
+      'VIXCLS 9/11 종가 24.39 (9/9 25.47 → 9/10 24.52 → 9/11 24.39 → 9/12 25.66). 티커에는 쓰지 않고 ' +
+      'TED 궤적의 교차 확인용으로만 기록한다 — 파산 직전 주에도 VIX는 25 안팎에 머물렀고, ' +
+      '스트레스는 주식 변동성이 아니라 자금시장(TED)에 먼저 나타났다',
+  },
+  {
+    path: 'anchor.vix.2008-09-12',
+    value: 25.66,
+    unit: 'index',
+    asOf: '2008-09-12',
+    sourceId: 'cboe-vix-2008',
+    note: 'VIXCLS 9/12 종가 25.66 → 9/15 31.70 (파산 신청 당일 +24%)',
+  },
+  {
+    path: 'anchor.ownStockGap.2008-09-11',
+    value: -0.2,
+    unit: 'fraction',
+    asOf: '2008-09-11T09:30-04:00',
+    sourceId: 'press-kdb-2008-09-09',
+    tag: 'STYLIZED',
+    note:
+      '9/11 종가 −42%를 프리마켓 갭(−20%) × 장중 티커(0.725)로 분해했다. 곱 0.58은 종전 단일 ' +
+      '−42%와 정확히 같다. 시간대별 분해 자료는 없으므로 갭·티커 배분 자체는 양식화 값이다',
+  },
+  {
+    path: 'anchor.ownStockGap.2008-09-12',
+    value: -0.0703,
+    unit: 'fraction',
+    asOf: '2008-09-12T09:30-04:00',
+    sourceId: 'press-kdb-2008-09-09',
+    tag: 'STYLIZED',
+    note: '9/12 종가 −14% = 갭(0.86/0.925 − 1 ≈ −7.03%) × 장중 티커(0.925). 곱 0.86은 종전과 동일',
+  },
+  {
+    path: 'anchor.ownCdsBp.2008-09-11',
+    value: 700,
+    unit: 'bp',
+    asOf: '2008-09-11',
+    sourceId: 'press-kdb-2008-09-09',
     tag: 'VERIFY',
-    note: '도시에 [2차] 태그 유지. 파산 신청서의 $639B는 5/31 10-Q 총자산',
+    note:
+      '기존 T2 시세 이벤트(t2-market)가 표시하던 "≈700bp+"를 티커 종착점으로 승계한 값이다. ' +
+      'Markit 일별 스프레드는 공개 접근이 불가해 미확인 — **해소 문서**는 T0 앵커(475bp)와 동일하게 ' +
+      'FCIC 자료실의 위원회 수집 Markit CDS 계열 또는 Markit/IHS 라이선스 데이터다. ' +
+      '**본 점검에서 Valukas 보고서 Vol. 1·2·4 본문에 CDS bp 수치가 없음을 확인했으므로 그 경로는 제외한다.** ' +
+      '교차 확인 주의: BIS Quarterly Review 2008-12 [bis-qr-2008-12]가 인용하는 9월 초 327 → 360/370bp는 ' +
+      'KDB 협상 결렬(9/9) **이전**의 관측이므로 이 앵커와 같은 시점이 아니다 — 모순이라기보다 다른 날짜다. ' +
+      '그래도 9/9·9/11 값 자체는 미확정이므로 위 두 1차 문서로 확정해야 한다',
+  },
+  {
+    path: 'anchor.ownCdsBp.2008-09-12',
+    value: 775,
+    unit: 'bp',
+    asOf: '2008-09-12',
+    sourceId: 'press-kdb-2008-09-09',
+    tag: 'VERIFY',
+    note:
+      '9/12 5년 CDS. 기존 시나리오에 표시 값이 없던 날이므로 9/11 대비 추가 확대를 양식화했다. ' +
+      '**해소 문서**는 9/11 앵커와 같다 — FCIC 자료실의 위원회 수집 Markit CDS 계열 또는 ' +
+      'Markit/IHS 라이선스 데이터(Valukas 보고서 본문에는 bp 수치가 없다)',
+  },
+  {
+    path: 'anchor.nyDayProfile',
+    value: 0.35,
+    unit: 'fraction',
+    asOf: '2008-09-11',
+    sourceId: 'nyfed-sr506',
+    tag: 'STYLIZED',
+    note:
+      '뉴욕 영업일 유출 프로필 [0.35, 0.25, 0.18, 0.12, 0.10]의 첫 슬라이스. 전방 집중의 근거는 ' +
+      '트라이파티 언와인드가 아침에 일괄 실행된다는 구조(NY Fed SR 506 / EPR 2012)이며, ' +
+      '시각별 인출 자료는 공개되지 않았으므로 분포 자체는 양식화 값이다. 합계는 1이다',
   },
 ]

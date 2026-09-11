@@ -4,13 +4,15 @@ import type {
   Effect,
   GameOverRule,
   InstitutionState,
+  Interrupt,
   Option,
   ScenarioDefinition,
 } from '../types'
 import { SCORE_DIMENSIONS } from '../types/common'
 import { createGame } from '../core/createGame'
+import { validateDialogue } from '../core/dialogue'
 import { getNumberPath } from '../core/paths'
-import { allDecisions } from '../core/lookup'
+import { allDecisions, tickCount } from '../core/lookup'
 
 export interface IntegrityIssue {
   level: 'error' | 'warning'
@@ -140,17 +142,68 @@ export function validateScenario<S extends InstitutionState>(
     -1,
   )
 
+  /** A ticked `runoffStep` must carry one share per tick. */
+  const checkRunoffProfile = (effects: Effect[] | undefined, where: string, ticks: number) => {
+    for (const e of effects ?? []) {
+      if (e.kind !== 'fn' || e.name !== 'runoffStep') continue
+      const profile = e.params?.profile
+      if (typeof profile !== 'string') continue
+      const shares = profile.split('/')
+      if (shares.length !== ticks)
+        err('tick-profile', where, `runoffStep profile 길이 ${shares.length} ≠ ticks ${ticks}`)
+    }
+  }
+
   // --- turns
   let currentTurnIndex = 0
+  let currentTicks = 1
   sc.turns.forEach((turn, ti) => {
     currentTurnIndex = ti
+    const ticks = tickCount(turn)
+    currentTicks = ticks
     const tw = `turns[${ti}](${turn.id})`
     addId(turn.id, tw)
     if (turn.events.length === 0 && turn.decisions.length === 0)
       err('turn-empty', tw, '이벤트도 결정도 없는 턴')
+    if (turn.ticks !== undefined && (!Number.isInteger(turn.ticks) || turn.ticks < 1))
+      err('ticks-range', tw, `ticks는 1 이상의 정수여야 합니다 (${turn.ticks})`)
+    if (turn.tickLabels && turn.tickLabels.length !== ticks)
+      err('tick-labels', tw, `tickLabels 길이 ${turn.tickLabels.length} ≠ ticks ${ticks}`)
     for (const ce of turn.entryEffects ?? []) {
-      checkEffects(ce.effects, `${tw}.entryEffects(${ce.id})`)
-      checkCondition(ce.when, `${tw}.entryEffects(${ce.id})`)
+      const ew2 = `${tw}.entryEffects(${ce.id})`
+      checkEffects(ce.effects, ew2)
+      checkCondition(ce.when, ew2)
+      checkRunoffProfile(ce.effects, ew2, ticks)
+      if (ticks > 1 && ce.effects.some((e) => e.kind === 'fn' && e.name === 'runoffStep')) {
+        warn(
+          'runoff-in-entry',
+          ew2,
+          '틱이 있는 턴의 runoffStep은 eachTick으로 옮기세요 (entryEffects에서는 한 슬라이스만 실행됩니다)',
+        )
+      }
+    }
+    for (const ce of turn.eachTick ?? []) {
+      const cw = `${tw}.eachTick(${ce.id})`
+      checkEffects(ce.effects, cw)
+      checkCondition(ce.when, cw)
+      checkRunoffProfile(ce.effects, cw, ticks)
+    }
+    for (const ce of turn.tickEffects ?? []) {
+      const cw = `${tw}.tickEffects(${ce.id})`
+      if (!(ce.atTick >= 0 && ce.atTick < ticks))
+        err('at-tick-range', cw, `atTick ${ce.atTick}은 0..${ticks - 1} 범위여야 합니다`)
+      checkEffects(ce.effects, cw)
+      checkCondition(ce.when, cw)
+      checkRunoffProfile(ce.effects, cw, ticks)
+    }
+    for (const series of turn.ticker?.series ?? []) {
+      const sw = `${tw}.ticker(${series.path})`
+      if (series.values.length !== ticks)
+        err('ticker-length', sw, `values 길이 ${series.values.length} ≠ ticks ${ticks}`)
+      if (initial && getNumberPath(initial, series.path) === undefined)
+        err('ticker-path', sw, `티커 경로가 초기 상태에서 숫자로 해석되지 않음: ${series.path}`)
+      if (series.path.startsWith('confidence'))
+        err('ticker-path', sw, '티커는 confidence를 움직이지 않습니다 (ΔCI 이벤트를 쓰세요)')
     }
     for (const ev of turn.events) {
       const ew = `${tw}.events(${ev.id})`
@@ -158,6 +211,8 @@ export function validateScenario<S extends InstitutionState>(
       checkEffects(ev.effects, ew)
       checkCondition(ev.when, ew)
       checkRefs(ev.cardRefs, ev.sourceRefs, ew)
+      if (ev.atTick !== undefined && !(ev.atTick >= 0 && ev.atTick < ticks))
+        err('at-tick-range', ew, `atTick ${ev.atTick}은 0..${ticks - 1} 범위여야 합니다`)
       if (ev.correctionOf && !allIds.has(ev.correctionOf))
         warn('correction-ref', ew, `정정 대상 미존재: ${ev.correctionOf}`)
     }
@@ -166,6 +221,31 @@ export function validateScenario<S extends InstitutionState>(
       addId(d.id, dw)
       decisionIds.add(d.id)
       checkDecision(d as Decision, dw)
+    }
+    for (const it of (turn.interrupts ?? []) as Interrupt[]) {
+      const iw = `${tw}.interrupts(${it.id})`
+      addId(it.id, iw)
+      decisionIds.add(it.id)
+      if (!(it.atTick >= 0 && it.atTick < ticks))
+        err('at-tick-range', iw, `atTick ${it.atTick}은 0..${ticks - 1} 범위여야 합니다`)
+      if (!it.defaultOptionId)
+        err('interrupt-default', iw, '인터럽트에는 defaultOptionId가 필요합니다 (무응답 처리)')
+      if (!(it.timeoutSec > 0)) err('interrupt-timeout', iw, 'timeoutSec는 0보다 커야 합니다')
+      if (it.options.length < 2 || it.options.length > 4)
+        err('interrupt-options', iw, `빠른 응답은 2~4개여야 합니다 (${it.options.length}개)`)
+      if (!it.lines || it.lines.length === 0)
+        err('interrupt-lines', iw, '인터럽트 대사(lines)가 없습니다')
+      // The deadline sweep fires at the tick *after* the one an interrupt opens on, so an interrupt
+      // that opens on the last tick can never time out — its `defaultOptionId` would be unreachable.
+      // Jitter can push it there too, so the check uses the latest tick it can land on.
+      const latestOpen = Math.min(ticks - 1, it.atTick + (it.jitter ?? 0))
+      if (ticks > 1 && latestOpen >= ticks - 1)
+        warn(
+          'interrupt-last-tick',
+          iw,
+          `atTick ${it.atTick}${it.jitter ? ` (지터 ±${it.jitter})` : ''}이 마지막 틱에 열릴 수 있어 무응답 자동 확정이 일어나지 않습니다 (≤ ${ticks - 2} 권장)`,
+        )
+      checkDecision(it as Decision, iw)
     }
     for (const h of turn.advisorHints ?? []) checkCondition(h.when, `${tw}.advisorHints`)
     checkRefs(turn.relatedCards, undefined, tw)
@@ -183,8 +263,55 @@ export function validateScenario<S extends InstitutionState>(
     if (d.defaultOptionId && !d.options.some((o) => o.id === d.defaultOptionId)) {
       err('default-option', dw, `defaultOptionId ${d.defaultOptionId} 없음`)
     }
+    const ticks = currentTicks
+    if (d.availableFrom !== undefined && !(d.availableFrom >= 0 && d.availableFrom < ticks))
+      err(
+        'available-from',
+        dw,
+        `availableFrom ${d.availableFrom}은 0..${ticks - 1} 범위여야 합니다`,
+      )
+    if (d.deadlineTick !== undefined) {
+      if (!(d.deadlineTick >= 0 && d.deadlineTick < ticks))
+        err('deadline-tick', dw, `deadlineTick ${d.deadlineTick}은 0..${ticks - 1} 범위여야 합니다`)
+      if (d.availableFrom !== undefined && d.availableFrom > d.deadlineTick)
+        err(
+          'deadline-tick',
+          dw,
+          `availableFrom ${d.availableFrom} > deadlineTick ${d.deadlineTick}`,
+        )
+      // A deadline with no default would deadlock a required decision, so this is an error.
+      if (!d.defaultOptionId)
+        err('deadline-default', dw, '마감 틱이 있는 결정에는 defaultOptionId가 필요합니다')
+      // The sweep fires at the tick *after* the deadline, so a deadline on the last tick never runs.
+      if (ticks > 1 && d.deadlineTick >= ticks - 1)
+        warn(
+          'deadline-last-tick',
+          dw,
+          `deadlineTick ${d.deadlineTick}은 마지막 틱이라 자동 확정이 일어나지 않습니다 (≤ ${ticks - 2} 권장)`,
+        )
+    }
+    if (d.scoreWeight !== undefined && !(d.scoreWeight >= 0))
+      err('score-weight', dw, `scoreWeight ${d.scoreWeight}는 0 이상이어야 합니다`)
     for (const dim of d.dimensions ?? []) {
       if (!SCORE_DIMENSIONS.includes(dim)) err('dimension', dw, `알 수 없는 점수 차원 ${dim}`)
+    }
+    // A dialogue always terminates in one of the decision's own options, so every rule below
+    // (historical option, traps, paths, scoring) still applies unchanged to a `steps` decision.
+    for (const issue of validateDialogue(d)) {
+      issues.push({
+        level: issue.level,
+        rule: issue.rule,
+        where: `${dw}.${issue.where}`,
+        message: issue.message,
+      })
+    }
+    for (const step of d.steps ?? []) {
+      addId(step.id, `${dw}.steps(${step.id})`)
+      for (const r of step.replies) {
+        const rw = `${dw}.steps(${step.id}).replies(${r.id})`
+        checkCondition(r.when, rw)
+        checkEffects(r.effects, rw)
+      }
     }
     const ids = new Set<string>()
     let historical = 0
@@ -218,7 +345,14 @@ export function validateScenario<S extends InstitutionState>(
         )
       }
     }
-    if (trap === 0) warn('min-one-trap', dw, '함정 옵션이 없습니다 (시나리오 전체에 ≥1 필요)')
+    // A dialogue can put the trap in a reply rather than an option — the mistake is just as real,
+    // so it counts. Without this the rule nags a decision that already teaches a trap.
+    const dialogueTraps = (d.steps ?? []).reduce(
+      (n, st) => n + st.replies.filter((r) => r.trap).length,
+      0,
+    )
+    if (trap + dialogueTraps === 0)
+      warn('min-one-trap', dw, '함정 옵션이 없습니다 (시나리오 전체에 ≥1 필요)')
     if (d.timeLimitSec && !d.defaultOptionId)
       warn('timeout-default', dw, '타이머가 있는 결정에 defaultOptionId가 없습니다')
   }
@@ -246,7 +380,18 @@ export function validateScenario<S extends InstitutionState>(
     checkRefs(undefined, o.feasibility?.sourceRefs, ow)
     o.delayedEffects?.forEach((de, i) => {
       const dew = `${ow}.delayedEffects[${i}]`
-      if (de.afterTurns < 1) err('delayed-offset', dew, 'afterTurns는 1 이상이어야 합니다')
+      if (de.afterTurns < 1 && !de.afterTicks)
+        err('delayed-offset', dew, 'afterTurns는 1 이상이어야 합니다')
+      if (de.afterTicks !== undefined) {
+        const dueTicks = tickCount(sc.turns[currentTurnIndex + de.afterTurns])
+        if (!(de.afterTicks > 0 && de.afterTicks < dueTicks)) {
+          err(
+            'delayed-tick',
+            dew,
+            `afterTicks ${de.afterTicks}는 틱이 있는 턴에만 쓸 수 있습니다 (대상 턴 ticks ${dueTicks})`,
+          )
+        }
+      }
       checkEffects(de.effects, dew)
       checkCondition(de.when, dew)
       if (!de.description) err('delayed-description', dew, 'description 누락')
@@ -337,7 +482,11 @@ export function validateScenario<S extends InstitutionState>(
       err('checkpoint-turn', `checkpoints(${c.label})`, `턴 ${c.turnId} 없음`)
   }
   // scenario-level trap requirement
-  const anyTrap = decisionsAll.some((d) => d.decision.options.some((o) => o.trap))
+  const anyTrap = decisionsAll.some(
+    (d) =>
+      d.decision.options.some((o) => o.trap) ||
+      (d.decision.steps ?? []).some((st) => st.replies.some((r) => r.trap)),
+  )
   if (!anyTrap) err('min-one-trap', 'turns', '시나리오에 함정 옵션이 최소 1개 필요합니다')
   return issues
 }

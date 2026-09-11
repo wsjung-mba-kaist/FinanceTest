@@ -40,8 +40,13 @@ export const DEFAULT_THRESHOLDS: ThresholdMap = {
   regulatorLevel: { warn: 1, breach: 3, direction: 'above' },
 }
 
+/**
+ * Status of `value` against its band. A metric **without** a threshold has no band to breach,
+ * so it returns `'na'` ("기준 없음"), never `'ok'` — a green 정상 badge on an unbanded metric
+ * (누적 예금 유출, 현금 …) reads as reassurance through an entire bank run.
+ */
 export function statusFor(value: number, t?: Threshold): MetricStatus {
-  if (!t || Number.isNaN(value) || !Number.isFinite(value)) return t ? 'na' : 'ok'
+  if (!t || Number.isNaN(value) || !Number.isFinite(value)) return 'na'
   if (t.direction === 'below') {
     if (value < t.breach) return 'breach'
     if (value < t.warn) return 'warn'

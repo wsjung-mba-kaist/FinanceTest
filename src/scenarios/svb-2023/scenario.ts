@@ -64,6 +64,8 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     sources: SVB_SOURCES,
   },
   units: { currency: 'USD', scale: 1e9, display: 'B' },
+  // 변동성(variance > 0)에서만 사용된다. variance 0(테스트·체크포인트 정본)에서는 RNG를 아예 당기지 않는다.
+  noise: { runoffSigma: 0.15, runoffCap: 0.3, tickerSigma: 0.01, tickerSigmaBp: 2, eventJitter: 1 },
   initialState: {
     institution: svbInitialBank,
     market: svbInitialMarket,
@@ -145,7 +147,9 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     ],
     simplificationNotes: [
       'PVB는 SVB Financial Group 2022-12-31 연결 재무제표를 반올림한 합성 기관이며, 예금 세그먼트와 일일 유출률은 양식화·보정된 값이다(calibration.md).',
-      '3월 9일 $42B의 일중 분포(오전 55%/오후 45%)는 양식화. 실제 시각별 인출 자료는 공개되지 않았다.',
+      '3월 9일 $42B의 일중 분포(오전 55%/오후 45%와 그 안의 정시 단위 프로필)는 양식화. 실제 시각별 인출 자료는 공개되지 않았다.',
+      '일중 시세(주가·2년물·KRE)는 그날의 종가를 앵커로 한 양식화된 궤적이다. 시간대별 실제 시세를 재현한 것이 아니다.',
+      '전화·데스크 인터럽트의 대사는 공개 기록을 바탕으로 재구성한 것이며 녹취·속기록이 아니다.',
       '기설정 담보차입 여력 $6.4B는 역사 경로가 마감 잔고 −$958M을 재현하도록 역산한 값이다.',
       '무디스·골드만·VC의 발언은 공개 기록을 바탕으로 각색한 것이다.',
       '세율 25%, 약정 한도 $60B, 대출 세그먼트 배분은 단순화된 가정이다.',
@@ -345,6 +349,7 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
         't4-d1': ['t4-a'],
         't4-d2': ['t4-d2-b'],
         't5-d1': ['t5-b'],
+        't5-d2': ['t5-d2-b'],
         't6-d1': ['t6-a'],
       },
       note: 'SVB의 실제 선택 순서. T3.D1의 FHLB 당일 인출(A)은 SVB가 3/9 FHLB 차입을 늘린 기록을 반영한다. 체크포인트: 3/9 유출 ≈$40~43B, 마감 잔고 ≈−$1B, 3/10 폐쇄.',

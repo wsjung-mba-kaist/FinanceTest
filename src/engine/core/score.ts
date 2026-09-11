@@ -30,13 +30,15 @@ export function evalCurve(curve: Curve, x: number): number {
   return clamp(last[1], 0, 100)
 }
 
+/**
+ * Finiteness only — **never** `status`. `statusFor` returns 'na' for any metric without a threshold
+ * band, so filtering on status here silently dropped every scoring component that reads a metric a
+ * scenario routes through `institution.custom`.
+ */
 function metricSeries(state: GameState, key: string): number[] {
   return state.metricsHistory
     .map((s) => s.metrics[key])
-    .filter(
-      (m): m is NonNullable<typeof m> =>
-        Boolean(m) && m!.status !== 'na' && Number.isFinite(m!.value),
-    )
+    .filter((m): m is NonNullable<typeof m> => Boolean(m) && Number.isFinite(m!.value))
     .map((m) => m.value)
 }
 
@@ -67,6 +69,9 @@ interface ChosenOption {
   decisionId: string
   optionId: string
   rating: number
+  /** `Decision.scoreWeight` (default 1); interrupts are authored at 0.5 so quick calls do not
+   * outweigh the day's key decision. */
+  weight: number
   dimensions: ScoreDimension[] | undefined
   scoreAdjust: Partial<Record<ScoreDimension, number>> | undefined
 }
@@ -85,6 +90,7 @@ function chosenOptions(state: GameState, scenario: ScenarioDefinition): ChosenOp
         decisionId: rec.decisionId,
         optionId: oid,
         rating: o.expert.rating,
+        weight: found.decision.scoreWeight ?? 1,
         dimensions: found.decision.dimensions,
         scoreAdjust: o.scoreAdjust,
       })
@@ -118,7 +124,11 @@ function evalComponent(
       const tagged = chosen.filter((o) => o.dimensions?.includes(dim))
       const pool = tagged.length > 0 ? tagged : chosen
       if (pool.length === 0) return undefined
-      const avg = pool.reduce((a, o) => a + o.rating, 0) / pool.length
+      const wsum = pool.reduce((a, o) => a + o.weight, 0)
+      const avg =
+        wsum > 0
+          ? pool.reduce((a, o) => a + o.weight * o.rating, 0) / wsum
+          : pool.reduce((a, o) => a + o.rating, 0) / pool.length
       return {
         score: avg,
         text: `${c.label ?? '전문가 정합'}: 선택 옵션 평균 ${avg.toFixed(0)}점 (${pool.length}건${tagged.length ? '' : ', 전체 결정 기준'})`,

@@ -12,7 +12,7 @@ import { letterFor } from './playHelpers'
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h4 className="text-[12px] font-semibold text-muted">{title}</h4>
+      <h4 className="text-sm font-semibold text-muted">{title}</h4>
       {children}
     </section>
   )
@@ -65,23 +65,23 @@ export function RationalePanel({
     >
       <Block title="결과">
         {chosen.map((o) => (
-          <div key={o.id} className="text-[12px]">
+          <div key={o.id} className="text-sm">
             <span className="num mr-1 font-semibold">{letterOf(o.id)}</span>
             <span className="font-medium">{o.label}</span>
-            <Markdown className="mt-0.5 text-[12px] leading-relaxed">{o.consequences}</Markdown>
+            <Markdown className="mt-0.5 text-base leading-relaxed">{o.consequences}</Markdown>
           </div>
         ))}
         {feedItems.map((f) => (
-          <div key={f.id} className="flex items-start gap-1.5 text-[12px]">
+          <div key={f.id} className="flex items-start gap-1.5 text-sm">
             <Badge tone={f.severity === 'info' ? 'neutral' : f.severity}>[결과]</Badge>
             <div>
               <div className="font-medium">{f.title}</div>
-              <Markdown className="text-[12px] leading-relaxed">{f.body}</Markdown>
+              <Markdown className="text-base leading-relaxed">{f.body}</Markdown>
             </div>
           </div>
         ))}
         {deltas.length > 0 && (
-          <ul className="mt-1 space-y-0.5 text-[12px]">
+          <ul className="mt-1 space-y-0.5 text-sm">
             {deltas.map((d) => {
               const spec = kpiByMetric.get(d.key)
               return (
@@ -104,7 +104,7 @@ export function RationalePanel({
 
       <Block title="역사적 대응">
         {historical.length > 0 ? (
-          <p className="text-[12px]">
+          <p className="text-sm">
             실제로는{' '}
             {historical.map((o) => (
               <span key={o.id}>
@@ -114,12 +114,12 @@ export function RationalePanel({
             {chosenHistorical ? ' — 실제 대응과 같은 선택입니다.' : ' 쪽으로 대응했습니다.'}
           </p>
         ) : (
-          <p className="text-[12px] text-muted">이 결정에는 역사적 대응이 표시되지 않습니다.</p>
+          <p className="text-sm text-muted">이 결정에는 역사적 대응이 표시되지 않습니다.</p>
         )}
         {chosen
           .filter((o) => o.expert.historicalNote)
           .map((o) => (
-            <Markdown key={o.id} className="text-[12px] leading-relaxed">
+            <Markdown key={o.id} className="text-base leading-relaxed">
               {o.expert.historicalNote ?? ''}
             </Markdown>
           ))}
@@ -127,7 +127,7 @@ export function RationalePanel({
 
       <Block title="전문가 관점">
         {chosen.map((o) => (
-          <div key={o.id} className="space-y-0.5 text-[12px]">
+          <div key={o.id} className="space-y-0.5 text-sm">
             <div className="flex items-center gap-1.5">
               <span className="num font-semibold">{letterOf(o.id)}</span>
               <span className="font-medium">{o.label}</span>
@@ -146,11 +146,11 @@ export function RationalePanel({
                 <Citation ids={o.expert.sourceRefs} local={scenario.meta.sources} />
               )}
             </div>
-            <Markdown className="text-[12px] leading-relaxed">{o.expert.rationale}</Markdown>
+            <Markdown className="text-base leading-relaxed">{o.expert.rationale}</Markdown>
           </div>
         ))}
         {best && !chosen.includes(best) && (
-          <p className="text-[12px] text-muted">
+          <p className="text-sm text-muted">
             가장 높은 평점의 선택지:{' '}
             <span className="num font-semibold text-text">{letterOf(best.id)}</span> {best.label} (
             {best.expert.rating}/100)
@@ -160,15 +160,15 @@ export function RationalePanel({
 
       <Block title="왜 중요한가">
         {why.length === 0 && (
-          <p className="text-[12px] text-muted">이 선택에는 추가 설명이 없습니다.</p>
+          <p className="text-sm text-muted">이 선택에는 추가 설명이 없습니다.</p>
         )}
         {chosen.map((o) => (
           <div key={o.id} className="space-y-1.5">
             {o.trap && (
-              <div className="rounded border border-warning/40 bg-warning-bg px-2 py-1 text-[12px]">
+              <div className="rounded border border-warning/40 bg-warning-bg px-2 py-1 text-sm">
                 <Badge tone="warning">함정 선택지</Badge>
                 {o.trapExplanation && (
-                  <Markdown className="mt-1 text-[12px] leading-relaxed">
+                  <Markdown className="mt-1 text-base leading-relaxed">
                     {o.trapExplanation}
                   </Markdown>
                 )}
@@ -178,7 +178,7 @@ export function RationalePanel({
               <InlineCard cardId={o.remediationCard} prefix="보완 학습:" onOpen={markCardViewed} />
             )}
             {o.feasibility && (
-              <p className="text-[12px] text-muted">
+              <p className="text-sm text-muted">
                 실행 가능성 근거: {o.feasibility.basis}
                 {o.feasibility.sourceRefs && o.feasibility.sourceRefs.length > 0 && (
                   <Citation ids={o.feasibility.sourceRefs} local={scenario.meta.sources} />
@@ -186,7 +186,7 @@ export function RationalePanel({
               </p>
             )}
             {o.calibrationNote && (
-              <p className="text-[12px] text-muted">보정 노트: {o.calibrationNote}</p>
+              <p className="text-sm text-muted">보정 노트: {o.calibrationNote}</p>
             )}
           </div>
         ))}

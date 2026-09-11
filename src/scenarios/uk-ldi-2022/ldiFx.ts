@@ -1,5 +1,6 @@
 import type { Draft } from 'immer'
 import type { Effect, EffectContext, GameState, PensionState } from '../../engine/types'
+import { DEFAULT_NOISE, gaussian } from '../../engine/core/noise'
 import { clamp } from '../../engine/core/paths'
 import { fnEffect } from '../../engine/fx/common'
 import { pensionFx } from '../../engine/fx/pension'
@@ -110,6 +111,59 @@ function floorExposure(d: PDraft, hedgeBefore: number, exposureBefore: number): 
 }
 
 export const ldiFx = {
+  /**
+   * 틱 턴 전용 금리 이동. 엔진 `pensionFx.yieldShock`과 두 가지가 다르다.
+   *
+   * 1. **`market.govt30yBp`를 직접 움직이지 않는다.** 틱 턴에서는 `Turn.ticker`가 표시 금리를
+   *    틱마다 걷는다. 같은 이동을 효과와 티커가 두 번 반영하지 않도록 여기서는 담보 회계만 계상한다.
+   * 2. **장부·부채 재평가(`revalueBp`)를 PV01 손익과 분리**해 지정한 한 틱에서만 한 번에 적용한다.
+   *    장부 평가는 `(1 − D·Δy)`의 **곱**이므로 슬라이스로 나누면 복리 오차가 남는다. 반면 변동증거금은
+   *    `PV01 × Δbp`로 **선형**이라 슬라이스 합계가 정확히 일치한다. 실제로도 변동증거금은 일중 여러 번
+   *    정산되지만 스킴 장부와 기술적 준비금은 **종가 기준 일별**로 다시 매겨진다 —
+   *    분리는 보정상의 편의가 아니라 실무 순서다(calibration.md §12.1).
+   *
+   * 라이브 플레이(variance > 0)에서는 **슬라이스의 이동폭에만** `noise.tickerSigmaBp` 크기의 지터를
+   * 얹는다 — 그날 실제로 청구되는 변동증거금의 크기가 조금씩 달라지는 것이 이 시나리오의 유일한
+   * 살아 있는 불확실성이기 때문이다(연기금에는 예금 유출이 없어 `runoffSigma`가 쓰이지 않는다).
+   * 종가 재평가(`revalueBp`)에는 지터를 걸지 않는다: 종가는 사료로 고정된 값이다.
+   * `variance === 0`에서는 난수를 **한 번도 당기지 않는다**(엔진 보증과 같은 계약).
+   */
+  yieldTick(p: { deltaBp: number; revalueBp?: number; label?: string }): Effect<PensionState> {
+    return fnEffect<PensionState>(
+      'yieldTick',
+      { deltaBp: p.deltaBp, revalueBp: p.revalueBp ?? 0 },
+      (d, ctx) => {
+        const s = d.institution
+        const ldi = s.assets.ldi
+        const p01 = pv01Of(ldi)
+        const sigmaBp = ctx.noise?.tickerSigmaBp ?? DEFAULT_NOISE.tickerSigmaBp
+        const jitterBp = ctx.variance === 0 ? 0 : gaussian(ctx.rng) * sigmaBp * ctx.variance
+        const loss = p01 * (p.deltaBp + jitterBp)
+        if (loss > 0) {
+          ldi.marginCallOutstanding += loss
+          ldi.equity -= loss
+        } else if (loss < 0) {
+          ldi.collateral.cash += -loss
+          ldi.equity += -loss
+        }
+        if (p.revalueBp !== undefined) {
+          const dy = p.revalueBp / 10000
+          for (const book of [s.assets.gilts, s.assets.corporateBonds]) {
+            book.marketValue = Math.max(0, book.marketValue * (1 - book.modDuration * dy))
+          }
+          s.liabilities.pv = Math.max(0, s.liabilities.pv * (1 - s.liabilities.modDuration * dy))
+          s.liabilities.discountRateBp += p.revalueBp
+        }
+        ctx.log(
+          `금리 ${p.deltaBp > 0 ? '+' : ''}${(p.deltaBp + jitterBp).toFixed(1)}bp(틱): PV01 ${p01.toFixed(2)} → ${
+            loss > 0 ? `마진콜 +${loss.toFixed(1)}` : `담보 반환 ${(-loss).toFixed(1)}`
+          }${p.revalueBp !== undefined ? ` · 종가 재평가 ${p.revalueBp}bp` : ''}`,
+        )
+      },
+      p.label,
+    )
+  },
+
   /** 엔트리 효과: yieldShock 직후 풀 자체 버퍼로 콜 충당. */
   postFromBuffer(label?: string): Effect<PensionState> {
     return fnEffect<PensionState>(
@@ -268,18 +322,18 @@ export const ldiFx = {
    */
   requestSponsor(p: { amount: number }): Effect<PensionState> {
     return fnEffect<PensionState>('requestSponsor', { amount: p.amount }, (d, ctx) => {
-      const cap = d.institution.sponsor.contributionCapacity
-      const amt = Math.min(p.amount, Math.max(0, cap))
-      if (amt <= 0) {
-        ctx.log('스폰서 출연 여력 없음')
-        return
-      }
-      if (d.flags.sponsor_standby) {
-        sponsorNow(d, ctx, amt)
-      } else {
-        addCounter(d, 'sponsorInstructed', amt)
-        ctx.log(`스폰서 출연 요청 ${f1(amt)} — 스폰서 이사회 승인 후 다음 턴 반영`)
-      }
+      askSponsor(d, ctx, p.amount)
+    })
+  },
+
+  /**
+   * 대화(`t4-d2`)에서 이산 선택으로 약속한 요청 규모(`counters.sponsorAskM`)로 출연을 요청한다.
+   * 카운터가 없으면 `fallback`(= 스폰서 여력과 같은 £300M)을 쓴다 — 마감 스윕이 대화를 건너뛰고
+   * 기본 옵션을 바로 확정할 때의 값이며, 역사 경로의 요청액과 같다(calibration.md §13).
+   */
+  requestSponsorAsk(p: { fallback: number }): Effect<PensionState> {
+    return fnEffect<PensionState>('requestSponsorAsk', { fallback: p.fallback }, (d, ctx) => {
+      askSponsor(d, ctx, d.counters.sponsorAskM ?? p.fallback)
     })
   },
 
@@ -545,6 +599,21 @@ export const ldiFx = {
       if (p.volIndex !== undefined) d.market.volIndex = Math.max(5, d.market.volIndex + p.volIndex)
     })
   },
+}
+
+function askSponsor(d: PDraft, ctx: EffectContext, amount: number): void {
+  const cap = d.institution.sponsor.contributionCapacity
+  const amt = Math.min(amount, Math.max(0, cap))
+  if (amt <= 0) {
+    ctx.log('스폰서 출연 여력 없음')
+    return
+  }
+  if (d.flags.sponsor_standby) {
+    sponsorNow(d, ctx, amt)
+  } else {
+    addCounter(d, 'sponsorInstructed', amt)
+    ctx.log(`스폰서 출연 요청 ${f1(amt)} — 스폰서 이사회 승인 후 다음 턴 반영`)
+  }
 }
 
 function sponsorNow(d: PDraft, ctx: EffectContext, amt: number): void {

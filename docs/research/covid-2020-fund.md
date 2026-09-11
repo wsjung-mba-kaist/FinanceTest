@@ -73,3 +73,60 @@
 - SEC, Money Market Fund Reforms(2023)
 - FSB, Open-Ended Funds 권고(2023.12)
 - Bloomberg / ICE 지수(IG OAS)
+
+## 정확성 검증 결과 (2026-09) — 접근 경로와 반증
+
+### 1. 회사채 ETF의 NAV 대비 괴리는 발행사 공시로 닫힌다
+
+SEC **Rule 6c-11(c)(1)(ii)**는 ETF에 프리미엄/할인을 웹사이트로 공시하게 하고, 그 대신 연차보고서(N-CSR)의
+빈도표 의무를 면제한다. 그래서 LQD의 2020년 괴리 계열은 **SEC 공시가 아니라 iShares 웹페이지**에 있다.
+현행 페이지는 최근 기간만 노출하므로 아카이브본을 쓴다:
+
+```
+https://web.archive.org/web/20210115084252id_/https://www.ishares.com/us/products/239566/
+  ishares-iboxx-investment-grade-corporate-bond-etf/1467271812595.ajax?tab=premium-discount-chart
+```
+
+응답 본문에 `Date.UTC(2020,2,19),y:Number((-5.080372257341182).toFixed(2))` 형태로 일별 값이 그대로 들어
+있다. 2020년 3월: 3/11 −3.2943 · **3/12 −5.0239** · 3/13 −0.4550 · 3/16 −1.6425 · 3/17 −2.2708 ·
+3/18 −2.2528 · **3/19 −5.0804(연중 최대 할인)** · 3/20 −2.7798 · 3/23 +2.9341 · 3/24 +2.8127 ·
+**3/25 +5.0396(연중 최대 프리미엄)**. 같은 아카이브본의 NAV 계열(3/12 124.178582 · 3/19 110.672579)로도
+재현된다.
+
+**세 숫자를 구분한다.** −5.08%는 **LQD 자신의 NAV 기준 3/19** 값이다. 널리 인용되는 **−5.35%는 같은
+3/19을 ICE 평가가격 기준으로 잰 값**(ICE Market Pulse, "Exchange traded funds in volatile markets")이고,
+언론의 **−4.5%는 3/12을 "fair value" 기준으로** 적은 값이다. BIS Bulletin No 6(2020-04-14) p.4가
+"some of the largest ETFs in both the IG and HY segments recorded NAV discounts in excess of 5%"로
+규제기관 교차확인을 준다(Graph 2 범례에 LQD 명시). 같은 쪽의 **5.3%는 IG ETF 횡단면 평균**이므로
+LQD 값과 혼동하지 않는다. ICI 보고서의 **365bp**는 IG 채권 ETF 자산가중 평균이다.
+
+### 2. "회사채 펀드+ETF 2주간 $174bn"은 FSB Holistic Review에 없다
+
+전문(60쪽)을 기계 판독한 결과 "174"는 각주의 트위터 URL 조각 외에 등장하지 않으며, 회사채 펀드+ETF의
+2주간 유출액이라는 항목 자체가 없다. 보고서가 싣는 값은 §4.2(인쇄본 p.21)의
+*"in mid-March, weekly outflows from bond funds reached record levels (US$109 billion)"* 이다(EPFR·FSB 계산).
+규모 정합성: ICI는 3/18·3/25 종료 2주간 IG 채권 ETF 순유출을 약 **$23bn**으로, FSOC 2020 연차보고서는
+3월 한 달 채권 뮤추얼펀드 유출을 **$255bn**으로 적는다 — $174bn을 "2주"에 놓으면 자리가 없다.
+
+### 3. FRA-OIS는 공표 문헌에 값이 없다 — LIBOR-OIS를 대용하지 말 것
+
+FRA-OIS를 **이름으로만** 쓰는 1차 문헌: 뉴욕연준·재무부 『Treasury and Federal Reserve Foreign Exchange
+Operations, Q1 2020』 p.5, IMF GFSR 2020-04 Fig 1.1(값 없는 변화폭 막대). BIS QR 2020-06 · 연준 FSR
+2020-05 · 2020-03-15 FOMC 의사록에는 "FRA"라는 단어가 없다. 값이 필요하면 블룸버그 `USFOSC1 BGN Curncy`
+(3x6 USD LIBOR FRA − 대응 선도 OIS)이고, 무료 경로는 CME 유로달러(GE) 정산가 − 30일 연방기금선물(ZQ)
+OIS 스트립 재구성이다.
+
+**인접 계열은 확보했다.** 연준 FEDS Notes 2020-06-29 "How Correlated is LIBOR with Bank Funding Costs?"
+**Figure 1의 접근성(accessible) 버전**이 3개월 LIBOR-OIS 일별 표를 그대로 공표한다 —
+2020-02-27 16.12 · **2020-02-28 26.60** · 03-02 17.27 · 03-23 111.39 · **03-31 138.17(3월 최대)** bp.
+다만 2020-02-28은 시장이 긴급 인하를 선반영해 현물·선도 지표가 갈라진 날이므로 FRA-OIS 대용이 될 수 없다
+(3/3 51.53 → 3/4 23.52의 급등락은 회의간 인하에 따른 현물 고시 artefact다).
+
+### 4. ICE BofA OAS의 3년 제한은 라이선스 제약임이 확인되었다
+
+2026-09 재확인: `fredgraph.csv?id=BAMLC0A0CM,BAMLH0A0HYM2`는 2023-09-12 이후 795건만 반환하고,
+`cosd`·`coed`를 붙여도 **바이트 단위로 동일한 파일**이 온다. 같은 요청에 `DGS10`을 섞으면 DGS10만 1962년부터
+16,877건이 온다 — 즉 다운로드 상한이 아니라 ICE 계열에 붙은 제약이다. 연준 FSR 2020-11도 이 계열에 대해서는
+"Source: ICE Data Indices, LLC, used with permission"만 달고 값을 싣지 않는다. FEDS Note 2020-10-07
+Figure 1 접근성 버전의 서술이 최선의 공개 앵커다: IG "around 1% in February" → 3/23 4%, HY "4% in February"
+→ 3/23 약 11%.

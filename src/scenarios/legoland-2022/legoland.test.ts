@@ -1,16 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
+  advanceTick,
   advanceTurn,
   applyDecision,
   autoplay,
+  canAdvanceTick,
   computeScore,
   createGame,
+  fastForwardTicks,
+  replay,
   validateScenario,
 } from '../../engine'
-import type { GameState, SecuritiesState, Turn } from '../../engine/types'
+import type { GameState, ScenarioDefinition, SecuritiesState, Turn } from '../../engine/types'
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import { cardIds, sourceIds } from '../../content'
+import { legoFx } from './localFx'
 import scenario from './scenario'
+import { T3_CP_PROFILE } from './turnsA'
+import { T5_CP_PROFILE } from './turnsB'
 
 type State = GameState<SecuritiesState>
 
@@ -29,13 +36,29 @@ function metricMin(state: State, key: string): number {
   return Math.min(...state.metricsHistory.map((m) => m.metrics[key]?.value ?? Infinity))
 }
 
-/** Drives a hand-picked path: { turnIndex: [[decisionId, optionIds], ...] }. Stops when the game ends. */
+/**
+ * Drives a hand-picked path: { turnIndex: [[decisionId, optionIds], ...] }. Stops when the game
+ * ends. On a ticked turn each decision is answered at the first tick it is available, advancing the
+ * clock in between — the same order a player would meet them.
+ */
 function drive(perTurn: Record<number, [string, string[]][]>): State {
   let s = createGame(scenario, 1)
   while (s.phase !== 'ended') {
-    for (const [decisionId, optionIds] of perTurn[s.turnIndex] ?? []) {
+    const queue = [...(perTurn[s.turnIndex] ?? [])]
+    let guard = 0
+    while (queue.length > 0 && s.phase !== 'ended' && guard++ < 64) {
+      const turn = scenario.turns[s.turnIndex]!
+      const i = queue.findIndex(([id]) => {
+        const d = turn.decisions.find((x) => x.id === id)
+        return d !== undefined && (d.availableFrom ?? 0) <= s.tick
+      })
+      if (i < 0) {
+        if (!canAdvanceTick(s, scenario)) break
+        s = advanceTick(s, scenario)
+        continue
+      }
+      const [decisionId, optionIds] = queue.splice(i, 1)[0]!
       s = applyDecision(s, scenario, decisionId, optionIds)
-      if (s.phase === 'ended') break
     }
     if (s.phase === 'ended') break
     s = advanceTurn(s, scenario)
@@ -402,6 +425,163 @@ describe('legoland-2022 scenario', () => {
     s = applyDecision(s, scenario, 't2-d2', ['t2-d2-d'])
     s = advanceTurn(s, scenario)
     expect(() => applyDecision(s, scenario, 't3-d3', ['t3-d3-a'])).toThrow()
+  })
+
+  // ------------------------------------------------------------------ L2: 틱 · 인터럽트 · 대화
+
+  /** 같은 시나리오의 T3을 틱 이전 형태(하루치 단일 `cpRollStep`)로 되돌린 변형. */
+  function untickedT3(): ScenarioDefinition<SecuritiesState> {
+    return {
+      ...scenario,
+      turns: scenario.turns.map((t) => {
+        if (t.id !== 't3') return t
+        const { ticks, tickLabels, eachTick, tickEffects, ticker, interrupts, ...rest } = t
+        void ticks
+        void tickLabels
+        void eachTick
+        void tickEffects
+        void ticker
+        void interrupts
+        return {
+          ...rest,
+          entryEffects: [
+            ...(t.entryEffects ?? []),
+            {
+              id: 't3-cp-single',
+              description: 'CP 만기(잔액 8%) 재발행 — 틱 이전 단일 호출',
+              effects: [legoFx.cpRollStep({ share: 0.08 })],
+            },
+            {
+              id: 't3-settle-single',
+              description: '결제일 점검',
+              effects: [legoFx.settlementCheck()],
+            },
+          ],
+          decisions: t.decisions.map((d) => {
+            const { availableFrom, deadlineTick, ...rd } = d
+            void availableFrom
+            void deadlineTick
+            return rd
+          }),
+        }
+      }),
+    }
+  }
+
+  /** 역사 경로를 `turnIndex` 끝까지만 재생한 상태 (체크포인트 헬퍼와 같은 방식). */
+  function stateAtTurnEnd(def: ScenarioDefinition<SecuritiesState>, turnIndex: number): State {
+    const full = autoplay(def, 'historical', { seed: 1 })
+    const log = full.decisions.filter((d) => d.turnIndex <= turnIndex)
+    return replay(def, { seed: 1, decisions: log, turnIndex }).state
+  }
+
+  it('T3 CP tick slices sum exactly to the un-ticked single call at variance 0', () => {
+    const ticked = stateAtTurnEnd(scenario, 3)
+    const single = stateAtTurnEnd(untickedT3(), 3)
+    console.log(
+      '[ticks] T3 cpRunoff sliced',
+      ticked.counters.cpRunoff,
+      'single',
+      single.counters.cpRunoff,
+    )
+    expect(Math.abs(ticked.counters.cpRunoff! - single.counters.cpRunoff!)).toBeLessThan(1e-9)
+    expect(Math.abs(ticked.institution.funding.cp - single.institution.funding.cp)).toBeLessThan(
+      1e-9,
+    )
+    expect(
+      Math.abs(ticked.institution.liquidity.cash - single.institution.liquidity.cash),
+    ).toBeLessThan(1e-9)
+    // 프로필 합은 정확히 1이어야 한다 (린트가 길이만 검사하므로 저자 책임).
+    const sum = (p: number[]) => p.reduce((x, y) => x + y, 0)
+    expect(sum(T3_CP_PROFILE)).toBeCloseTo(1, 12)
+    expect(sum(T5_CP_PROFILE)).toBeCloseTo(1, 12)
+    expect(T3_CP_PROFILE).toHaveLength(4)
+    expect(T5_CP_PROFILE).toHaveLength(4)
+  })
+
+  it('the T3 ticker walks the real ECOS closes and lands exactly on them', () => {
+    const s = stateAtTurnEnd(scenario, 3)
+    expect(s.market.custom.corpAA3y).toBe(574) // 회사채 AA- 3년 10/21 5.736%
+    expect(s.market.custom.govt3y).toBe(450) // 국고채 3년 10/21 4.495%
+    expect(s.market.custom.cp91).toBe(430) // CP(91일) 10/21 4.30%
+    expect(s.market.custom.cd91).toBe(390) // CD(91일) 10/21 3.90%
+    const s5 = stateAtTurnEnd(scenario, 5)
+    expect(s5.market.custom.corpAA3y).toBe(549) // 11/1 5.486%
+    expect(s5.market.custom.govt3y).toBe(407) // 11/1 4.068%
+    expect(s5.market.custom.cd91).toBe(397) // 11/1 3.97%
+    expect(s5.market.custom.creditSpreadAA).toBe(142)
+  })
+
+  it('an unanswered interrupt times out to its default option (historical choice)', () => {
+    let s = createGame(scenario, 1)
+    s = applyDecision(s, scenario, 't0-d1', ['t0-e'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't1-d1', ['t1-d1-a'])
+    s = applyDecision(s, scenario, 't1-d2', ['t1-d2-c'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't2-d1', ['t2-d1-a'])
+    s = applyDecision(s, scenario, 't2-d2', ['t2-d2-a'])
+    s = advanceTurn(s, scenario)
+    expect(s.turnIndex).toBe(3)
+    s = applyDecision(s, scenario, 't3-d2', ['t3-d2-b'])
+    s = applyDecision(s, scenario, 't3-d3', ['t3-d3-d'])
+    s = advanceTick(s, scenario) // 11:00 — 주관사 전화가 도착한다
+    expect(s.openInterrupts).toContain('t3-i1-arranger')
+    s = advanceTick(s, scenario) // 14:00 — 마감 스윕이 기본 옵션으로 확정한다
+    expect(s.openInterrupts).not.toContain('t3-i1-arranger')
+    const rec = s.decisions.find((d) => d.decisionId === 't3-i1-arranger')
+    expect(rec).toBeDefined()
+    expect(rec!.optionIds).toEqual(['t3-i1-a'])
+    expect(rec!.timedOut).toBe(true)
+    expect(rec!.interrupt).toBe(true)
+    // 기본 옵션 = 역사 선택이므로 무응답 플레이는 역사 경로로 수렴한다 (차환률 불변).
+    const it3 = scenario.turns[3]!.interrupts!.find((i) => i.id === 't3-i1-arranger')!
+    expect(it3.options.find((o) => o.id === it3.defaultOptionId)?.historical).toBe(true)
+    expect(s.institution.pf.rollRate).toBeCloseTo(0.35, 10)
+  })
+
+  it('the T4 증권금융 dialogue walks and replays exactly (ksfcRequested is committed)', () => {
+    const r = autoplay(scenario, 'historical', { seed: 1 })
+    const rec = r.decisions.find((d) => d.decisionId === 't4-d3')
+    expect(rec).toBeDefined()
+    expect(rec!.optionIds).toEqual(['t4-d3-a'])
+    expect(rec!.path).toEqual(['coll-full', 'ksfcRequested-1000', 'time-today'])
+    expect(r.state.counters.ksfcRequested).toBe(1000)
+    expect(r.state.flags.ksfc_collateral_ready).toBe(true)
+    expect(r.state.flags.ksfc_over_requested).toBeUndefined()
+    const back = replay(scenario, { seed: 1, decisions: r.decisions })
+    expect(back.state.counters.ksfcRequested).toBe(1000)
+    expect(back.state.decisions.find((d) => d.decisionId === 't4-d3')!.path).toEqual(rec!.path)
+    expect(back.state.counters.abcpBought).toBeCloseTo(r.state.counters.abcpBought!, 10)
+  })
+
+  it('over-requesting the 증권금융 line (2,000억) is judged one turn later (ΔCI −3)', () => {
+    let s = createGame(scenario, 1)
+    s = applyDecision(s, scenario, 't0-d1', ['t0-e'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't1-d1', ['t1-d1-a'])
+    s = applyDecision(s, scenario, 't1-d2', ['t1-d2-c'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't2-d1', ['t2-d1-a'])
+    s = applyDecision(s, scenario, 't2-d2', ['t2-d2-a'])
+    s = advanceTurn(s, scenario)
+    s = applyDecision(s, scenario, 't3-d2', ['t3-d2-b'])
+    s = applyDecision(s, scenario, 't3-d3', ['t3-d3-d'])
+    s = fastForwardTicks(s, scenario)
+    s = applyDecision(s, scenario, 't3-d1', ['t3-d1-a'])
+    s = advanceTurn(s, scenario)
+    expect(s.turnIndex).toBe(4)
+    s = applyDecision(s, scenario, 't4-d1', ['t4-d1-a'])
+    s = applyDecision(s, scenario, 't4-d2', ['t4-d2-a'])
+    s = applyDecision(s, scenario, 't4-d3', ['t4-d3-a'], {
+      path: ['coll-full', 'ksfcRequested-2000', 'time-today'],
+    })
+    expect(s.counters.ksfcRequested).toBe(2000)
+    s = advanceTurn(s, scenario)
+    expect(s.turnIndex).toBe(5)
+    expect(s.flags.ksfc_over_requested).toBe(true)
+    const hist = autoplay(scenario, 'historical', { seed: 1 }).state
+    expect(metricAt(s, 5, 'confidence')).toBeLessThan(metricAt(hist, 5, 'confidence'))
   })
 
   it('worst and random policies complete without NaN and with scores in [0,100]', () => {

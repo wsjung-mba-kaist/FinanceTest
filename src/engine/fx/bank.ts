@@ -1,6 +1,7 @@
 import type { Draft } from 'immer'
 import type { BankState, Effect, GameState } from '../types'
 import { clamp } from '../core/paths'
+import { DEFAULT_NOISE, noiseFactor } from '../core/noise'
 import { projectRunoff, runStateFromCi, totalDeposits } from '../../metrics/runoff'
 import { fnEffect } from './common'
 
@@ -168,31 +169,58 @@ export const bankFx = {
    * Runs one period of deposit outflow using the calibrated run-off model and pays it from the
    * liquidity waterfall: cash → same-day secured capacity → (shortfall recorded → settlement failure).
    * `windowFraction` prorates intraday turns.
+   *
+   * **Tick behaviour.** On a ticked turn (called from `Turn.eachTick`) each tick takes a slice of the
+   * window — `profile[tick]`, or `1/ticks` without a profile — projected against the balance at the
+   * start of the window (`seg.windowBase`), never against the shrinking balance. At `variance: 0`
+   * the slices therefore sum **exactly** to the single-call result (Σ share = 1).
+   *
+   * Rate inputs (CI → run state, amplifier, dampener) are read **live at every tick**: an amplifier
+   * set mid-window applies to the remaining slices and is reset only at the window's last tick.
+   * With no `ticks` on the turn, tick 0 is both the first and the last tick, so this is exactly the
+   * pre-tick behaviour.
    */
-  runoffStep(p: { windowFraction?: number; label?: string }): Effect<BankState> {
+  runoffStep(p: {
+    windowFraction?: number
+    profile?: number[]
+    label?: string
+  }): Effect<BankState> {
     return fnEffect<BankState>(
       'runoffStep',
-      { windowFraction: p.windowFraction ?? 1 },
+      {
+        windowFraction: p.windowFraction ?? 1,
+        ...(p.profile ? { profile: p.profile.join('/') } : {}),
+      },
       (d, ctx) => {
         const b = bank(d)
+        const first = ctx.tick === 0
+        const last = ctx.isLastTick
+        const share = p.profile ? (p.profile[ctx.tick] ?? 0) : 1 / ctx.ticks
+        if (first && ctx.ticks > 1) for (const seg of b.deposits) seg.windowBase = seg.balance
         const runState = runStateFromCi(d.confidence.index)
         const amp = d.counters.amplifier || 1
         const damp = Math.max(0.3, d.counters.dampener || 1)
+        const noise = noiseFactor(
+          ctx,
+          ctx.noise?.runoffSigma ?? DEFAULT_NOISE.runoffSigma,
+          ctx.noise?.runoffCap ?? DEFAULT_NOISE.runoffCap,
+        )
         const projected = projectRunoff({
-          segments: b.deposits,
+          segments: b.deposits.map((seg) => ({ ...seg, balance: seg.windowBase ?? seg.balance })),
           runState,
           amplifier: amp,
           dampener: damp,
-          windowFraction: p.windowFraction ?? 1,
+          windowFraction: (p.windowFraction ?? 1) * share * noise,
           networkAmplifier: d.counters.networkAmplifier || 1,
         })
         if (d.counters.startDeposits === undefined) d.counters.startDeposits = totalDeposits(b)
         for (const seg of b.deposits) {
           const row = projected.bySegment.find((r) => r.id === seg.id)
-          if (row) seg.balance = Math.max(0, seg.balance - row.outflow)
+          if (row) seg.balance = Math.max(0, seg.balance - Math.min(seg.balance, row.outflow))
         }
         const out = projected.total
-        d.counters.lastOutflow = out
+        // "당일 유출" accumulates across the intraday window; cumulative is lifetime.
+        d.counters.lastOutflow = first ? out : (d.counters.lastOutflow ?? 0) + out
         d.counters.cumulativeOutflow = (d.counters.cumulativeOutflow ?? 0) + out
         // Outflows settle from cash only. Secured facilities must be drawn explicitly (an operational
         // step with cut-offs) — un-drawn capacity does not stop a negative settlement balance.
@@ -206,9 +234,12 @@ export const bankFx = {
         ctx.log(
           `예금 유출 ${out.toFixed(1)} [${['S0', 'S1', 'S2', 'S3'][runState]} × 증폭 ${amp.toFixed(2)} × 완화 ${damp.toFixed(2)}] — 현금 ${cashBefore.toFixed(1)} → ${b.cash.toFixed(1)}`,
         )
-        // amplifiers are one-period unless persistent flags say otherwise
-        if (!d.flags.persistentAmplifier) d.counters.amplifier = 1
-        d.counters.networkAmplifier = 1
+        if (last) {
+          if (ctx.ticks > 1) for (const seg of b.deposits) delete seg.windowBase
+          // amplifiers are one-period unless persistent flags say otherwise
+          if (!d.flags.persistentAmplifier) d.counters.amplifier = 1
+          d.counters.networkAmplifier = 1
+        }
       },
       p.label,
     )

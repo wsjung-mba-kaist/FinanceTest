@@ -1,6 +1,6 @@
-import type { Counters, Flags, RegulatorLevel } from './common'
+import type { Counters, Flags, RegulatorLevel, Severity } from './common'
 import type { PendingEffect } from './effects'
-import type { MetricSnapshot } from './metrics'
+import type { MetricDelta, MetricSnapshot, MetricUnit, TickSample } from './metrics'
 
 export interface SecurityBook {
   marketValue: number
@@ -37,6 +37,12 @@ export interface DepositSegment {
   lcrCategory: DepositCategory
   /** Whether this segment is network-coordinated (amplifier-sensitive). */
   networked?: boolean
+  /**
+   * Balance at the start of the current intraday run-off window. Set by `bankFx.runoffStep` on the
+   * first tick of a multi-tick turn and removed on the last one, so per-tick slices are projected
+   * against a stable base (Σ slices ≡ the single-call result).
+   */
+  windowBase?: number
 }
 
 export interface BankState {
@@ -252,9 +258,23 @@ export interface DecisionRecord {
   timedOut?: boolean
   memo?: string
   hintsUsed?: number
+  /** Sub-turn tick at which the decision was committed. Omitted when 0 (the legacy shape). */
+  tick?: number
+  /** Set when the record answers an `Interrupt` rather than a turn decision. */
+  interrupt?: true
+  /**
+   * Reply ids walked through the decision's dialogue, in order. Omitted when the decision has no
+   * `steps` (the legacy shape), so records of every existing scenario are byte-identical.
+   */
+  path?: string[]
 }
 
 export type FeedKind = 'consequence' | 'delayed' | 'gameover' | 'system' | 'timeout'
+
+/** Narrative axis shared by the consequence reel order and the log filter. */
+export type FeedChannel =
+  'result' | 'market' | 'depositors' | 'regulator' | 'board' | 'press' | 'internal'
+
 export interface FeedItem {
   id: string
   turnIndex: number
@@ -264,6 +284,44 @@ export interface FeedItem {
   body: string
   /** Decision/option that caused it, for causality display. */
   cause?: { decisionId: string; optionId: string }
+  /** Sub-turn tick. Omitted when 0 (the legacy shape). */
+  tick?: number
+  channel?: FeedChannel
+}
+
+/**
+ * One beat of the consequence reel. The shape mirrors `src/components/play/reelSteps.ts` exactly so
+ * the player-facing component can consume engine-built reels without changing.
+ */
+export type ReelStep =
+  | { kind: 'metrics'; deltas: MetricDelta[]; delayMs: number }
+  | {
+      kind: 'consequence'
+      items: { title: string; body: string; severity: Severity }[]
+      delayMs: number
+    }
+  | {
+      kind: 'market'
+      items: { label: string; before: number; after: number; unit: MetricUnit }[]
+      delayMs: number
+    }
+  | {
+      kind: 'reaction'
+      from: 'regulator' | 'board' | 'counterparty'
+      text: string
+      delayMs: number
+    }
+
+export interface ConsequenceReel {
+  id: string
+  cause: {
+    kind: 'turn' | 'tick' | 'decision' | 'interrupt'
+    decisionId?: string
+    optionIds?: string[]
+  }
+  turnIndex: number
+  tick: number
+  steps: ReelStep[]
 }
 
 export interface EndedInfo {
@@ -283,6 +341,10 @@ export interface GameState<S extends InstitutionState = InstitutionState> {
   /** PRNG state (mulberry32), advanced deterministically. */
   rng: number
   turnIndex: number
+  /** Sub-turn tick (0 .. ticks-1). Turns without `ticks` have exactly one tick, 0. */
+  tick: number
+  /** 0 = canonical (no RNG is consumed by the engine), 0.5 / 1 = live play volatility. */
+  variance: number
   phase: 'deciding' | 'ended'
   institution: S
   market: MarketState
@@ -295,7 +357,17 @@ export interface GameState<S extends InstitutionState = InstitutionState> {
   pending: PendingEffect[]
   decisions: DecisionRecord[]
   metricsHistory: MetricSnapshot[]
+  /** Intra-turn metric samples (capped); one entry per (turnIndex, tick). */
+  tickHistory: TickSample[]
+  /** Resolved tick for each jitterable event / interrupt id of the current turn. */
+  tickSchedule: Record<string, number>
+  /** `market.*` values captured at the start of the current turn, for the ticker series. */
+  tickerBase: Record<string, number>
+  /** Ids of interrupts awaiting an answer. */
+  openInterrupts: string[]
   feed: FeedItem[]
   log: string[]
+  /** Reel built by the last state transition (start of turn / tick / decision). */
+  lastReel?: ConsequenceReel
   ended?: EndedInfo
 }

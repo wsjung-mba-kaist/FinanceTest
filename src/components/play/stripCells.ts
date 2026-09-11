@@ -1,0 +1,213 @@
+import type {
+  Currency,
+  GameState,
+  MetricStatus,
+  MetricValue,
+  ScenarioDefinition,
+  Units,
+} from '../../engine'
+import { latestSnapshot } from '../../engine'
+import { formatBp, formatDelta, formatMetric, formatNumber } from '../../lib/format'
+import { mergeThresholds } from '../../metrics/thresholds'
+import { directionOf, type Direction } from '../dashboard/kpiRows'
+
+export interface MetricCell {
+  kind: 'metric'
+  id: string
+  /** Metric id used as the help anchor (`useHelp().open({ tab: 'kpis', anchor })`). */
+  metric: string
+  label: string
+  value: string
+  raw: number
+  status: MetricStatus
+  delta?: string
+  direction: Direction
+  /** Secondary line, e.g. 익일 담보 여력. */
+  sub?: string
+  /** Intraday sparkline values from `tickHistory` (empty on an un-ticked run). */
+  series: number[]
+}
+
+export interface LegendCell {
+  kind: 'legend'
+  id: 'legend'
+  legend: string
+  figures: { label: string; value: string; direction: Direction }[]
+}
+
+export type StripCell = MetricCell | LegendCell
+
+const CURRENCY_WORD: Record<Currency, string> = {
+  USD: '달러',
+  KRW: '원',
+  GBP: '파운드',
+  EUR: '유로',
+  CHF: '스위스프랑',
+}
+
+function scaleWord(scale: number): string {
+  if (scale >= 1e12) return '1조'
+  if (scale >= 1e9) return '10억'
+  if (scale >= 1e8) return '1억'
+  if (scale >= 1e6) return '100만'
+  if (scale >= 1e4) return '1만'
+  return '1'
+}
+
+/**
+ * `$B = 10억 달러` / `억원 = 1억 원`. Local to the strip: `lib/format.ts` is shared with
+ * other screens and is not edited by this milestone.
+ */
+export function unitsLegend(units: Units): string {
+  return `${units.display} = ${scaleWord(units.scale)} ${CURRENCY_WORD[units.currency]}`
+}
+
+interface Ctx {
+  scenario: ScenarioDefinition
+  current: Record<string, MetricValue>
+  previous?: Record<string, MetricValue>
+  units: Units
+  /** Live values of the current turn only, so the strip shows what moved *today*. */
+  seriesFor: (metric: string) => number[]
+}
+
+function metricCell(
+  ctx: Ctx,
+  metric: string,
+  opts: { label?: string; sub?: string; decimals?: number } = {},
+): MetricCell | undefined {
+  const mv = ctx.current[metric]
+  if (!mv || !Number.isFinite(mv.value)) return undefined
+  const spec = ctx.scenario.kpis.find((k) => k.metric === metric)
+  const prev = ctx.previous?.[metric]
+  const thresholds = mergeThresholds(ctx.scenario.thresholds)
+  const delta =
+    prev && Number.isFinite(prev.value) && Math.abs(mv.value - prev.value) > 1e-9
+      ? mv.value - prev.value
+      : undefined
+  return {
+    kind: 'metric',
+    id: metric,
+    metric,
+    label: opts.label ?? spec?.label ?? mv.label,
+    value: formatMetric(mv.value, mv.unit, ctx.units, opts.decimals ?? spec?.decimals),
+    raw: mv.value,
+    status: mv.status,
+    delta: delta !== undefined ? formatDelta(delta, mv.unit, ctx.units) : undefined,
+    direction: directionOf(delta ? Math.sign(delta) : 0, thresholds[metric]),
+    sub: opts.sub,
+    series: ctx.seriesFor(metric),
+  }
+}
+
+/** Two related figures in one cell (누적 유출 / 예상 유출), so the strip keeps four columns. */
+function pairCell(ctx: Ctx, a: string, b: string, label: string): MetricCell | undefined {
+  const first = ctx.current[a]
+  const second = ctx.current[b]
+  const base = first ?? second
+  if (!base || !Number.isFinite(base.value)) return undefined
+  const cell = metricCell(ctx, base.key, { label })
+  if (!cell) return undefined
+  if (!first || !second) return cell
+  return {
+    ...cell,
+    value: `${formatMetric(first.value, first.unit, ctx.units)} / ${formatMetric(second.value, second.unit, ctx.units)}`,
+    sub: '누적 / 예상',
+    status: worse(first.status, second.status),
+  }
+}
+
+function worse(a?: MetricStatus, b?: MetricStatus): MetricStatus {
+  const rank: Record<MetricStatus, number> = { na: 0, ok: 1, warn: 2, breach: 3 }
+  if (!a) return b ?? 'na'
+  if (!b) return a
+  return rank[a] >= rank[b] ? a : b
+}
+
+function legendCell(ctx: Ctx, state: GameState): LegendCell {
+  const stockPrev = ctx.previous?.ownStock?.value
+  const stock = state.market.ownStock
+  const stockDelta = stockPrev !== undefined ? stock - stockPrev : 0
+  return {
+    kind: 'legend',
+    id: 'legend',
+    legend: unitsLegend(ctx.units),
+    figures: [
+      {
+        label: '자사 주가',
+        value: formatNumber(stock, 1),
+        direction: stockDelta === 0 ? 'neutral' : stockDelta > 0 ? 'better' : 'worse',
+      },
+      { label: 'CDS', value: formatBp(state.market.ownCdsBp), direction: 'neutral' },
+      { label: '신뢰지수', value: formatNumber(state.confidence.index, 0), direction: 'neutral' },
+    ],
+  }
+}
+
+/**
+ * Role-specific headline numbers for the liquidity strip: the three or four figures a crisis
+ * desk reads first (cash position → borrowing capacity → today's outflow → runway), plus a
+ * units legend and the market mini-figures. Cells whose metric is absent are omitted.
+ */
+export function buildStripCells(scenario: ScenarioDefinition, state: GameState): StripCell[] {
+  const snap = latestSnapshot(state)
+  const prevSnap = state.metricsHistory.find((m) => m.turnIndex === state.turnIndex - 1)
+  const intraday = state.tickHistory.filter((t) => t.turnIndex === state.turnIndex)
+  const ctx: Ctx = {
+    scenario,
+    current: snap.metrics,
+    previous: prevSnap?.metrics,
+    units: scenario.units,
+    seriesFor: (metric) => {
+      if (intraday.length < 2) return []
+      return intraday
+        .map((t) => t.values[metric])
+        .filter((v): v is number => v !== undefined && Number.isFinite(v))
+    },
+  }
+  const cells: (MetricCell | undefined)[] = []
+
+  switch (state.institution.kind) {
+    case 'bank': {
+      const pending = ctx.current.facilityPending
+      cells.push(
+        metricCell(ctx, 'cash'),
+        metricCell(ctx, 'facilityHeadroom', {
+          sub:
+            pending && Number.isFinite(pending.value) && pending.value > 0
+              ? `익일 +${formatMetric(pending.value, pending.unit, ctx.units)}`
+              : undefined,
+        }),
+        pairCell(ctx, 'cumulativeOutflow', 'projectedDailyOutflow', '오늘 유출 누적/예상'),
+        metricCell(ctx, 'survivalDays'),
+      )
+      break
+    }
+    case 'pension':
+      cells.push(
+        metricCell(ctx, 'collateralHeadroomBp'),
+        metricCell(ctx, 'marginCallPending'),
+        metricCell(ctx, 'hedgeRatio'),
+        metricCell(ctx, 'liquidAssets'),
+      )
+      break
+    case 'securities':
+      cells.push(
+        metricCell(ctx, 'ncr'),
+        metricCell(ctx, 'abcpMaturing30'),
+        metricCell(ctx, 'cash'),
+        metricCell(ctx, 'liquidityRatio'),
+      )
+      break
+    default:
+      break
+  }
+
+  let out = cells.filter((c): c is MetricCell => Boolean(c))
+  if (out.length === 0) {
+    const primary = scenario.kpis.filter((k) => k.primary)
+    const fallback = (primary.length > 0 ? primary : scenario.kpis).slice(0, 4)
+    out = fallback.map((k) => metricCell(ctx, k.metric)).filter((c): c is MetricCell => Boolean(c))
+  }
+  return [...out, legendCell(ctx, state)]
+}

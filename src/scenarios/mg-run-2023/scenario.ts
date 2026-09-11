@@ -80,7 +80,7 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
 | 상환준비금·가용현금 | 30.7 | 상환준비금 13.36 + 즉시 가용 17.3 [CAL] |
 | 국고채·통안채 | 40 | RP 담보 적격 [CAL] |
 | 은행채·기타 채권 | 20 | [CAL] |
-| 대출 | 196.4 | 건설·부동산 56.4, 연체액 12.16 |
+| 대출 | 196.4 | 건설·부동산 56.4(1월말 기준), 연체액 12.16 |
 | 총자산 | 290.7 | 6월 말 |
 | 예수금 | 259.6 | 6/29 |
 | 순자본 | 24.1 | 순자본비율 8.29% |
@@ -131,7 +131,7 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     regulatoryFramework: `- **예금자보호**: 새마을금고법상 중앙회 예금자보호준비금(2.6조)으로 1인당 원리금 5천만원. 예금자보호법(예보) 부보기관이 아님. 합병·P&A 시 예금은 5천만원 초과분까지 승계.
 - **감독**: 행정안전부 소관(새마을금고법). 금융위·금감원은 협력·지원 형태로만 참여 가능.
 - **한국은행법**: 65조 긴급여신(유동성 악화 금융기관, 임시 적격담보, 금통위 4명 이상 찬성·정부 의견 청취), 80조 영리기업 여신, 68조 공개시장운영(RP). 중앙회는 RP 대상기관이 아님.
-- **건전성**: 상호금융 유동성비율 100%(자산 1천억 이상), 순자본비율 기준 4%. 신용공여한도 건설·부동산 각 30%/합산 50%.
+- **건전성**: 상호금융 유동성비율 100%(자산 1천억 이상), 순자본비율 기준 4%. **업종별 대출 한도는 없다** — 건설·부동산 각 30%/합산 50% 한도는 신협·농협·수협에 2022.1.12부터 적용 중이지만 새마을금고 감독기준에는 아직 도입되지 않았다.
 - **감독당국 반응 R0~R4**: 강화 모니터링 → 제한 → 정리 준비 → 정부 직접 개입. 인출 지연·지급 유예·허위 공표는 즉시 R4.`,
     cardRefs: [
       'mutual-credit-deposit-protection',
@@ -146,8 +146,9 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
       '현금성자산 77.3조의 구성(즉시 가용 17.3 / 국고채·통안채 40 / 은행채·기타 20)은 공개되지 않아 보정값이다(calibration.md).',
       '예금 세그먼트 4개와 일일 유출률은 양식화·보정된 값이다. 5천만원 초과 예금 비중(≈25%)은 공개 통계가 아니다.',
       '순자본비율 8.29%는 순자본/총자산으로 근사했고, RWA는 총자산과 같게 두었다.',
-      '채권 매도 1.6조와 "7~8월 17조 인출"은 2차 출처이며, 후자는 누적 유출 체크포인트(6~10조 밴드)에 쓰지 않았다.',
-      '시장 배경(국고채·CD·환율)은 엔진 계산에 쓰이지 않는 참고값이다.',
+      '채권 매도 1.6조는 2차 출처다. 널리 인용되는 "7~8월 17조 인출"은 부정확한 표현이며, 한국은행 ECOS 111Y007(새마을금고 수신 말잔)로 확인한 사실은 **7월 한 달 △17.61조(6월말 259.46조 → 7월말 241.86조)이고 8월은 +1.86조 순유입(243.72조)**이다. 게임의 누적 유출 체크포인트(6~10조)는 7/5~7/17 9영업일분이므로 이 월간 총액과 정합적이다.',
+      '시장 배경(국고채·CD·환율)은 엔진 계산에 쓰이지 않는 참고값이다. 틱 턴(T1·T2·T4)의 원/달러·국고채 일중 궤적은 시가·고가·저가·종가만 실측(ECOS)이고 시각별 배열은 양식화한 것이다.',
+      '창구 하루의 시간대별 인출 분포(틱 프로필)는 공개된 자료가 없어 양식화한 값이다. variance 0에서 슬라이스 합계는 하루치 단일 계산과 일치한다.',
       '2024년 이후의 제도 변화(감독협력 MOU, 한은 RP 대상기관 편입, 예금보호한도 1억원)는 엔딩과 디브리핑에서만 다룬다.',
     ],
     disclaimer:
@@ -214,6 +215,16 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
       description: '6/29 잠정치 — 플레이어가 통제하지 않는 지표',
     },
     {
+      metric: 'market.govt3y',
+      label: '국고채 3년(bp)',
+      labelEn: 'KTB 3Y (bp)',
+      unit: 'bp',
+      sparkline: true,
+      decimals: 0,
+      description:
+        '중앙회 채권 매도와 시장 금리 — 틱 턴(T1·T2·T4)에서는 일중 궤적으로 움직인다 [ecos-817Y002]',
+    },
+    {
       metric: 'regulatorLevel',
       label: '감독당국 단계',
       labelEn: 'Regulator Level',
@@ -228,6 +239,9 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     dailyOutflowPct: { warn: 0.4, breach: 0.8, direction: 'above' },
   },
   turns: [...turnsA, ...turnsB],
+  // 크기(magnitude) 노이즈만 — 분기는 만들지 않는다. variance 0에서는 엔진이 RNG를 당기지 않으므로
+  // 체크포인트와 정본 경로는 불변이다. 근거는 calibration.md §9.4.
+  noise: { runoffSigma: 0.15, runoffCap: 0.3, tickerSigma: 0.01, tickerSigmaBp: 2, eventJitter: 1 },
   gameOver: [
     {
       id: 'unsafe_act',

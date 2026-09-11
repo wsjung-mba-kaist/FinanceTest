@@ -21,6 +21,7 @@ export function enqueueDelayed<S extends InstitutionState>(
     draft.pending.push({
       id: `p${draft.turnIndex}-${decisionId}-${option.id}-${index}`,
       dueTurn: draft.turnIndex + d.afterTurns,
+      ...(d.afterTicks ? { dueTick: d.afterTicks } : {}),
       description: d.description,
       ref: { decisionId, optionId: option.id, index },
     })
@@ -37,15 +38,21 @@ export function resolveDelayedSpec<S extends InstitutionState>(
   return option?.delayedEffects?.[ref.index] as DelayedEffectSpec<S> | undefined
 }
 
-/** Fires every pending effect whose due turn has arrived; re-evaluates `when` at fire time. */
+/**
+ * Fires every pending effect whose due point `(dueTurn, dueTick ?? 0)` has arrived; re-evaluates
+ * `when` at fire time. Effects queued without `afterTicks` keep the legacy behaviour exactly:
+ * they fire at tick 0 of their due turn.
+ */
 export function fireDuePending<S extends InstitutionState>(
   draft: Draft<GameState<S>>,
   scenario: ScenarioDefinition<S>,
   ctx: EffectContext,
 ): void {
-  const due = draft.pending.filter((p) => p.dueTurn <= draft.turnIndex)
+  const isDue = (p: { dueTurn: number; dueTick?: number }) =>
+    p.dueTurn < draft.turnIndex || (p.dueTurn === draft.turnIndex && (p.dueTick ?? 0) <= draft.tick)
+  const due = draft.pending.filter(isDue)
   if (due.length === 0) return
-  draft.pending = draft.pending.filter((p) => p.dueTurn > draft.turnIndex)
+  draft.pending = draft.pending.filter((p) => !isDue(p))
   for (const p of due) {
     const spec = resolveDelayedSpec(scenario, p.ref)
     if (!spec) {
@@ -60,6 +67,7 @@ export function fireDuePending<S extends InstitutionState>(
     draft.feed.push({
       id: `f${draft.turnIndex}-${draft.feed.length}`,
       turnIndex: draft.turnIndex,
+      ...(draft.tick ? { tick: draft.tick } : {}),
       kind: 'delayed',
       severity: 'info',
       title: '이전 결정의 지연 효과',

@@ -7,6 +7,8 @@ import type { BankState, ConfidenceState, MarketState } from '../../engine/types
  * 유동성 배분 [CAL]: 현금성자산 77.3조 = 즉시 가용 현금·예치금 17.3 + 국고채·통안채 40(AFS, L1) + 은행채·기타 20(HTM, L2A).
  * 가용현금 = 상환준비금 13.36 + 17.3 = 30.66 → 30.7. 은행 RP 라인은 7/10~11에야 체결되었으므로 T0 담보차입 여력 = 0.
  * 자본: 순자본비율 8.29% × 총자산 290.7 = 24.1 (순자본비율 = 순자본/총자산 근사 [STYLIZED]).
+ * 주의: 상환준비금 13.36조와 현금성자산 77.3조의 포함 관계는 정부 문서 두 건(행안부 7/5 보도자료 vs 7/6 브리핑)이
+ * 서로 다르게 말한다. 게임은 비중복으로 잡았다 — calibration.md §8 참조.
  */
 export const mgInitialBank: BankState = {
   kind: 'bank',
@@ -18,7 +20,7 @@ export const mgInitialBank: BankState = {
   loans: {
     retail: 85, // 가계대출 [STYLIZED]
     sme: 55, // 기타 기업대출 [STYLIZED]
-    corporate: 56.4, // 건설·부동산 대출 [press-mg-outflow-2023-07-17]
+    corporate: 56.4, // 건설·부동산 대출 (2023.1월말, 행안부→오영환 의원실 제출자료) [STYLIZED]
     fi: 0,
     nonPerforming: 12.16, // 연체액(6/29) [mg-joint-briefing-2023]
     avgDuration: 2.5,
@@ -86,18 +88,20 @@ export const mgInitialBank: BankState = {
 
 export const mgInitialMarket: MarketState = {
   policyRateBp: 350, // 한은 기준금리 3.50% [bok-base-rate-2023]
-  govt2yBp: 365, // 국고 3년 근사 [VERIFY]
-  govt10yBp: 367, // [VERIFY]
-  govt30yBp: 355, // [VERIFY]
-  creditSpreadIgBp: 70, // 회사채 AA− 3y − 국고 3y [VERIFY]
-  creditSpreadHyBp: 400, // BBB− [VERIFY]
-  fundingStressBp: 15, // CD91 − 통안 91일 [VERIFY]
+  govt2yBp: 368, // 국고채 2년 3.676% (3년은 3.619%) [ecos-817Y002]
+  govt10yBp: 362, // 국고채 10년 3.623% [ecos-817Y002]
+  govt30yBp: 363, // 국고채 30년 3.625% [ecos-817Y002]
+  creditSpreadIgBp: 81, // 회사채 AA− 3y 4.429% − 국고 3y 3.619% [CAL, ecos-817Y002]
+  creditSpreadHyBp: 720, // 회사채 BBB− 3y 10.817% − 국고 3y 3.619% [CAL, ecos-817Y002]
+  fundingStressBp: 19, // CD91 3.74% − 통안 91일 3.552% [CAL, ecos-817Y002]
   equityIndex: 100, // KOSPI 정규화 [STYLIZED]
-  volIndex: 14, // VKOSPI [VERIFY]
-  fxUsdLocal: 1300, // 원/달러 [VERIFY]
+  volIndex: 14, // VKOSPI [VERIFY — KRX 정보데이터시스템 [13103] 일별시세 미조회]
+  fxUsdLocal: 1301, // 원/달러 종가(15:30) 1,301.4원 [ecos-731Y003]
   ownStock: 100, // 비상장 — 사용하지 않음 [STYLIZED]
   ownCdsBp: 0,
-  custom: {},
+  custom: {
+    govt3y: 362, // 국고채 3년 3.619% (7/4 종가, bp 반올림) [ecos-817Y002] — 틱 턴 티커 경로
+  },
 }
 
 export const mgInitialConfidence: ConfidenceState = {

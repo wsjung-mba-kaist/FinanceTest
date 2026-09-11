@@ -13,7 +13,9 @@ import type { Competency } from '../../engine/types'
 import { formatNumber } from '../../lib/format'
 import {
   COMPETENCIES,
+  DIMENSION_HELP,
   DIMENSION_LABELS,
+  DIMENSION_LABELS_SHORT,
   MASTERY_LEVEL_LABELS,
   MODE_LABELS,
   shortDate,
@@ -21,6 +23,7 @@ import {
 import type { CompetencyMastery } from '../../lib/mastery'
 import { getScenarioSummary } from '../../scenarios'
 import { Badge, Button, type Tone } from '../ui'
+import { InfoTip } from '../ui/InfoTip'
 
 const LEVEL_TONE: Record<CompetencyMastery['level'], Tone> = {
   none: 'neutral',
@@ -32,6 +35,7 @@ const LEVEL_TONE: Record<CompetencyMastery['level'], Tone> = {
 interface Row {
   competency: Competency
   label: string
+  short: string
   value: number
   level: CompetencyMastery['level']
   n: number
@@ -41,7 +45,7 @@ function MapTooltip({ active, payload }: TooltipProps<number, string>) {
   const row = payload?.[0]?.payload as Row | undefined
   if (!active || !row) return null
   return (
-    <div className="rounded-md border border-border bg-surface p-2 text-[12px] shadow-lg">
+    <div className="rounded-md border border-border bg-surface p-2 text-sm shadow-lg">
       <div className="font-semibold">{row.label}</div>
       <div className="num">
         {row.level === 'none'
@@ -57,9 +61,7 @@ function EvidenceList({ m }: { m: CompetencyMastery }) {
   const [open, setOpen] = useState(false)
   if (m.evidence.length === 0)
     return (
-      <p className="text-[11px] text-muted">
-        아직 근거가 없습니다. 시나리오를 완료하면 반영됩니다.
-      </p>
+      <p className="text-sm text-muted">아직 근거가 없습니다. 시나리오를 완료하면 반영됩니다.</p>
     )
   return (
     <div>
@@ -67,12 +69,12 @@ function EvidenceList({ m }: { m: CompetencyMastery }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-accent bg-transparent border-0 p-0 underline-offset-2 hover:underline"
+        className="border-0 bg-transparent p-0 text-sm text-accent underline-offset-2 hover:underline"
       >
-        근거 {m.evidence.length}건 {open ? '접기' : '보기'}
+        {open ? '근거 접기' : '근거 보기'} <span className="num">({m.evidence.length}건)</span>
       </button>
       {open && (
-        <ul className="mt-1 list-none space-y-0.5 p-0 m-0 text-[11px] text-muted">
+        <ul className="mt-1 list-none space-y-0.5 p-0 m-0 text-xs text-muted">
           {m.evidence.map((e) => (
             <li key={`${e.runId}-${e.scenarioId}`} className="num">
               {getScenarioSummary(e.scenarioId)?.title ?? e.scenarioId} · {MODE_LABELS[e.mode]} ·{' '}
@@ -90,6 +92,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
   const rows: Row[] = COMPETENCIES.map((c) => ({
     competency: c,
     label: DIMENSION_LABELS[c],
+    short: DIMENSION_LABELS_SHORT[c],
     value: Math.round(mastery[c].mastery ?? 0),
     level: mastery[c].level,
     n: mastery[c].evidence.length,
@@ -104,7 +107,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="rounded-lg border border-border bg-surface p-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[13px] font-semibold">역량 맵</h3>
+          <h3 className="text-base font-semibold">역량 맵</h3>
           <Button
             size="sm"
             variant="ghost"
@@ -115,7 +118,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
           </Button>
         </div>
         {table ? (
-          <table className="mt-2 w-full text-[12px]">
+          <table className="mt-2 w-full text-sm">
             <caption className="sr-only">역량별 숙련도</caption>
             <thead>
               <tr className="text-left text-muted border-b border-border">
@@ -142,8 +145,8 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
               <RadarChart data={rows} outerRadius="70%">
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis
-                  dataKey="label"
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                  dataKey="short"
+                  tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
                 />
                 <PolarRadiusAxis
                   domain={[0, 100]}
@@ -176,8 +179,9 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
             <li key={c} className="rounded-lg border border-border bg-surface p-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{DIMENSION_LABELS[c]}</span>
+                <InfoTip label={`${DIMENSION_LABELS[c]} 설명`}>{DIMENSION_HELP[c]}</InfoTip>
                 <Badge tone={LEVEL_TONE[m.level]}>{MASTERY_LEVEL_LABELS[m.level]}</Badge>
-                <span className="ml-auto num text-[12px] text-muted">
+                <span className="ml-auto num text-sm text-muted">
                   {m.mastery === undefined ? '—' : `${formatNumber(v, 0)} / 100`}
                 </span>
               </div>
@@ -194,7 +198,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
                   style={{ width: `${Math.max(0, Math.min(100, v))}%` }}
                 />
               </div>
-              <div className="mt-1 text-[11px] text-muted num">
+              <div className="mt-1 text-xs text-muted num">
                 시나리오 {m.scenarioCount}개 · 전문가 모드 {m.hasExpertRun ? '있음' : '없음'}
               </div>
               <div className="mt-1">

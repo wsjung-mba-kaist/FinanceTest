@@ -5,6 +5,7 @@ import type {
   GameState,
   InstitutionState,
   MetricSnapshot,
+  NoiseSpec,
   RegulatorLevel,
 } from '../types'
 import { clamp, getNumberPath, setNumberPath } from './paths'
@@ -12,11 +13,16 @@ import { rngNext } from './rng'
 
 export const EMPTY_SNAPSHOT: MetricSnapshot = { turnIndex: -1, metrics: {} }
 
-/** Builds an effect context bound to an immer draft; rng advances `draft.rng` deterministically. */
+/**
+ * Builds an effect context bound to an immer draft; rng advances `draft.rng` deterministically.
+ * `ticks` defaults to 1, which makes tick 0 both the first and the last tick — the legacy shape.
+ */
 export function makeEffectContext<S extends InstitutionState>(
   draft: Draft<GameState<S>>,
   metrics: MetricSnapshot,
+  opts: { ticks?: number; noise?: NoiseSpec } = {},
 ): EffectContext {
+  const ticks = Math.max(1, opts.ticks ?? 1)
   return {
     turnIndex: draft.turnIndex,
     rng: () => {
@@ -29,6 +35,11 @@ export function makeEffectContext<S extends InstitutionState>(
     log: (msg) => {
       draft.log.push(`[T${draft.turnIndex}] ${msg}`)
     },
+    tick: draft.tick,
+    ticks,
+    isLastTick: draft.tick >= ticks - 1,
+    variance: draft.variance,
+    ...(opts.noise ? { noise: opts.noise } : {}),
   }
 }
 
@@ -113,6 +124,7 @@ function applyEffect<S extends InstitutionState>(
       draft.feed.push({
         id: `f${draft.turnIndex}-${draft.feed.length}`,
         turnIndex: draft.turnIndex,
+        ...(draft.tick ? { tick: draft.tick } : {}),
         ...e.item,
         ...(cause ? { cause } : {}),
       })

@@ -49,7 +49,7 @@ function eventTitle(ev: GameEvent): string {
 function EffectList({ effects }: { effects: Effect[] | undefined }) {
   if (!effects || effects.length === 0) return <span className="text-muted">효과 없음</span>
   return (
-    <ul className="m-0 list-disc pl-4 font-mono text-[11px]">
+    <ul className="m-0 list-disc pl-4 font-mono text-xs">
       {effects.map((e, i) => (
         <li key={i}>{effectText(e)}</li>
       ))}
@@ -106,7 +106,7 @@ function OptionRow({
       <td className="px-2 py-1">
         <EffectList effects={o.effects} />
         {o.setFlags && (
-          <div className="font-mono text-[11px] text-muted">
+          <div className="font-mono text-xs text-muted">
             setFlags {JSON.stringify(o.setFlags)}
           </div>
         )}
@@ -120,7 +120,7 @@ function OptionRow({
           </div>
         ))}
         {o.scoreAdjust && (
-          <div className="font-mono text-[11px] text-muted">
+          <div className="font-mono text-xs text-muted">
             scoreAdjust {JSON.stringify(o.scoreAdjust)}
           </div>
         )}
@@ -169,15 +169,15 @@ export default function DevScenarioInspectorPage() {
   const decisionIds = def.turns.flatMap((t) => t.decisions.map((d) => d.id))
 
   return (
-    <div className="space-y-6 text-[12px]">
+    <div className="space-y-6 text-sm">
       <header>
         <nav aria-label="경로" className="text-muted">
           <Link to={`/scenarios/${def.meta.id}`}>{def.meta.title}</Link>{' '}
           <span aria-hidden="true">›</span> DEV 인스펙터
         </nav>
-        <h1 className="mt-1 text-[20px] font-semibold tracking-tight">
+        <h1 className="mt-1 text-xl font-semibold tracking-tight">
           {def.meta.title}{' '}
-          <span className="font-mono text-[12px] text-muted">
+          <span className="font-mono text-sm text-muted">
             {def.meta.id} v{def.meta.version}
           </span>
         </h1>
@@ -189,7 +189,7 @@ export default function DevScenarioInspectorPage() {
       </header>
 
       <section aria-labelledby="dev-issues">
-        <h2 id="dev-issues" className="mb-1 text-[14px] font-semibold">
+        <h2 id="dev-issues" className="mb-1 text-base font-semibold">
           무결성 검사{' '}
           <Badge tone={errors.length ? 'critical' : 'positive'}>오류 {errors.length}</Badge>{' '}
           <Badge tone={warnings.length ? 'warning' : 'neutral'}>경고 {warnings.length}</Badge>
@@ -197,7 +197,7 @@ export default function DevScenarioInspectorPage() {
         {issues.length === 0 ? (
           <p className="text-positive">이슈가 없습니다.</p>
         ) : (
-          <ul className="m-0 list-none space-y-0.5 p-0 font-mono text-[11px]">
+          <ul className="m-0 list-none space-y-0.5 p-0 font-mono text-xs">
             {issues.map((i, k) => (
               <li key={k} className={i.level === 'error' ? 'text-critical' : 'text-warning'}>
                 {i.level === 'error' ? '✖' : '⚠'} [{i.rule}] {i.where}: {i.message}
@@ -209,7 +209,7 @@ export default function DevScenarioInspectorPage() {
 
       {runs && (
         <section aria-labelledby="dev-runs">
-          <h2 id="dev-runs" className="mb-1 text-[14px] font-semibold">
+          <h2 id="dev-runs" className="mb-1 text-base font-semibold">
             자동 플레이 (seed 1)
           </h2>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -232,7 +232,7 @@ export default function DevScenarioInspectorPage() {
                       {r.result!.deviations.length > 0 && (
                         <ul className="m-0 mt-1 list-disc pl-4 text-warning">
                           {r.result!.deviations.map((d, i) => (
-                            <li key={i} className="font-mono text-[11px]">
+                            <li key={i} className="font-mono text-xs">
                               {d.decisionId}: 원함 [{d.wanted.join(',')}] → 선택 [
                               {d.chosen.join(',')}] ({d.reason})
                             </li>
@@ -254,7 +254,7 @@ export default function DevScenarioInspectorPage() {
       )}
 
       <section aria-labelledby="dev-paths">
-        <h2 id="dev-paths" className="mb-1 text-[14px] font-semibold">
+        <h2 id="dev-paths" className="mb-1 text-base font-semibold">
           경로 표
         </h2>
         <div className="overflow-x-auto rounded-md border border-border bg-surface">
@@ -266,7 +266,7 @@ export default function DevScenarioInspectorPage() {
                 <th className="px-2 py-1 font-medium">전문가(paths / 최고 평점)</th>
               </tr>
             </thead>
-            <tbody className="font-mono text-[11px]">
+            <tbody className="font-mono text-xs">
               {def.turns.flatMap((t, ti) =>
                 t.decisions.map((d) => {
                   const hp = def.paths.historical.choices[d.id]
@@ -312,7 +312,7 @@ export default function DevScenarioInspectorPage() {
       </section>
 
       <section aria-labelledby="dev-gameover">
-        <h2 id="dev-gameover" className="mb-1 text-[14px] font-semibold">
+        <h2 id="dev-gameover" className="mb-1 text-base font-semibold">
           게임오버 규칙 · 엔딩
         </h2>
         <ul className="m-0 list-none space-y-1 p-0">
@@ -337,12 +337,12 @@ export default function DevScenarioInspectorPage() {
       </section>
 
       <section aria-labelledby="dev-turns" className="space-y-4">
-        <h2 id="dev-turns" className="text-[14px] font-semibold">
+        <h2 id="dev-turns" className="text-base font-semibold">
           턴 · 결정 · 옵션
         </h2>
         {def.turns.map((t, ti) => (
           <article key={t.id} className="rounded-lg border border-border bg-surface p-3">
-            <h3 className="m-0 text-[13px] font-semibold">
+            <h3 className="m-0 text-base font-semibold">
               <span className="font-mono text-muted">[{ti}]</span> {t.label} {t.title ?? ''}{' '}
               <span className="font-normal text-muted">{t.timeLabel}</span>
             </h3>
@@ -383,7 +383,7 @@ export default function DevScenarioInspectorPage() {
                       )}
                       {ev.effects && ev.effects.length > 0 && <EffectList effects={ev.effects} />}
                       {(ev.cardRefs?.length || ev.sourceRefs?.length) && (
-                        <div className="font-mono text-[11px] text-muted">
+                        <div className="font-mono text-xs text-muted">
                           {ev.cardRefs?.length ? `cards: ${ev.cardRefs.join(', ')} ` : ''}
                           {ev.sourceRefs?.length ? `sources: ${ev.sourceRefs.join(', ')}` : ''}
                         </div>
@@ -418,12 +418,12 @@ export default function DevScenarioInspectorPage() {
                 <div className="mt-1 text-muted">{d.prompt}</div>
                 {d.when && <div className="text-muted">조건: {describeCondition(d.when)}</div>}
                 {d.exclusive && d.exclusive.length > 0 && (
-                  <div className="font-mono text-[11px] text-muted">
+                  <div className="font-mono text-xs text-muted">
                     exclusive: {d.exclusive.map((g) => `[${g.join(',')}]`).join(' ')}
                   </div>
                 )}
                 {(d.cardRefs?.length || d.requiredConcepts?.length) && (
-                  <div className="font-mono text-[11px] text-muted">
+                  <div className="font-mono text-xs text-muted">
                     {d.cardRefs?.length ? `cards: ${d.cardRefs.join(', ')} ` : ''}
                     {d.requiredConcepts?.length ? `required: ${d.requiredConcepts.join(', ')}` : ''}
                   </div>
@@ -468,10 +468,10 @@ export default function DevScenarioInspectorPage() {
 
       {def.checkpoints && def.checkpoints.length > 0 && (
         <section aria-labelledby="dev-checkpoints">
-          <h2 id="dev-checkpoints" className="mb-1 text-[14px] font-semibold">
+          <h2 id="dev-checkpoints" className="mb-1 text-base font-semibold">
             체크포인트
           </h2>
-          <ul className="m-0 list-disc pl-4 font-mono text-[11px]">
+          <ul className="m-0 list-disc pl-4 font-mono text-xs">
             {def.checkpoints.map((c, i) => (
               <li key={i}>
                 {c.turnId} {c.metric ?? c.counter ?? c.path} ≈ {c.expected} ±

@@ -11,7 +11,7 @@ export function Citation({ ids, local }: { ids: string[]; local?: Source[] }) {
       getSource(id) ?? { id, title: id, publisher: '', date: '', kind: 'press' as const },
   )
   return (
-    <span className="relative inline-block align-super text-[10px] leading-none ml-0.5">
+    <span className="relative inline-block align-super text-xs leading-none ml-0.5">
       <button
         type="button"
         className="text-accent bg-transparent border-0 p-0 cursor-pointer"
@@ -24,7 +24,7 @@ export function Citation({ ids, local }: { ids: string[]; local?: Source[] }) {
       {open && (
         <span
           role="tooltip"
-          className="absolute z-40 left-0 top-full mt-1 w-80 max-w-[80vw] rounded-md border border-border bg-surface p-2 text-[12px] leading-snug shadow-lg text-text align-baseline"
+          className="absolute z-40 left-0 top-full mt-1 w-80 max-w-[80vw] rounded-md border border-border bg-surface p-2 text-sm leading-snug shadow-lg text-text align-baseline"
         >
           {sources.map((s) => (
             <span key={s.id} className="block mb-1 last:mb-0">

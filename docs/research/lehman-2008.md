@@ -81,3 +81,42 @@
 - Federal Reserve History(베어스턴스·리먼·AIG·PDCF·CPFF·AMLF·TARP·TLGP 항목)
 - Ball, L. — 리먼 연준 담보 부족 주장에 대한 반론
 - [2차]·[미확인] 표기 수치: 2차 출처 또는 미검증
+
+---
+
+## 2026-09 정확도 점검 — `[VERIFY]` 해소 기록
+
+`src/scenarios/lehman-2008`의 `[VERIFY]` 10건을 1차 출처에 대조한 결과다. 확인에 쓴 원문은
+파산조사관 보고서 Vol. 1·2·4(Stanford 미러 `web.stanford.edu/~jbulow/Lehmandocs/`), SEC 보도자료
+2008-48, FRED 공개 계열이다.
+
+### 닫힌 항목
+
+| 항목 | 결과 | 원문 |
+|---|---|---|
+| 유동성 풀 중 담보 예치분 $7.5B | 확인 (값 변동 없음) | Valukas Vol. 4 §III.A.5 목차 (5)(b), p.1455 — "…Including Both the $2 Billion Citibank 'Comfort Deposit' and Approximately $5.5 Billion of Securities Collateral Pledged to JPMorgan in Its Liquidity Pool" |
+| JPM 2차 담보 콜 $5B (9/11 요구 → 9/12 이행) | 확인 (값 변동 없음) | Valukas Vol. 4 §III.A.5 — "JPMorgan demanded $5 billion more in cash collateral on September 11, 2008, which Lehman provided by the afternoon of September 12." 같은 절이 청산은행 담보의 세 축을 (i) 2008년 누적 ≈$8B (ii) 9/9 $5B (iii) 9/11 현금 $5B로 정리한다 |
+| 베어스턴스 유동성 풀 $18.1B | 확인 (값 변동 없음) | SEC 위원장 Cox의 바젤위원회 앞 2008-03-20 서한(Press Release 2008-48): 3/10 $18.1B(고객자산보호규칙 조정 15.1) → 3/11 $11.5B → 3/12 $12.4B → 3/13 $2B |
+| 9/12 즉시 현금화 가능 자산 | **2 → 2.4로 정정** | Valukas Vol. 4 §III.A.5 — 전주말 보고유동성 $42.1B(고현금화 $33.8B) → 9/10 $37.6B(저현금화 $27.3B) → 9/12 $32.5B 중 $30.1B가 저현금화. "only **$2.4 billion** of Lehman's $32.5 billion liquidity pool was readily convertible to cash on September 12" |
+
+### 남은 `[VERIFY]`와 해소 문서
+
+| 항목 | 해소 문서 |
+|---|---|
+| IG OAS 300bp · HY OAS 850bp (2008-09-09) | 무료 FRED API 키로 `api.stlouisfed.org/fred/series/observations?series_id=BAMLC0A0CM`(및 `BAMLH0A0HYM2`)를 `observation_date=2008-09-09`로 조회. 공개 계열 교차 확인은 직접 수행: DBAA 6.97 · DAAA 5.37 · DGS10 3.62 → Baa−10y 335bp, Aaa−10y 175bp |
+| 자사 5년 CDS 475 / 700 / 775bp | FCIC 자료실(fcic.law.stanford.edu)의 위원회 수집 Markit CDS 스프레드 계열, 또는 Markit/IHS 라이선스 데이터. **파산조사관 보고서 Vol. 1·2·4 본문에는 리먼 CDS의 bp 수치가 없다**(전문 검색으로 확인) — 종전에 적혀 있던 "Valukas Vol.4 담보·CDS 절"은 해소 경로가 아니므로 삭제했다 |
+| 뉴버거버먼 파산 전 제안가 ≈$7B | LBHI 파산사건(Bankr. S.D.N.Y. No. 08-13555)의 IMD 매각 승인 신청서와 증거자료. **Valukas Vol. 2 §III.A.2(Survival)에는 칼라일 제안 금액이 없다**(본문 검색으로 확인) |
+
+### 체크포인트 이동
+
+`anchor.lehman.usablePoolFriday`의 정정에 맞추어 `scenario.ts`의 t3 `cash` 체크포인트 기대값을
+**2 → 2.4**로 옮겼다. **허용오차(1.0)는 건드리지 않았다.** 역사 경로의 실측값 2.8은 그대로이며,
+상대오차는 +40% → +17%로 오히려 줄었다. 누적 유출 체크포인트(기대 38, 실측 39.2)는 손대지 않았다.
+
+### 기존 기록과의 대조
+
+- 2008-09-09/09-12의 국채·TED·VIX 앵커, 5/31 10-Q의 총자산 $639,432M은 이번 점검에서 건드리지 않았고
+  모순도 발견되지 않았다.
+- BIS Quarterly Review 2008-12가 인용하는 9월 초 리먼 CDS 327 → 360/370bp는 KDB 협상 결렬(9/9)
+  **이전**의 관측이므로 시나리오의 9/9 종가 앵커와 다른 날짜다 — 모순이 아니다. 이 판단은 종전 기록과
+  같다.

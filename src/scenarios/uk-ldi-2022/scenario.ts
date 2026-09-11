@@ -170,6 +170,7 @@ const scenario: ScenarioDefinition<PensionState> = defineScenario<PensionState>(
       '풀 담보 회계는 NAV·유동 담보·잔여 콜 세 변수로 단순화했다. 실제 풀드펀드의 변동증거금은 스왑·레포 거래상대별로 나뉘고 적격 담보 범위가 다르다.',
       '스폰서 출연 여력 £300M(대기 약정 시 £600M), TPR 통화 시점(10/11), 운용사 표준 회신서는 양식화된 설정이다.',
       '펀딩비율은 자산(풀 NAV 포함)/부채(PV)로 단순 계산하며, 물가연동 부채·회수계획 분담금은 제외했다.',
+      '9월 28일(오전·오후 두 턴)은 서브턴 5틱으로 진행된다. 틱 라벨과 장중 금리 경로는 양식화이며 관측 앵커는 종가(9/27 5.10%, 9/28 4.05%)뿐이다 — 오전 장중 고점 5.15%는 관측값이 아니라 보간값[CAL]으로, 커늘리프 서한(2022-10-05)의 9/28 일중 변동폭 127bp와 "100bp 초과 하락"이 만드는 5.05~5.32% 구간 안에서 잡았다. 중간에 걸려 오는 전화와 스폰서 협상의 대사는 공개 기록을 바탕으로 한 재구성이며 녹취가 아니다.',
     ],
     disclaimer:
       '본 시나리오는 공개 자료(영란은행 FSR·QB·FPC 스태프 페이퍼·보도자료, TPR 가이드·성명, IMF 워킹페이퍼, 의회 위원회 보고서)를 바탕으로 교육 목적으로 재구성한 것이며, 합성 스킴의 수치와 인물의 발언은 단순화·각색되었습니다.',
@@ -255,6 +256,20 @@ const scenario: ScenarioDefinition<PensionState> = defineScenario<PensionState>(
     marginCallPending: { warn: 1, breach: 200, direction: 'above' },
   },
   turns: [...turnsA, ...turnsB],
+  /**
+   * 라이브 플레이(variance 1)에서만 쓰이는 크기 노이즈. variance 0(정본·체크포인트)에서는 엔진이
+   * 난수를 아예 당기지 않는다. 하우스 기본값 그대로다 — `tickerSigmaBp`를 3으로 올려 보았으나
+   * 9/28 종가(4.05%)가 체크포인트 허용폭(±0.12%p) 밖으로 벗어나는 시드가 열에 셋이었다.
+   * `runoffSigma`·`runoffCap`은 예금 유출 모델의 계수이고 연기금에는 `runoffStep`이 없어
+   * **이 시나리오에서는 쓰이지 않는다**(선언만 유지). calibration.md §12.6.
+   */
+  noise: {
+    runoffSigma: 0.15,
+    runoffCap: 0.3,
+    tickerSigma: 0.01,
+    tickerSigmaBp: 2,
+    eventJitter: 1,
+  },
   gameOver: [
     {
       id: 'funding_collapse',
@@ -335,6 +350,7 @@ const scenario: ScenarioDefinition<PensionState> = defineScenario<PensionState>(
         't2-d2': ['t2-d2-a'],
         't3-d1': ['t3-a'],
         't4-d1': ['t4-a'],
+        't4-d2': ['t4-d2-a'],
         't5-d1': ['t5-a'],
         't6-d1': ['t6-a'],
         't6-d2': ['t6-d2-b'],

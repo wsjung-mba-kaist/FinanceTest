@@ -396,7 +396,10 @@ export const LDI_FACTS: FactRow[] = [
     asOf: '2022-09-23',
     sourceId: 'boe-qb-2023-gilt',
     tag: 'CAL',
-    note: '9/23~27 +130bp를 35/50/45로 분할 (35bp 초과 2일: BoE 스태프 페이퍼)',
+    note:
+      '9/23~27 +130bp(BoE QB)를 35/50/45로 분할 (35bp 초과 2일: BoE 스태프 페이퍼). 커늘리프 서한의 ' +
+      '일자별 서술은 9/23 +30 · 9/26 +50 · 9/27 순증 +47(오전 −20 후 저녁까지 +67)로 합계 127bp다 — ' +
+      '분할이 서한과 ±5bp·±2bp 다른 것은 QB의 3거래일 합계 130bp를 맞추기 위해서다',
   },
   {
     path: 'turns.t2.entry.yieldShock.deltaBp',
@@ -421,9 +424,11 @@ export const LDI_FACTS: FactRow[] = [
     value: 5,
     unit: 'bp',
     asOf: '2022-09-28T08:00+01:00',
-    sourceId: 'boe-yield-curves',
-    tag: 'STYLIZED',
-    note: '9/28 오전 장중 고점 ≈5.1%대',
+    sourceId: 'boe-cunliffe-letter-2022-10-05',
+    tag: 'CAL',
+    note:
+      '9/27 종가 5.10% → 9/28 장중 고점 5.15%. 고점은 관측값이 아니라 서한의 일중 변동폭 127bp·"100bp 초과 하락"과 ' +
+      '종가 4.05%가 만드는 5.05~5.32% 구간 안의 보간값이다(anchor.govt30yBp.2022-09-28-intraday-high 참조)',
   },
   {
     path: 'turns.t5.entry.yieldShock.deltaBp',
@@ -449,5 +454,70 @@ export const LDI_FACTS: FactRow[] = [
     asOf: '2022-10-14',
     sourceId: 'boe-fsr-2022-12',
     note: '10/14 정점 — 잠시 5% 상회, 8/1 대비 +270bp 초과(FSR §1.2): 2.40 → 5.10',
+  },
+  // ───────────── 9/28 일중 티커 앵커 (L2-c 서브턴 틱) ─────────────
+  // 앵커는 언제나 "그 시각의 수준"이고, 그 사이를 잇는 일중 분포는 전부 [STYLIZED]다.
+  // 티커 종착점은 전환 전 턴 종료 값과 **정확히 같다** — 그래서 체크포인트가 움직이지 않는다.
+  {
+    path: 'anchor.govt30yBp.2022-09-27',
+    value: 510,
+    unit: 'bp',
+    asOf: '2022-09-27',
+    sourceId: 'boe-yield-curves',
+    note: '9/27 종가 5.10%(9/22 3.80% + 3거래일 130bp, BoE QB). T4 티커의 틱 0 앵커',
+  },
+  {
+    path: 'anchor.govt30yBp.2022-09-28-intraday-high',
+    value: 515,
+    unit: 'bp',
+    asOf: '2022-09-28T11:00+01:00',
+    sourceId: 'boe-cunliffe-letter-2022-10-05',
+    tag: 'CAL',
+    note:
+      '**관측값이 아니라 확인된 앵커 사이의 보간값이다.** BoE 수익률곡선 통계는 일별 종가만 공표하므로 ' +
+      '장중 고점 자체는 공표되지 않는다. 확인된 앵커: ① 9/27 종가 5.10% · 9/28 종가 4.05%(boe-yield-curves) ' +
+      '② 커늘리프 서한(2022-10-05) "On Wednesday 28 September the intraday range of the yield on 30 year ' +
+      'gilts of 127 basis points" ③ 같은 서한 "This led to a more than 100 basis point fall in 30 year gilt ' +
+      'yields that day". 방법: ③ + 종가 4.05% ⇒ 고점 ≥ 5.05%, ② + 종가 4.05% ⇒ 고점 ≤ 5.32%(저점 ≤ 종가). ' +
+      '5.15%는 이 구간 안에서 9/27 종가 +5bp로 잡았고, 그러면 일중 저점이 3.88%가 되어 ②의 127bp 변동폭을 ' +
+      '정확히 재현한다 — T4 티커의 종착점이자 T5 티커의 틱 0 앵커. 구간을 한 점으로 좁히려면 영란은행의 ' +
+      '2022-09-28 일중 길트 호가 공개가 필요하다',
+  },
+  {
+    path: 'anchor.govt30yBp.2022-09-28',
+    value: 405,
+    unit: 'bp',
+    asOf: '2022-09-28',
+    sourceId: 'boe-qb-2023-gilt',
+    note: '9/28 종가 ≈4.05% — 발표 당일 −100bp 이상, 사상 최대 일일 하락. T5 티커의 종착점(체크포인트와 동일 값)',
+  },
+  {
+    path: 'anchor.govt10yBp.2022-09-27',
+    value: 450,
+    unit: 'bp',
+    asOf: '2022-09-27',
+    sourceId: 'boe-yield-curves',
+    tag: 'CAL',
+    note: '9/22 3.50% + T1~T3 누적 +100bp. T4 티커의 틱 0 앵커',
+  },
+  {
+    path: 'anchor.govt10yBp.2022-09-28',
+    value: 405,
+    unit: 'bp',
+    asOf: '2022-09-28',
+    sourceId: 'boe-yield-curves',
+    tag: 'CAL',
+    note: '9/28 오전 4.55% → 종가 4.05%(−50bp). T5 티커의 종착점',
+  },
+  {
+    path: 'anchor.t4.dealingCutoff',
+    value: 11,
+    unit: 'hour(BST)',
+    asOf: '2022-09-28',
+    sourceId: 'tpr-ldi-guidance-2023',
+    tag: 'CAL',
+    note:
+      '풀드 LDI 펀드의 딜링 컷오프 오전 11시(브리핑 institutionProfile). T4의 틱 4가 이 시각이며, ' +
+      '컷오프까지 도착하지 않은 담보는 그날 없는 것으로 확정되어 운용사가 익스포저를 축소한다',
   },
 ]

@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, LiveRegion } from '../ui'
 import { usePlay } from './playContext'
-import { dayKeyOf, previousTurnEntries, turnEntries, type WireEntry } from './playHelpers'
+import {
+  dayKeyOf,
+  previousTurnEntries,
+  tickLabelOf,
+  tickOfEntry,
+  turnEntries,
+  type WireEntry,
+} from './playHelpers'
 import { WireItem } from './WireItem'
 
 function TurnSeparator({
@@ -21,7 +28,7 @@ function TurnSeparator({
     <h3
       id={current ? 'turn-header-current' : `turn-header-${turnIndex}`}
       tabIndex={-1}
-      className="flex items-center gap-2 pt-2 text-[12px] font-semibold text-muted outline-none"
+      className="flex items-center gap-2 pt-2 text-sm font-semibold text-muted outline-none"
     >
       <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-text">{label}</span>
       <span>{timeLabel}</span>
@@ -31,10 +38,25 @@ function TurnSeparator({
   )
 }
 
+/** `09:00` rule between feed items belonging to different sub-turn ticks. */
+function TickSeparator({ label }: { label: string }) {
+  return (
+    <div
+      className="flex items-center gap-2 pt-1 text-xs text-muted"
+      role="separator"
+      aria-label={`${label} 시각`}
+      data-tick-separator={label}
+    >
+      <span className="num rounded bg-surface-2 px-1.5 py-0.5">{label}</span>
+      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+    </div>
+  )
+}
+
 function DaySeparator({ label }: { label: string }) {
   return (
     <div
-      className="flex items-center gap-2 pt-3 text-[11px] uppercase tracking-wide text-muted"
+      className="flex items-center gap-2 pt-3 text-xs uppercase tracking-wide text-muted"
       role="separator"
       aria-label={label}
     >
@@ -108,6 +130,8 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
   }, [unreadCount, onUnreadChange])
 
   const currentTurn = view.turn
+  // Tick rules only make sense on a turn that actually has sub-turn ticks.
+  const ticked = view.ticks > 1
   const prevTurnDef = state.turnIndex > 0 ? scenario.turns[state.turnIndex - 1] : undefined
   const showDayForCurrent = !prevTurnDef || dayKeyOf(prevTurnDef) !== dayKeyOf(currentTurn)
 
@@ -147,7 +171,7 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
                 title={def.title}
               />
               {t.entries.length === 0 && (
-                <p className="text-[12px] text-muted">이 턴에는 소식이 없었습니다.</p>
+                <p className="text-sm text-muted">이 턴에는 소식이 없었습니다.</p>
               )}
               {t.entries.map((e) => (
                 <WireItem
@@ -173,16 +197,24 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
           title={currentTurn.title}
           current
         />
-        {current.length === 0 && <p className="text-[12px] text-muted">아직 새 소식이 없습니다.</p>}
-        {current.map((e) => (
-          <WireItem
-            key={e.id}
-            entry={e}
-            unread={!readIds.has(e.id)}
-            onRead={markRead}
-            sources={scenario.meta.sources}
-          />
-        ))}
+        {current.length === 0 && <p className="text-sm text-muted">아직 새 소식이 없습니다.</p>}
+        {current.map((e, i) => {
+          const tick = tickOfEntry(e, state)
+          const prevTick = i > 0 ? tickOfEntry(current[i - 1]!, state) : -1
+          return (
+            <Fragment key={e.id}>
+              {ticked && tick !== prevTick && (
+                <TickSeparator label={tickLabelOf(currentTurn, tick)} />
+              )}
+              <WireItem
+                entry={e}
+                unread={!readIds.has(e.id)}
+                onRead={markRead}
+                sources={scenario.meta.sources}
+              />
+            </Fragment>
+          )
+        })}
       </section>
     </div>
   )

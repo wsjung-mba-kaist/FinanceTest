@@ -15,7 +15,11 @@ export interface KpiRow {
   /** Value one turn before `current`. */
   previous?: MetricValue
   delta?: number
-  /** History up to the shown turn, oldest first. */
+  /**
+   * Sparkline series up to the shown turn, oldest first. Drawn from `state.tickHistory` so a
+   * ticked turn moves the line within the turn; falls back to the per-turn snapshots. The
+   * delta beside it always stays 전 턴 대비 — an intraday wiggle is not a turn-over-turn move.
+   */
   series: number[]
   /** Turns of staleness applied (expert `lagTurns`), 0 otherwise. */
   lag: number
@@ -63,12 +67,37 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
       current && previous && Number.isFinite(current.value) && Number.isFinite(previous.value)
         ? current.value - previous.value
         : undefined
-    const series: number[] = []
-    for (const snap of hist) {
-      if (snap.turnIndex > shownTurn) break
-      const v = snap.metrics[spec.metric]?.value
-      if (v !== undefined && Number.isFinite(v)) series.push(v)
+    return {
+      spec,
+      current,
+      previous,
+      delta,
+      series: metricSeries(state, spec.metric, shownTurn),
+      lag,
+      threshold: thresholds[spec.metric],
     }
-    return { spec, current, previous, delta, series, lag, threshold: thresholds[spec.metric] }
   })
+}
+
+/**
+ * Live sparkline values for one metric up to (and including) `throughTurn`.
+ * `tickHistory` carries one sample per (turn, tick), so an un-ticked run produces exactly the
+ * per-turn series it did before L2 while a ticked turn adds its intraday points.
+ */
+export function metricSeries(state: GameState, metric: string, throughTurn: number): number[] {
+  const out: number[] = []
+  if (state.tickHistory.length > 0) {
+    for (const sample of state.tickHistory) {
+      if (sample.turnIndex > throughTurn) break
+      const v = sample.values[metric]
+      if (v !== undefined && Number.isFinite(v)) out.push(v)
+    }
+    if (out.length > 0) return out
+  }
+  for (const snap of state.metricsHistory) {
+    if (snap.turnIndex > throughTurn) break
+    const v = snap.metrics[metric]?.value
+    if (v !== undefined && Number.isFinite(v)) out.push(v)
+  }
+  return out
 }

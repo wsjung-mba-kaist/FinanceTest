@@ -1,9 +1,11 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Citation } from '../components/knowledge/Citation'
-import { EmptyState } from '../components/ui'
+import { Button, EmptyState } from '../components/ui'
 import { GLOSSARY, getCard } from '../content'
 import type { GlossaryEntry } from '../content/types'
+import { scenariosUsingCards } from '../lib/catalog'
+import { getScenarioSummary } from '../scenarios'
 import { useProgressStore } from '../store/progressStore'
 import { useSettingsStore } from '../store/settingsStore'
 
@@ -58,6 +60,26 @@ function initialOf(text: string): string {
   const up = ch.toUpperCase()
   if (/[A-Z]/.test(up)) return up
   return '#'
+}
+
+/** "이 용어가 등장하는 시나리오" — resolved through the card the term points at. */
+function RelatedScenarios({ cardId }: { cardId: string }) {
+  const ids = scenariosUsingCards([cardId])
+  if (ids.length === 0) return null
+  return (
+    <div className="mt-0.5 text-muted">
+      관련 시나리오:{' '}
+      {ids.map((id, i) => {
+        const s = getScenarioSummary(id)
+        return (
+          <span key={id}>
+            {i > 0 && ', '}
+            <Link to={`/scenarios/${id}`}>{s?.title ?? id}</Link>
+          </span>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function GlossaryPage() {
@@ -120,16 +142,16 @@ export default function GlossaryPage() {
   return (
     <div className="space-y-4">
       <header>
-        <nav aria-label="경로" className="text-[12px] text-muted">
+        <nav aria-label="경로" className="text-sm text-muted">
           <Link to="/knowledge">지식 베이스</Link> <span aria-hidden="true">›</span> 용어집
         </nav>
-        <h1 className="mt-1 text-[22px] font-semibold tracking-tight">
-          용어집 <span className="num text-[13px] font-normal text-muted">({GLOSSARY.length})</span>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight">
+          용어집 <span className="num text-base font-normal text-muted">({GLOSSARY.length})</span>
         </h1>
       </header>
 
       <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
-        <label htmlFor={searchId} className="block text-[12px] text-muted">
+        <label htmlFor={searchId} className="block text-sm text-muted">
           검색 (한글·영문·약어)
         </label>
         <input
@@ -140,7 +162,7 @@ export default function GlossaryPage() {
           placeholder="예: LCR, 유동성, margin call"
           className="w-full rounded border border-border bg-bg px-2 py-1.5"
         />
-        <nav aria-label="색인" className="flex flex-wrap gap-0.5 text-[12px]">
+        <nav aria-label="색인" className="flex flex-wrap gap-0.5 text-sm">
           {[...KO_INDEX, ...EN_INDEX].map((k) => (
             <a
               key={k}
@@ -161,17 +183,28 @@ export default function GlossaryPage() {
       {groups.length === 0 ? (
         <EmptyState
           title={GLOSSARY.length === 0 ? '용어집이 아직 없습니다' : '검색 결과가 없습니다'}
-        />
+        >
+          {GLOSSARY.length === 0 ? (
+            <Link to="/knowledge">지식 베이스로 돌아가기</Link>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setQuery('')}>
+              검색어 지우기
+            </Button>
+          )}
+        </EmptyState>
       ) : (
         groups.map(([k, entries]) => (
           <section key={k} id={`idx-${k}`} aria-labelledby={`idx-${k}-h`} className="scroll-mt-4">
             <h2
               id={`idx-${k}-h`}
-              className="num sticky top-0 z-10 border-b border-border bg-bg py-1 text-[14px] font-semibold"
+              className="num sticky top-0 z-10 border-b border-border bg-bg py-1 text-base font-semibold"
             >
               {k}
             </h2>
-            <dl className="m-0 divide-y divide-border">
+            {/* Each entry is a term and a sentence or two — a single column across a 1080px page
+                left the right half empty and doubled the scroll. Multi-column keeps the `dl`
+                semantics; `break-inside-avoid` stops an entry splitting across columns. */}
+            <dl className="m-0 lg:columns-2 lg:gap-x-8">
               {entries.map((g) => {
                 const card = g.cardRef ? getCard(g.cardRef) : undefined
                 const hl = highlight === g.id
@@ -180,7 +213,9 @@ export default function GlossaryPage() {
                     key={g.id}
                     id={`term-${g.id}`}
                     tabIndex={-1}
-                    className={`scroll-mt-12 py-2 ${hl ? 'bg-accent-soft -mx-2 px-2 rounded' : ''}`}
+                    className={`scroll-mt-12 break-inside-avoid border-b border-border py-2 ${
+                      hl ? 'bg-accent-soft -mx-2 px-2 rounded' : ''
+                    }`}
                   >
                     <dt className="font-medium">
                       {termDisplay === 'ko-en' ? (
@@ -193,13 +228,13 @@ export default function GlossaryPage() {
                         </>
                       )}
                       {g.aliases && g.aliases.length > 0 && (
-                        <span className="ml-2 text-[11px] font-normal text-muted">
+                        <span className="ml-2 text-xs font-normal text-muted">
                           별칭: {g.aliases.join(', ')}
                         </span>
                       )}
                       {termsViewed.includes(g.id) && <span className="sr-only"> (열람함)</span>}
                     </dt>
-                    <dd className="m-0 mt-0.5 text-[12px]">
+                    <dd className="m-0 mt-0.5 text-sm">
                       {g.definition.ko}
                       {g.sourceRef && <Citation ids={[g.sourceRef]} />}
                       {g.definition.en && (
@@ -210,6 +245,7 @@ export default function GlossaryPage() {
                           <Link to={`/knowledge#card-${card.id}`}>관련 카드: {card.title}</Link>
                         </div>
                       )}
+                      {card && <RelatedScenarios cardId={card.id} />}
                     </dd>
                   </div>
                 )

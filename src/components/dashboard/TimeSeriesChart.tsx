@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -12,9 +12,17 @@ import {
 import type { KpiSpec, MetricSnapshot, ThresholdMap, Units } from '../../engine'
 import { formatMetric } from '../../lib/format'
 import { useReducedMotion } from '../../lib/useMediaQuery'
+import { PlayContext } from '../play/playContext'
 import { Button, Card, StatusBadge } from '../ui'
+import { NoThresholdChip } from './KpiTile'
 
-/** One selectable KPI across the run, with warn/breach reference lines and a table alternative. */
+/**
+ * One selectable KPI across the run, with warn/breach reference lines and a table alternative.
+ *
+ * During play it also offers a 틱 단위 view drawn from `state.tickHistory`, which is the only
+ * place the intraday shape of a ticked turn can be read; the per-turn snapshots stay the default
+ * because scoring, conditions and the debrief are all defined on them.
+ */
 export function TimeSeriesChart({
   kpis,
   history,
@@ -26,18 +34,32 @@ export function TimeSeriesChart({
   units: Units
   thresholds: ThresholdMap
 }) {
+  const play = useContext(PlayContext)
   const [metric, setMetric] = useState(kpis[0]?.metric ?? '')
   const [table, setTable] = useState(false)
+  const [intraday, setIntraday] = useState(false)
   const reduced = useReducedMotion()
   const spec = kpis.find((k) => k.metric === metric) ?? kpis[0]
+  const tickHistory = play?.state.tickHistory ?? []
+  const hasIntraday = tickHistory.some((s) => s.tick > 0)
   if (!spec) return null
   const t = thresholds[spec.metric]
   const fmt = (v: number) => formatMetric(v, spec.unit, units, spec.decimals)
-  const data = history.map((s) => {
-    const mv = s.metrics[spec.metric]
-    const v = mv && Number.isFinite(mv.value) ? mv.value : null
-    return { turn: `T+${s.turnIndex}`, value: v, status: mv?.status ?? 'na' }
-  })
+  const data =
+    intraday && hasIntraday
+      ? tickHistory.map((s) => {
+          const v = s.values[spec.metric]
+          return {
+            turn: s.tick > 0 ? `T+${s.turnIndex}.${s.tick}` : `T+${s.turnIndex}`,
+            value: v !== undefined && Number.isFinite(v) ? v : null,
+            status: 'na' as const,
+          }
+        })
+      : history.map((s) => {
+          const mv = s.metrics[spec.metric]
+          const v = mv && Number.isFinite(mv.value) ? mv.value : null
+          return { turn: `T+${s.turnIndex}`, value: v, status: mv?.status ?? 'na' }
+        })
   const nums = data.map((d) => d.value).filter((v): v is number => v !== null)
   if (t) nums.push(t.warn, t.breach)
   const lo = nums.length ? Math.min(...nums) : 0
@@ -48,12 +70,12 @@ export function TimeSeriesChart({
   return (
     <Card as="section" aria-labelledby="ts-title" className="p-2">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 id="ts-title" className="text-[12px] font-semibold">
+        <h3 id="ts-title" className="text-sm font-semibold">
           지표 시계열
         </h3>
         <select
           aria-label="지표 선택"
-          className="rounded border border-border bg-bg px-1.5 py-0.5 text-[12px]"
+          className="rounded border border-border bg-bg px-1.5 py-0.5 text-sm"
           value={spec.metric}
           onChange={(e) => setMetric(e.target.value)}
         >
@@ -63,10 +85,21 @@ export function TimeSeriesChart({
             </option>
           ))}
         </select>
+        {hasIntraday && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            aria-pressed={intraday}
+            onClick={() => setIntraday((v) => !v)}
+          >
+            {intraday ? '턴 단위' : '틱 단위'}
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"
-          className="ml-auto"
+          className={hasIntraday ? '' : 'ml-auto'}
           aria-pressed={table}
           onClick={() => setTable((v) => !v)}
         >
@@ -75,7 +108,7 @@ export function TimeSeriesChart({
       </div>
       {table ? (
         <div className="mt-2 max-h-48 overflow-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-sm">
             <caption className="sr-only">{spec.label} 턴별 값</caption>
             <thead>
               <tr className="text-left text-muted">
@@ -96,14 +129,14 @@ export function TimeSeriesChart({
                   <td className="num py-0.5">{d.turn}</td>
                   <td className="num py-0.5 text-right">{d.value === null ? '—' : fmt(d.value)}</td>
                   <td className="py-0.5 text-right">
-                    <StatusBadge status={d.status} />
+                    {d.status === 'na' ? <NoThresholdChip /> : <StatusBadge status={d.status} />}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {t && (
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-xs text-muted">
               경고 {fmt(t.warn)} · 위험 {fmt(t.breach)} (
               {t.direction === 'below' ? '낮을수록 위험' : '높을수록 위험'})
             </p>

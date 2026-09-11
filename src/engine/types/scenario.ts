@@ -78,6 +78,10 @@ interface EventBase<S extends InstitutionState> {
   relatedMetrics?: string[]
   /** Time label shown in the feed, e.g. '09:12'. */
   time?: string
+  /** Sub-turn tick at which the event fires (defaults to 0 = turn start). */
+  atTick?: number
+  /** Max ± tick jitter applied when `variance > 0`. */
+  jitter?: number
 }
 
 export type GameEvent<S extends InstitutionState = InstitutionState> = EventBase<S> &
@@ -154,6 +158,40 @@ export interface Option<S extends InstitutionState = InstitutionState> {
   preview?: PreviewHint[]
 }
 
+/**
+ * One reply a player can give at a `DialogueStep`. Exactly one of `next` / `resolvesTo` is set:
+ * the conversation either continues at another step or resolves to one of the decision's existing
+ * `options`, which is what actually gets committed. `when` is evaluated against the state the
+ * decision was asked in — the same context `Option.when` sees — so the panel and `applyDecision`
+ * never disagree about which replies exist.
+ */
+export interface DialogueReply<S extends InstitutionState = InstitutionState> {
+  id: string
+  label: string
+  /** Hidden entirely when false. */
+  when?: Condition
+  /** Effects applied the moment this reply is given (usually just counters/flags). */
+  effects?: Effect<S>[]
+  setFlags?: Flags
+  /** Next step, or the option the whole dialogue resolves to. Exactly one. */
+  next?: string
+  resolvesTo?: string
+  expert?: { rating: number; rationale: string }
+  trap?: boolean
+  trapExplanation?: string
+}
+
+/** One beat of a multi-step conversation: what the counterparty says, and 2–4 ways to answer. */
+export interface DialogueStep<S extends InstitutionState = InstitutionState> {
+  id: string
+  /** What the counterparty says at this step. */
+  lines: DialogueLine[]
+  /** 2–4 replies. */
+  replies: DialogueReply<S>[]
+  /** Shown above the replies, e.g. '약속한 ETA는 이후 이행 여부로 평가됩니다'. */
+  note?: string
+}
+
 export interface Decision<S extends InstitutionState = InstitutionState> {
   id: string
   title: string
@@ -169,7 +207,18 @@ export interface Decision<S extends InstitutionState = InstitutionState> {
   timeLimitSec?: number
   /** Applied on timeout (pressure modes). */
   defaultOptionId?: string
+  /** First tick at which the decision can be answered (default 0). */
+  availableFrom?: number
+  /** Last tick at which it can be answered; the tick sweep then commits `defaultOptionId`. */
+  deadlineTick?: number
+  /** Weight in the `expert` score component (default 1; interrupts are authored at 0.5). */
+  scoreWeight?: number
   options: Option<S>[]
+  /**
+   * Multi-step conversation that resolves **into one of `options`**. `steps[0]` is the entry point.
+   * A decision without `steps` behaves exactly as it always has: the options are offered directly.
+   */
+  steps?: DialogueStep<S>[]
   cardRefs?: string[]
   /** Concepts a learner should know before deciding (card ids). */
   requiredConcepts?: string[]
@@ -184,6 +233,56 @@ export interface AdvisorHint {
   text: string
   cardRefs?: string[]
   decisionId?: string
+}
+
+/** One intraday series driven tick by tick; `values[0]` is the tick-0 anchor. */
+export interface TickerSeries {
+  /** Dotted state path, e.g. 'market.ownStock'. */
+  path: string
+  mode: 'relative' | 'absolute'
+  values: number[]
+}
+export interface TickerSpec {
+  series: TickerSeries[]
+}
+
+/**
+ * Magnitude-only noise (never branches an outcome). Every field is ignored while `variance` is 0,
+ * and in that case the engine does not draw from the RNG at all.
+ */
+export interface NoiseSpec {
+  /** Log-normal σ on each run-off slice (default 0.15). */
+  runoffSigma?: number
+  /** Cap on the run-off multiplier deviation (default 0.30). */
+  runoffCap?: number
+  /** Log-normal σ on relative ticker moves (default 0.01). */
+  tickerSigma?: number
+  /** σ in basis points on absolute ticker moves (default 2). */
+  tickerSigmaBp?: number
+  /** Default ± tick jitter for events/interrupts that do not set their own. */
+  eventJitter?: number
+}
+
+/**
+ * A decision that arrives mid-turn (a phone call, a desk request, a supervisor on the line). It is a
+ * `Decision`, so validation, effects, delayed effects, scoring and path comparison all reuse the
+ * existing machinery; `applyDecision` looks ids up in `turn.decisions ∪ turn.interrupts`.
+ */
+export interface Interrupt<S extends InstitutionState = InstitutionState> extends Decision<S> {
+  interrupt: true
+  atTick: number
+  /** Max ± tick jitter applied when `variance > 0`. */
+  jitter?: number
+  source: {
+    kind: 'call' | 'regulator' | 'board' | 'desk'
+    caller: string
+    agency?: string
+    tone?: 'routine' | 'concerned' | 'urgent'
+  }
+  lines: DialogueLine[]
+  /** Real-seconds countdown for the UI; the engine only uses `deadlineTick`. */
+  timeoutSec: number
+  defaultOptionId: string
 }
 
 export interface Turn<S extends InstitutionState = InstitutionState> {
@@ -201,6 +300,16 @@ export interface Turn<S extends InstitutionState = InstitutionState> {
   decisions: Decision<S>[]
   advisorHints?: AdvisorHint[]
   relatedCards?: string[]
+  /** Sub-turn ticks. Undefined ⇒ 1 ⇒ tick 0 is both the first and the last tick. */
+  ticks?: number
+  /** Clock labels per tick, e.g. ['07:00', '08:00', …]. */
+  tickLabels?: string[]
+  /** Applied at every tick (including tick 0, after `entryEffects`). */
+  eachTick?: ConditionalEffects<S>[]
+  /** Applied at one specific tick. */
+  tickEffects?: (ConditionalEffects<S> & { atTick: number })[]
+  ticker?: TickerSpec
+  interrupts?: Interrupt<S>[]
 }
 
 export interface GameOverRule {
@@ -239,6 +348,10 @@ export interface Checkpoint {
   expected: number
   /** Relative tolerance, e.g. 0.15. */
   tolerance: number
+  /** Absolute tolerance; when set, the check passes if either tolerance is met. */
+  absTolerance?: number
+  /** Tick within the turn at which to check (default: the turn's last tick). */
+  tick?: number
   label: string
 }
 
@@ -280,6 +393,18 @@ export interface Stakeholder {
   canDo: string
 }
 
+/**
+ * Optional authoring override for the briefing's one-page summary. Every field is otherwise derived
+ * from the briefing content itself, so a scenario only sets what it wants to take control of.
+ */
+export interface ExecutiveSummarySpec {
+  situation?: string
+  mandate?: string
+  objective?: string
+  keyJudgements?: string[]
+  preflight?: { id: string; label: string; question: string; metrics?: string[] }[]
+}
+
 export interface Briefing {
   situation: string
   mandate: string
@@ -290,6 +415,8 @@ export interface Briefing {
   cardRefs: string[]
   simplificationNotes: string[]
   disclaimer?: string
+  /** Overrides any derived field of the one-page summary. */
+  executiveSummary?: ExecutiveSummarySpec
 }
 
 export interface ScenarioDefinition<S extends InstitutionState = InstitutionState> {
@@ -307,6 +434,8 @@ export interface ScenarioDefinition<S extends InstitutionState = InstitutionStat
   kpis: KpiSpec[]
   thresholds?: ThresholdMap
   turns: Turn<S>[]
+  /** Volatility magnitudes used when `variance > 0`. */
+  noise?: NoiseSpec
   gameOver: GameOverRule[]
   endings: Ending[]
   scoring: ScoringSpec
@@ -336,4 +465,10 @@ export interface ScenarioSummary {
   tags: string[]
   /** M-status for catalog: 'available' | 'planned'. */
   status: 'available' | 'planned'
+  /**
+   * Concept cards the scenario's briefing teaches — a copy of `briefing.cardRefs` carried on the
+   * summary so the knowledge base can answer "이 프레임워크가 쓰인 시나리오" without pulling every
+   * (lazily loaded) scenario module into the initial bundle. Kept in sync by an integrity test.
+   */
+  cardRefs?: string[]
 }

@@ -161,12 +161,13 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     ],
     simplificationNotes: [
       'MB는 리먼 2008-05-31 10-Q와 9/10 사전 공시를 반올림한 합성 기관이다. 조달 세그먼트(PB 프리크레딧·파생 담보·CP·기타)와 레포 북의 담보별 분해는 양식화·보정된 값이다(calibration.md).',
-      '유동성 풀 $42B는 8-K(9/10) 추정치이며, 그중 담보 예치분 $7.5B는 파산 조사관 보고서의 2차 인용이다[VERIFY].',
+      '유동성 풀 $42B는 8-K(9/10) 추정치이며, 그중 담보 예치분 $7.5B(JPM ≈5.5 + 씨티 2)는 파산 조사관 보고서 Vol. 4 §III.A.5 p.1455에서 원문 확인했다.',
       '주주지분 $28.4B(8/31)를 보통주 20 + 우선주 8로 나눈 것은 양식화다. 3분기 손실 $3.9B는 이미 반영된 수치이므로 공시 시 자본 효과는 없고 신뢰 효과만 있다.',
       '비유동 북의 시장가치 38(장부 46)은 "시장이 요구하는 추가 상각"이며 economicTce에만 반영된다. 매각은 시나리오 전용 효과로 처리하며 ASC 320 tainting 규칙은 적용하지 않는다.',
       '자산운용 자회사 확정 매각의 2일 종결, bad-bank 스핀오프의 주말 확정, 컨소시엄 자금 $5B는 양식화·반사실이다.',
       '9/15 이후 생존 분기에서 AIG·Reserve Primary·MMF 보증은 외생으로 유지한다. 실제로는 리먼 파산이 이 사건들의 원인이었으므로, MB가 생존한 세계에서 같은 시점에 같은 사건이 일어났을지는 가정이다.',
       '주말 턴(T4·T5)에는 송금 창구가 없어 세그먼트 유출을 적용하지 않는다. 시장 데이터(주가 −45/−7/−42/−14%)는 실제 종가 기준이다[press].',
+      '9/11·9/12는 서브턴 5틱으로 진행된다. 틱 라벨(07:00 언와인드 → 09:30 개장 → 청산은행 요구 → 장 마감 → 연준 소집)과 그날 유출의 시간대별 분포는 양식화이며, 앵커는 그날의 합계뿐이다. 중간에 걸려 오는 전화와 주말 협상의 대사는 공개 기록을 바탕으로 한 재구성이며 녹취가 아니다.',
     ],
     disclaimer:
       '본 시나리오는 공개 자료(SEC 공시, 연준·FDIC·SEC 자료, FCIC 보고서, 파산 조사관 보고서, 학술 논문)를 바탕으로 교육 목적으로 재구성한 것이며, 수치와 인물의 발언은 단순화·각색되었습니다.',
@@ -288,6 +289,19 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     leverageRatio: { warn: 3, breach: 2, direction: 'below' },
   },
   turns: [...turnsA, ...turnsB],
+  /**
+   * 라이브 플레이(variance 1)에서만 쓰이는 크기 노이즈. variance 0(정본·체크포인트)에서는 엔진이
+   * 난수를 아예 당기지 않는다. 하우스 기본값에서 `runoffSigma`만 0.15 → 0.12로 낮췄다: 9/12 체크포인트
+   * 두 개(누적 유출 ≈38, 풀 ≈2)가 **하루 유출의 합**으로 정의되어 있어 슬라이스 분산이 그대로
+   * 누적되기 때문이다. calibration.md §7.6.
+   */
+  noise: {
+    runoffSigma: 0.12,
+    runoffCap: 0.3,
+    tickerSigma: 0.01,
+    tickerSigmaBp: 2,
+    eventJitter: 1,
+  },
   gameOver: [
     {
       id: 'unsafe_act',
@@ -428,14 +442,15 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
       metric: 'cumulativeOutflow',
       expected: 38,
       tolerance: 0.3,
-      label: '9/12(금) 누적 자금 유출 ≈$38B (풀 $42B → ≈$2B; Valukas·SEC Cox 서한 앵커)',
+      label: '9/12(금) 누적 자금 유출 ≈$38B (풀 $42B → ≈$2.4B; Valukas·SEC Cox 서한 앵커)',
     },
     {
       turnId: 't3',
       metric: 'cash',
-      expected: 2,
+      expected: 2.4,
       tolerance: 1,
-      label: '9/12(금) 유동성 풀 ≈$2B (Examiner: 즉시 현금화 가능 자산 <$2B)',
+      label:
+        '9/12(금) 유동성 풀 ≈$2.4B (Examiner Vol.4: 보고유동성 $32.5B 중 즉시 현금화 가능 $2.4B)',
     },
   ],
   debrief: lehmanDebrief,

@@ -1,4 +1,5 @@
 import type { BankState, Turn } from '../../engine/types'
+import { commitReplies } from '../../engine/core/dialogue'
 import { bankFx } from '../../engine/fx/bank'
 import { confidence, flag, ownStockMove, regulator } from '../../engine/fx/common'
 import { ibFx } from './fx'
@@ -88,6 +89,125 @@ export const t4: T = {
         '인수자·컨소시엄·규제당국 세 축이 동시에 맞아야 합니다. 하나라도 빠지면 일요일 밤 선택지는 줄어듭니다.',
       requiredConcepts: ['fdic-resolution-weekend'],
       dimensions: ['solvency', 'policy', 'communication'],
+      select: { min: 1, max: 1 },
+      defaultOptionId: 't4-a',
+      // 3단계 협상: 구조 선택 → 컨소시엄 출자 약속액(commitReplies) → 규제 승인 축의 주체.
+      // 약속액은 `counters.consortiumPledgeB`에 남고, 그 크기가 충분했는지는 t4-a의 지연효과가
+      // 일요일(T5)에 판정한다. 대사는 FCIC ch.18과 연준 사료가 전하는 회의 내용을 바탕으로 한
+      // **재구성**이며 녹취·속기록이 아니다(calibration.md §7.4).
+      steps: [
+        {
+          id: 't4-neg-open',
+          lines: [
+            {
+              speaker: '뉴욕연준 총재',
+              text: '두 축입니다 — 인수자, 그리고 인수자가 원하지 않는 상업용 부동산을 떠안을 컨소시엄. 무엇부터 붙이시겠습니까?',
+            },
+          ],
+          note: '여기서 정한 구조가 주말 내내 협상 테이블의 형태를 결정합니다.',
+          replies: [
+            {
+              id: 't4-neg-r-package',
+              label: '인수자와 bad-bank를 한 패키지로 묶어 동시에 협상',
+              next: 't4-neg-pledge',
+              expert: {
+                rating: 70,
+                rationale:
+                  '인수자는 부동산을 원하지 않고 컨소시엄은 인수자 없이 움직이지 않는다. 두 축을 따로 세우면 서로를 기다리다 주말이 끝난다.',
+              },
+            },
+            {
+              id: 't4-neg-r-bofa',
+              label: 'BofA 한 곳에 집중해 단독 인수를 설득',
+              resolvesTo: 't4-c',
+              expert: {
+                rating: 30,
+                rationale:
+                  'BofA는 보증 없이 움직이지 않았고 토요일에 메릴린치로 돌아섰다. 한 후보에 거는 것은 일요일 밤을 비운다.',
+              },
+            },
+            {
+              id: 't4-neg-r-marks',
+              label: '부동산 마크를 상향해 실사팀을 먼저 안심시킨다',
+              resolvesTo: 't4-e',
+              trap: true,
+              trapExplanation:
+                '실사는 숫자가 아니라 신뢰를 검증한다. 마크를 고치면 거래가 죽고, 그 사실은 같은 주말에 드러난다.',
+              expert: { rating: 5, rationale: '거래를 살리려 숫자를 고치면 거래가 죽는다.' },
+            },
+          ],
+        },
+        {
+          id: 't4-neg-pledge',
+          lines: [
+            {
+              speaker: '대형은행 CEO',
+              text: '우리가 SpinCo에 얼마를 대야 합니까? 숫자가 없으면 각 사 이사회에 올릴 수 없습니다.',
+            },
+          ],
+          note: '여기서 부른 출자 규모는 일요일 실사에서 그대로 검증됩니다. 분리 대상 부동산 북은 $25~30B입니다.',
+          replies: commitReplies<BankState>('consortiumPledgeB', [10, 20, 30], {
+            idPrefix: 't4-neg-pledge',
+            label: (v) => `컨소시엄 출자 $${v}B 규모로 제안`,
+            next: 't4-neg-regulator',
+            expert: (v) => ({
+              rating: v >= 30 ? 80 : v >= 20 ? 60 : 30,
+              rationale:
+                v >= 30
+                  ? '분리 대상 부동산 북(REI Global $25~30B)을 실제로 덮는 규모다. 인수자가 잔여 리스크를 계산할 수 있어야 거래가 성립한다.'
+                  : v >= 20
+                    ? '북의 대부분을 덮지만 잔여분은 인수자가 떠안아야 한다. 협상이 한 번 더 돌아간다.'
+                    : '분리 대상의 3분의 1에 불과하다. 인수자는 나머지를 자기 대차대조표에서 보게 되고, 그 순간 실사가 멈춘다.',
+            }),
+            trap: (v) => v < 20,
+            trapExplanation: (v) =>
+              v < 20
+                ? '숫자를 낮게 불러 컨소시엄의 동의를 얻어도, 같은 숫자가 인수자에게는 "덮이지 않은 리스크"로 읽힌다. 두 상대에게 같은 숫자가 반대로 작동한다.'
+                : undefined,
+          }),
+        },
+        {
+          id: 't4-neg-regulator',
+          lines: [
+            {
+              speaker: '뉴욕연준 총재',
+              text: '세 번째 축이 남았습니다. 영국 인수자에게는 자국 감독당국의 면제가 필요합니다. 누가 그것을 책임집니까?',
+            },
+          ],
+          replies: [
+            {
+              id: 't4-neg-r-fsa-joint',
+              label: '연준·재무부가 영국 감독당국과 직접 협의하도록 요청',
+              resolvesTo: 't4-a',
+              expert: {
+                rating: 60,
+                rationale:
+                  '규제 승인은 거래의 세 번째 축이며 당사자가 풀 수 없다. 실제로도 일요일 오후에 "불가"라는 답이 왔고, 그때는 대안을 만들 시간이 없었다.',
+              },
+            },
+            {
+              id: 't4-neg-r-buyer-owns',
+              label: '규제 승인 문제는 인수자가 알아서 해결하도록 둔다',
+              resolvesTo: 't4-d',
+              expert: {
+                rating: 35,
+                rationale: '인수자에게 맡기면 일요일 오후에 "불가"라는 답을 받는다.',
+              },
+            },
+            {
+              id: 't4-neg-r-standalone',
+              label: '인수자 없이 컨소시엄 지원 스핀오프만으로 독립 생존을 확정',
+              when: { all: [{ flag: 'pdcf_prepositioned' }, { flag: 'fed_engaged' }] },
+              resolvesTo: 't4-b',
+              expert: {
+                rating: 75,
+                rationale:
+                  '비유동 북이 대차대조표에서 사라지면 규제 승인이라는 축 자체가 필요 없어진다. 다만 사전 예치 담보와 연준 채널이 모두 있을 때만 성립한다(반사실).',
+              },
+            },
+          ],
+        },
+      ],
       options: [
         {
           id: 't4-a',
@@ -95,6 +215,22 @@ export const t4: T = {
           description:
             '월가 컨소시엄이 $30B 안팎의 부동산 SpinCo를 지원하고 바클레이스가 나머지를 산다. 규제 승인은 별도.',
           effects: [flag('consortium_deal_tentative')],
+          // 협상에서 부른 출자 규모의 이행 판정. 대화를 걷지 않고 옵션이 바로 확정된 경우
+          // (마감 스윕·타임아웃) 카운터는 0으로 남고, `gt: 0` 조건 덕분에 판정도 생략된다.
+          delayedEffects: [
+            {
+              afterTurns: 1,
+              when: {
+                all: [
+                  { counter: 'consortiumPledgeB', gt: 0 },
+                  { counter: 'consortiumPledgeB', lt: 20 },
+                ],
+              },
+              description:
+                '컨소시엄 출자 약속이 분리 대상 부동산 북($25~30B)에 못 미쳐 인수 후보가 잔여 리스크를 이유로 조건을 다시 요구 → 신뢰지수 −8',
+              effects: [confidence(-8, '컨소시엄 출자 부족 — 인수 협상 후퇴')],
+            },
+          ],
           expert: {
             rating: 45,
             rationale:

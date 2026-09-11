@@ -31,7 +31,7 @@ function StackedBar({
   const summary = segments.map((s) => `${s.label} ${formatCurrency(s.value, units)}`).join(', ')
   return (
     <div>
-      <div className="flex items-baseline justify-between text-[11px]">
+      <div className="flex items-baseline justify-between text-xs">
         <span className="font-medium">{title}</span>
         <span className="num text-muted">{formatCurrency(total, units)}</span>
       </div>
@@ -53,7 +53,7 @@ function StackedBar({
           )
         })}
       </div>
-      <ul className="mt-1 grid grid-cols-2 gap-x-2 text-[11px]">
+      <ul className="mt-1 grid grid-cols-2 gap-x-2 text-xs">
         {segments.map((s, i) => (
           <li key={s.label} className="flex items-center gap-1">
             <span
@@ -115,7 +115,7 @@ function BankSheet({ bank, units }: { bank: BankState; units: Units }) {
     <div className="space-y-3">
       <StackedBar title="자산" segments={assets} units={units} />
       <StackedBar title="부채·자본" segments={liabilities} units={units} />
-      <p className="text-[11px] text-muted">
+      <p className="text-xs text-muted">
         미실현손실 AFS {formatCurrency(afsLoss, units)} · HTM {formatCurrency(htmLoss, units)}
         {bank.htmTainted ? ' · HTM 재분류(tainting) 발생' : ''}
       </p>
@@ -153,7 +153,7 @@ function PensionSheet({ p, units }: { p: PensionState; units: Units }) {
     <div className="space-y-3">
       <StackedBar title="자산" segments={assets} units={units} />
       <StackedBar title="부채" segments={liabilities} units={units} />
-      <p className="text-[11px] text-muted">
+      <p className="text-xs text-muted">
         LDI 담보 {formatCurrency(collateral, units)} · 마진콜 대기{' '}
         {formatCurrency(ldi.marginCallOutstanding, units)} · 헤지비율{' '}
         {formatNumber(p.hedgeRatio * 100, 0)}% · 스폰서 여력{' '}
@@ -187,7 +187,7 @@ function SecuritiesSheet({ s, units }: { s: SecuritiesState; units: Units }) {
     <div className="space-y-3">
       <StackedBar title="유동성 자산" segments={assets} units={units} />
       <StackedBar title="조달·자본" segments={liabilities} units={units} />
-      <p className="text-[11px] text-muted">
+      <p className="text-xs text-muted">
         PF 매입약정·보증 잔액 {formatCurrency(s.pf.abcpGuaranteed, units)} · 30일 차환 만기{' '}
         {formatCurrency(maturing30, units)} · 차환 성공률 {formatNumber(s.pf.rollRate * 100, 0)}% ·
         총위험액 {formatCurrency(s.risk.market + s.risk.credit + s.risk.operational, units)}
@@ -215,7 +215,7 @@ function flattenNumbers(
 function KeyFigures({ institution }: { institution: InstitutionState }) {
   const rows = flattenNumbers(institution).slice(0, 16)
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-[11px]">
+    <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-xs">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="truncate text-muted" title={k}>
@@ -234,7 +234,7 @@ export function BalanceSheetMini() {
   const inst = state.institution
   return (
     <Card as="section" aria-labelledby="bs-title" className="p-2">
-      <h3 id="bs-title" className="text-[12px] font-semibold">
+      <h3 id="bs-title" className="text-sm font-semibold">
         {inst.kind === 'bank' || inst.kind === 'pension' || inst.kind === 'securities'
           ? '대차대조표 미니뷰'
           : '주요 수치'}

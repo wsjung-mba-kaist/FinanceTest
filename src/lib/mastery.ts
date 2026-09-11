@@ -95,6 +95,24 @@ export function computeMastery(
   return out
 }
 
+export interface RecentRun {
+  scenarioId: string
+  attempt: AttemptSave
+}
+
+/** The last `n` completed runs across all scenarios, newest first. */
+export function recentRuns(
+  scenarios: Record<string, ScenarioProgress>,
+  n = RECENT_RUNS,
+): RecentRun[] {
+  const runs: RecentRun[] = []
+  for (const [scenarioId, p] of Object.entries(scenarios)) {
+    for (const attempt of p.attempts) runs.push({ scenarioId, attempt })
+  }
+  runs.sort((a, b) => b.attempt.completedAt.localeCompare(a.attempt.completedAt))
+  return runs.slice(0, n)
+}
+
 /** Competency with the least evidence (ties → lowest mastery), then an available scenario emphasising it. */
 export function recommendNext(
   mastery: Record<Competency, CompetencyMastery>,

@@ -6,9 +6,14 @@ function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T
 }
 
+/**
+ * Creates a run at T0. `variance` defaults to 0 — the canonical, fully reproducible mode in which
+ * the engine never draws from the RNG on its own (live play passes 0.5 / 1).
+ */
 export function createGame<S extends InstitutionState>(
   scenario: ScenarioDefinition<S>,
   seed = 1,
+  opts: { variance?: number } = {},
 ): GameState<S> {
   const init = scenario.initialState
   const base: GameState<S> = {
@@ -17,6 +22,8 @@ export function createGame<S extends InstitutionState>(
     seed,
     rng: seedToState(seed),
     turnIndex: 0,
+    tick: 0,
+    variance: opts.variance ?? 0,
     phase: 'deciding',
     institution: clone(init.institution),
     market: clone(init.market),
@@ -28,6 +35,10 @@ export function createGame<S extends InstitutionState>(
     pending: [],
     decisions: [],
     metricsHistory: [],
+    tickHistory: [],
+    tickSchedule: {},
+    tickerBase: {},
+    openInterrupts: [],
     feed: [],
     log: [],
   }

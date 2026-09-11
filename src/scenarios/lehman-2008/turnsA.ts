@@ -1,6 +1,6 @@
-import type { BankState, Turn } from '../../engine/types'
+import type { BankState, Interrupt, Turn } from '../../engine/types'
 import { bankFx } from '../../engine/fx/bank'
-import { confidence, counter, flag, ownStockMove, regulator } from '../../engine/fx/common'
+import { confidence, counter, flag, op, ownStockMove, regulator } from '../../engine/fx/common'
 import { ibFx } from './fx'
 
 type T = Turn<BankState>
@@ -36,6 +36,14 @@ export const S = {
 
 /** 도주성 조달 시작 잔액(세그먼트 합) — 라이브 카운터 조건 산정용. */
 const START_RUNNABLE = 80
+
+/**
+ * 뉴욕 영업일의 자금 유출 분포(틱 5개). **전방 집중** — 트라이파티 언와인드가 아침에 일어나고
+ * PB 잔고 이전·노베이션 지시가 개장 전에 쌓여 있다가 한꺼번에 나간다. 오후에는 무담보 만기와
+ * 남은 결제만 남는다. 시각별 분해 자료는 공개되지 않았으므로 모양 자체는 [STYLIZED]이며,
+ * 합계는 1이므로 variance 0에서 슬라이스 합이 종전 단일 호출과 정확히 일치한다(calibration.md §7.1).
+ */
+export const NY_DAY_PROFILE = [0.35, 0.25, 0.18, 0.12, 0.1]
 
 // 사후정보 금지 토큰(턴 T0~T5 텍스트에 등장 불가): AIG, Reserve Primary, AMLF, TARP, TLGP, CPFF.
 // PDCF 담보 확대는 T5(9/14 저녁) 이전 텍스트에 등장 불가 — lehman.test.ts 가 검사한다.
@@ -642,26 +650,208 @@ export const t1: T = {
 // ---------------------------------------------------------------------------------------------
 // T2 — 2008-09-11 (목) "레포 롤오버 거부"
 // ---------------------------------------------------------------------------------------------
+/**
+ * 09:30 개장 직후 프라임브로커리지 최대 고객의 잔고 이전 통지. 합성 기관의 고객이므로 실존 인물의
+ * 발언이 아니며, 내용은 헤지펀드 잔고 이전·노베이션 요청이 9/10~12에 급증했다는 공개 기록
+ * (FCIC ch.15, Valukas)을 1인칭 통화로 각색한 **재구성**이다(calibration.md §7.4).
+ */
+const t2PrimeBrokerCall: Interrupt<BankState> = {
+  id: 't2-i1-pb',
+  interrupt: true,
+  atTick: 1,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't2-i1-asis',
+  scoreWeight: 0.5,
+  required: false,
+  title: '프라임브로커리지 고객 통화 — 잔고 이전 통지',
+  prompt: '$3B 규모 프리크레딧 잔고 이전 요청에 어떻게 답하시겠습니까?',
+  context: 'PB 고객은 서로 통화합니다. 한 곳의 처리 속도가 나머지 전부의 이전 시점을 결정합니다.',
+  source: { kind: 'call', caller: '헤지펀드 COO', agency: '프라임브로커리지 고객', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '헤지펀드 COO',
+      text: '오늘 프리크레딧 잔고 전액을 다른 프라임브로커로 옮기겠습니다. 오늘 안에 처리됩니까?',
+    },
+  ],
+  dimensions: ['liquidity', 'compliance', 'communication'],
+  cardRefs: ['tri-party-repo-run'],
+  options: [
+    {
+      id: 't2-i1-priority',
+      label: '정시 전량 처리 + 노베이션 전담 인력 배치',
+      description:
+        '이전 요청과 OTC 노베이션을 전담팀이 당일 처리하고 처리 현황을 고객에게 공유한다. 현금은 그대로 나가지만 "막힌다"는 소문이 생기지 않는다.',
+      effects: [flag('pb_priority'), counter('pbSupport', 1)],
+      expert: {
+        rating: 75,
+        rationale:
+          'PB 잔고는 고객 자산이다. 이전을 늦추는 것은 유동성을 버는 것이 아니라 감독상 즉시 조치의 사유를 만드는 것이며, 네트워크로 연결된 고객은 지연을 수 분 안에 공유한다. 리먼 런던 법인의 고객 자산 동결은 파산의 가장 큰 2차 피해였다.',
+        sourceRefs: [S.fdic, S.fcic],
+      },
+      preview: [
+        { metric: 'cash', direction: 'down', magnitude: 1, note: '유출은 그대로, 확산은 억제' },
+      ],
+      consequences: '전담팀이 배치되어 이전이 정시 처리되었습니다.',
+    },
+    {
+      id: 't2-i1-asis',
+      label: '접수 순서대로 처리',
+      description: '별도 지시 없이 평시 절차로 처리한다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 40,
+        rationale:
+          '위법도 지연도 아니다. 9/11 리먼의 실제 상태였고, 이전은 그대로 일어났다. 보정 노트: S2/S3 기본 유출률이 이미 PB 이탈을 내재하므로 이 경로에는 증폭기를 추가로 곱하지 않는다(calibration.md §1.3).',
+        sourceRefs: [S.fcic, S.val],
+      },
+      preview: [
+        { metric: 'cash', direction: 'down', magnitude: 1, note: '기본 유출률에 이미 반영' },
+      ],
+      consequences: '이전 요청이 접수 순서대로 처리되었습니다.',
+      historical: true,
+    },
+    {
+      id: 't2-i1-slow',
+      label: '대형 계좌 이전은 내일 처리하겠다고 답변',
+      description:
+        '가장 큰 계좌의 이전을 하루 미뤄 오늘 유출을 줄인다. 고객은 즉시 다른 고객들에게 알린다.',
+      effects: [
+        bankFx.addAmplifier(1.5, 'PB 이전 지연(네트워크 확산)', { networked: true }),
+        regulator({ add: 1 }, '고객 자산 이전 지연'),
+        flag('pb_delayed'),
+      ],
+      expert: {
+        rating: 0,
+        rationale:
+          '고객 자산 이전 지연은 유동성 조달 수단이 아니라 고객보호규칙 위반의 입구다. 남은 슬라이스의 유출이 네트워크 증폭 ×1.5로 계산되고 감독 단계가 오른다(calibration.md §2의 "PB 이전 지연 −20, 증폭 ×1.5").',
+        sourceRefs: [S.fdic, S.fcic],
+      },
+      preview: [{ metric: 'cash', direction: 'down', magnitude: 3 }],
+      consequences: '고객이 "처리를 거부당했다"고 다른 고객들에게 알렸습니다.',
+      trap: true,
+      trapExplanation:
+        '하루를 버는 대신 남은 하루의 유출을 키운다. 고객 자산은 회사의 유동성이 아니며, 지연은 감독당국에 즉시 보이는 사건이다.',
+      irreversible: true,
+    },
+  ],
+}
+
+/**
+ * 15:00 청산은행 트라이파티 데스크의 마감 확인. JPM 실무 데스크와의 통화를 **재구성**한 것이며
+ * 녹취가 아니다. 내용은 Valukas 보고서가 정리한 9/11 담보 요구·이행 경위에 근거한다.
+ */
+const t2ClearingDeskCall: Interrupt<BankState> = {
+  id: 't2-i2-clearing',
+  interrupt: true,
+  atTick: 3,
+  jitter: 0,
+  timeoutSec: 30,
+  defaultOptionId: 't2-i2-confirm',
+  scoreWeight: 0.5,
+  required: false,
+  title: '청산은행 트라이파티 데스크 — 마감 확인',
+  prompt: '마감 전 담보 이체 확인 요청에 어떻게 답하시겠습니까?',
+  source: { kind: 'desk', caller: '트라이파티 데스크', agency: 'JPMorgan Chase', tone: 'urgent' },
+  lines: [
+    {
+      speaker: '트라이파티 데스크',
+      text: '마감까지 한 시간입니다. 오늘 이체가 확인되지 않으면 내일 아침 언와인드를 실행할 수 없습니다.',
+    },
+  ],
+  dimensions: ['liquidity', 'compliance'],
+  cardRefs: ['tri-party-repo-run'],
+  options: [
+    {
+      id: 't2-i2-escalate',
+      label: '상위 책임자와 통화해 내일 언와인드 조건을 문서로 확인',
+      description:
+        '실무 데스크가 아니라 결정 권한이 있는 상대와 통화해, 오늘 이체가 확인되면 내일 아침 언와인드를 실행한다는 조건을 문서로 받는다.',
+      effects: [flag('unwind_terms_documented'), counter('clearingContacts', 1)],
+      expert: {
+        rating: 75,
+        rationale:
+          '청산은행은 심판이 아니라 일중 대출자이며, 일중 신용 제공은 재량이다. 조건을 문서로 고정해 두는 것이 다음 날 아침의 유일한 보장이다(NY Fed EPR 2012의 트라이파티 개혁 논점).',
+        sourceRefs: [S.epr, S.val],
+      },
+      preview: [
+        { metric: 'cash', direction: 'flat', magnitude: 1, note: '현금 변화 없음, 조건만 확정' },
+      ],
+      consequences: '언와인드 조건을 서면으로 확인받았습니다.',
+    },
+    {
+      id: 't2-i2-confirm',
+      label: '이체 예정을 구두로 확인하고 회신',
+      description: '오늘 이체가 진행 중임을 알리고 통화를 끝낸다.',
+      effects: [counter('callsDeferred', 1)],
+      expert: {
+        rating: 50,
+        rationale:
+          '필요한 답이고 리먼이 실제로 한 답이다. 다만 구두 확인은 다음 날 아침의 재량을 묶지 못한다.',
+        sourceRefs: [S.val],
+      },
+      preview: [{ metric: 'cash', direction: 'flat', magnitude: 1 }],
+      consequences: '데스크가 이체 예정을 접수했습니다.',
+      historical: true,
+    },
+    {
+      id: 't2-i2-securities',
+      label: '현금 대신 인벤토리 증권으로 대체하겠다고 제안',
+      description:
+        '현금을 아끼려 보유 증권을 담보로 제시한다. 청산은행은 자체 헤어컷으로 다시 평가한다.',
+      effects: [flag('collateral_quality_disputed'), counter('clearingContacts', 1)],
+      expert: {
+        rating: 15,
+        rationale:
+          '청산은행은 시장보다 보수적으로 평가하고, 그 차이는 결국 현금으로 메워야 한다(CGFS 36의 헤어컷 스파이럴). 리먼이 JPM에 제공한 담보 중 일부는 이후 가치 논쟁의 대상이 되었다(Valukas).',
+        sourceRefs: [S.cgfs, S.val],
+      },
+      preview: [
+        { metric: 'cash', direction: 'down', magnitude: 2, note: '헤어컷 차액은 내일 현금으로' },
+      ],
+      consequences: '데스크가 "품질을 검토한 뒤 부족분을 다시 요청하겠다"고 답했습니다.',
+      trap: true,
+      trapExplanation:
+        '현금을 아끼려 비유동 담보를 주면 헤어컷 스파이럴이 시작된다. 담보의 가치는 보유자가 아니라 청산은행이 정한다.',
+    },
+  ],
+}
+
 export const t2: T = {
   id: 't2',
   label: 'T2',
-  timeLabel: '2008년 9월 11일 (목) 07:00 ET',
+  timeLabel: '2008년 9월 11일 (목) 07:00~16:00 ET',
   title: '레포 롤오버 거부',
   time: '2008-09-11T07:00:00-04:00',
+  ticks: 5,
+  tickLabels: ['07:00', '09:30', '11:00', '15:00', '16:00'],
   entryEffects: [
     {
-      id: 't2-stock',
-      description: '주가 −42% (9/11 실제)',
-      effects: [ownStockMove(-0.42, '9/11')],
+      id: 't2-anchor',
+      description: 'TED 스프레드를 9/10 종가 1.20%로 맞춘다 (티커가 9/11 종가 1.24%까지 걷는다)',
+      effects: [op('market.custom.tedBp', 'set', 120, 'TED 9/10 종가 1.20%')],
     },
     {
-      id: 't2-runoff',
-      description: '9/11 자금 유출(PB 잔고·파생 담보·CP 만기)',
-      effects: [bankFx.runoffStep({ windowFraction: 1, label: '9/11 유출' })],
+      id: 't2-stock',
+      description: '프리마켓 갭 −20% (9/11 종가 −42% 중 갭 부분; 개장 후 하락은 티커가 이어받는다)',
+      effects: [ownStockMove(-0.2, '9/11 프리마켓 갭')],
     },
+  ],
+  eachTick: [
+    {
+      id: 't2-runoff-tick',
+      description: '9/11 자금 유출(PB 잔고·파생 담보·CP 만기) — 뉴욕 영업일 전방 집중 분포',
+      effects: [
+        bankFx.runoffStep({ windowFraction: 1, profile: NY_DAY_PROFILE, label: '9/11 유출' }),
+      ],
+    },
+  ],
+  tickEffects: [
     {
       id: 't2-repo-refusal',
-      description: 'CMBS·비투자등급 담보 레포 카운터파티 20% 롤오버 거부 → 현금 반환',
+      atTick: 0,
+      description:
+        '07:00 트라이파티 언와인드 — CMBS·비투자등급 담보 레포 카운터파티 20% 롤오버 거부 → 현금 반환',
       effects: [
         ibFx.repoRollOff({
           book: 'repoOther',
@@ -670,8 +860,12 @@ export const t2: T = {
         }),
       ],
     },
+    // ΔCI 세 건은 모두 **마지막 틱**에 건다. 유출 슬라이스가 매 틱 CI를 실시간으로 읽으므로,
+    // 중간 틱에 걸면 런 상태 경계(S2 30~49 / S3 <30)를 넘어 남은 슬라이스가 다시 계산된다.
+    // 전환 전 모델에서도 ΔCI는 그날의 유출이 모두 끝난 뒤에 적용되었다(calibration.md §7.1).
     {
       id: 't2-visible',
+      atTick: 4,
       when: {
         fn: (ctx) => (ctx.counters.cumulativeOutflow ?? 0) / START_RUNNABLE > 0.1,
         label: '누적 자금 유출 > 도주성 조달의 10%',
@@ -681,6 +875,7 @@ export const t2: T = {
     },
     {
       id: 't2-pool-contradiction',
+      atTick: 4,
       when: {
         all: [
           { flag: 'pool_overstated' },
@@ -696,14 +891,27 @@ export const t2: T = {
     },
     {
       id: 't2-rating-warning',
+      atTick: 4,
       description: '무디스 "전략적 거래 없으면 강등" 공개 경고 → 신뢰지수 −3',
       effects: [confidence(-3, '강등 경고')],
     },
   ],
+  ticker: {
+    series: [
+      // 프리마켓 갭(0.80) × 장중 티커(0.725) = 0.58 → 9/11 종가 −42% [press-kdb-2008-09-09]
+      { path: 'market.ownStock', mode: 'relative', values: [100, 90, 84, 78, 72.5] },
+      // TED: 9/10 종가 1.20% → 9/11 종가 1.24% [fred-tedrate-2008]
+      { path: 'market.custom.tedBp', mode: 'absolute', values: [120, 121, 122, 123, 124] },
+      // 5년 CDS 475bp → ≈700bp [VERIFY — facts.ts 주석의 해소 문서: FCIC 자료실 Markit 계열]
+      { path: 'market.ownCdsBp', mode: 'absolute', values: [475, 560, 620, 670, 700] },
+    ],
+  },
+  interrupts: [t2PrimeBrokerCall, t2ClearingDeskCall],
   events: [
     {
       id: 't2-market',
       kind: 'market',
+      atTick: 1,
       time: '09:30',
       headline: '개장 시세',
       items: [
@@ -717,6 +925,7 @@ export const t2: T = {
       id: 't2-news-repo',
       kind: 'newswire',
       outlet: 'Reuters',
+      atTick: 0,
       time: '08:20',
       headline: 'MMF·증권대여 기관, 메리디언 레포 익스포저 축소 — "비유동 담보는 받지 않는다"',
       body: '복수의 머니마켓펀드와 증권대여 대리인이 메리디언과의 익일물 레포를 줄이거나 국채 담보만 받겠다고 통보한 것으로 알려졌다. 헤지펀드들은 프라임브로커 잔고를 경쟁사로 옮기고 있다.',
@@ -727,6 +936,7 @@ export const t2: T = {
     {
       id: 't2-call-jpm-call',
       kind: 'call',
+      atTick: 2,
       time: '10:00',
       caller: 'JPM 청산은행',
       callee: 'Treasurer',
@@ -752,7 +962,8 @@ export const t2: T = {
       id: 't2-memo-pool-gap',
       kind: 'memo',
       when: { flag: 'pool_contradicted' },
-      time: '11:30',
+      atTick: 4,
+      time: '16:20',
       from: 'IR',
       to: 'CEO · Treasurer',
       subject: '"$42B" 질문 쇄도',
@@ -764,7 +975,8 @@ export const t2: T = {
       id: 't2-news-buyers',
       kind: 'newswire',
       outlet: 'WSJ',
-      time: '17:30',
+      atTick: 4,
+      time: '16:30',
       headline: '메리디언, 회사 전체 매각 타진 — 뱅크오브아메리카 등과 접촉 보도',
       body: '재무부·뉴욕연준이 인수 후보를 물색하고 있으며 BofA가 실사에 착수했다는 보도가 나왔다. 정부는 "공적 자금 투입은 없다"는 입장을 비공식적으로 전하고 있다.',
       severity: 'warning',
@@ -782,6 +994,10 @@ export const t2: T = {
       requiredConcepts: ['tri-party-repo-run'],
       dimensions: ['liquidity', 'compliance'],
       timeLimitSec: 120,
+      // 청산은행의 요구는 10:00(틱 2)에 도착하고 마감(틱 3, 15:00) 안에 이체되어야 한다.
+      // 틱 4(16:00)를 마감으로 두면 스윕이 그 뒤에 돌아 자동 확정이 일어나지 않는다.
+      availableFrom: 2,
+      deadlineTick: 3,
       defaultOptionId: 't2-a',
       options: [
         {
@@ -896,6 +1112,11 @@ export const t2: T = {
       exclusive: [['t2-d2-a', 't2-d2-b']],
       requiredConcepts: ['tri-party-repo-run', 'hqla-and-haircuts'],
       dimensions: ['liquidity', 'marketRisk', 'communication'],
+      // 레포 북의 처리는 07:00 언와인드 직후부터 열려 있고 마감(15:00)까지 결정해야 한다.
+      availableFrom: 0,
+      deadlineTick: 3,
+      defaultOptionId: 't2-d2-a',
+      timeLimitSec: 120,
       options: [
         {
           id: 't2-d2-a',
@@ -1037,32 +1258,134 @@ export const t2: T = {
 // ---------------------------------------------------------------------------------------------
 // T3 — 2008-09-12 (금) "3자 회동"
 // ---------------------------------------------------------------------------------------------
+/**
+ * 16:00 뉴욕연준의 소집 통보. 통화의 존재와 시각은 공개 기록(FCIC ch.18: 9/12 저녁 6시 소집)에
+ * 근거하지만, 대사 자체는 **재구성**이며 녹취·속기록이 아니다(calibration.md §7.4).
+ */
+const t3FrbnySummons: Interrupt<BankState> = {
+  id: 't3-i1-frbny',
+  interrupt: true,
+  atTick: 3,
+  jitter: 1,
+  timeoutSec: 45,
+  defaultOptionId: 't3-i1-attend',
+  scoreWeight: 0.5,
+  required: false,
+  title: '뉴욕연준 소집 통보 — 오늘 저녁 6시',
+  prompt: '오늘 저녁 회동에 어떻게 임하시겠습니까?',
+  context: '주말은 60시간입니다. 오늘 저녁 회의실에 가지고 들어가는 자료가 일요일의 선택지입니다.',
+  source: {
+    kind: 'regulator',
+    caller: '뉴욕연준 실무국장',
+    agency: 'Federal Reserve Bank of New York',
+    tone: 'urgent',
+  },
+  lines: [
+    {
+      speaker: '뉴욕연준 실무국장',
+      text: '오늘 저녁 6시에 주요 금융기관 CEO를 소집합니다. 귀사도 참석하십시오. 공적 자금은 논의 대상이 아닙니다.',
+    },
+  ],
+  dimensions: ['policy', 'compliance'],
+  cardRefs: ['fdic-resolution-weekend'],
+  options: [
+    {
+      id: 't3-i1-prebrief',
+      label: '참석 전에 담보 목록·고객자산 분리 현황을 사전 제출',
+      description:
+        '브로커딜러의 트라이파티 적격 담보 목록과 고객 자산 분리 상태를 회의 전에 보낸다. 주말에 창구 조건이 바뀌면 곧바로 쓸 수 있다.',
+      effects: [flag('fed_prebrief'), counter('fedContacts', 1)],
+      expert: {
+        rating: 80,
+        rationale:
+          '준비된 담보 목록만 월요일 아침에 자금이 된다(CFP 원칙의 리드타임). 사전 제출은 연준의 담보 확대가 실제로 나왔을 때 몇 시간을 벌어 주며, 사전 조율된 정리(pre-pack)의 전제이기도 하다(FDIC 2011).',
+        sourceRefs: [S.bcbs, S.fdic, S.fed914],
+      },
+      preview: [
+        {
+          metric: 'facilityHeadroom',
+          direction: 'up',
+          magnitude: 1,
+          note: '담보 확대가 나올 경우 반영 폭이 커진다',
+        },
+      ],
+      consequences: '담보 목록과 고객자산 분리 현황이 회의 전에 전달되었습니다.',
+    },
+    {
+      id: 't3-i1-attend',
+      label: 'CEO·자금담당이 동반 참석',
+      description: '자료 없이 참석해 현장에서 상황을 설명한다.',
+      effects: [counter('fedContacts', 1)],
+      expert: {
+        rating: 55,
+        rationale:
+          '리먼의 실제 대응이다. 참석 자체는 필요했지만, 회의실에서 요구된 것은 설명이 아니라 인수자와 컨소시엄이었다.',
+        historicalNote: '9/12 저녁 뉴욕연준 회동 참석.',
+        sourceRefs: [S.fcic, S.fhSup],
+      },
+      preview: [{ metric: 'facilityHeadroom', direction: 'flat', magnitude: 1 }],
+      consequences: '참석을 통보했습니다.',
+      historical: true,
+    },
+    {
+      id: 't3-i1-delegate',
+      label: '자문사를 대리 참석시키고 경영진은 인수 협상에 집중',
+      description: '회의에는 자문사를 보내고 경영진은 후보와의 협상을 계속한다.',
+      effects: [flag('frbny_delegated'), regulator({ add: 1 }, '소집 회의 대리 참석')],
+      expert: {
+        rating: 10,
+        rationale:
+          '소집은 초대가 아니다. 감독당국이 직접 부른 자리에 대리인을 보내는 것은 협상력을 얻는 대신 감독 관계를 잃는 선택이며, 주말의 조율 채널이 좁아진다.',
+        sourceRefs: [S.fcic, S.fdic],
+      },
+      preview: [{ metric: 'confidence', direction: 'down', magnitude: 1 }],
+      consequences: '자문사가 대리 참석했습니다. 뉴욕연준이 경영진의 불참을 기록했습니다.',
+      trap: true,
+      trapExplanation:
+        '주말의 선택지는 금요일 저녁에 열린 채널로만 만들어진다. 그 자리에 결정 권한이 없는 사람을 보내면 일요일 밤에 협상할 상대가 남지 않는다.',
+    },
+  ],
+}
+
 export const t3: T = {
   id: 't3',
   label: 'T3',
-  timeLabel: '2008년 9월 12일 (금) 07:00 ET',
+  timeLabel: '2008년 9월 12일 (금) 07:00~18:00 ET',
   title: '금요일: 뉴욕연준 회동',
   time: '2008-09-12T07:00:00-04:00',
+  ticks: 5,
+  tickLabels: ['07:00', '09:30', '12:00', '16:00', '18:00'],
   entryEffects: [
     {
       id: 't3-stock',
-      description: '주가 −14% (9/12 실제)',
-      effects: [ownStockMove(-0.14, '9/12')],
+      description:
+        '프리마켓 갭 −7.03% (9/12 종가 −14% 중 갭 부분; 개장 후 하락은 티커가 이어받는다)',
+      // 0.86 = 갭 × 0.925(장중 티커) ⇒ 갭 = 0.86 / 0.925. 곱이 종전 −14%와 정확히 같다.
+      effects: [ownStockMove(0.86 / 0.925 - 1, '9/12 프리마켓 갭')],
     },
+  ],
+  eachTick: [
     {
-      id: 't3-runoff',
-      description: '9/12 자금 유출',
-      effects: [bankFx.runoffStep({ windowFraction: 1, label: '9/12 유출' })],
+      id: 't3-runoff-tick',
+      description: '9/12 자금 유출 — 뉴욕 영업일 전방 집중 분포',
+      effects: [
+        bankFx.runoffStep({ windowFraction: 1, profile: NY_DAY_PROFILE, label: '9/12 유출' }),
+      ],
     },
+  ],
+  tickEffects: [
     {
       id: 't3-jpm-call2',
+      atTick: 0,
       when: { notFlag: 'clearing_bank_refused' },
       description:
         'JPM 2차 추가 담보 요구 $5B (9/11 저녁 요구 → 9/12 아침 현금 이행) — 유동성 풀에서 예치',
       effects: [ibFx.clearingBankCollateralCall({ amount: 5, label: 'JPM 2차 담보 콜 $5B 예치' })],
     },
+    // ΔCI·감독 강화는 마지막 틱에 건다 — T2와 같은 이유다(유출 슬라이스가 CI를 실시간으로 읽는다).
     {
       id: 't3-pb-report',
+      atTick: 4,
       when: {
         fn: (ctx) => (ctx.counters.cumulativeOutflow ?? 0) / START_RUNNABLE > 0.3,
         label: '누적 자금 유출 > 도주성 조달의 30%',
@@ -1072,14 +1395,27 @@ export const t3: T = {
     },
     {
       id: 't3-regulator',
+      atTick: 4,
       description: 'SEC·뉴욕연준 상주 감독 강화(R+1)',
       effects: [regulator({ add: 1 }, 'SEC·FRBNY 상주')],
     },
   ],
+  ticker: {
+    series: [
+      // 프리마켓 갭 × 장중 티커(0.925) = 0.86 → 9/12 종가 −14% [press-kdb-2008-09-09]
+      { path: 'market.ownStock', mode: 'relative', values: [100, 97, 95, 93.5, 92.5] },
+      // TED: 9/11 종가 1.24% → 9/12 종가 1.36% [fred-tedrate-2008]
+      { path: 'market.custom.tedBp', mode: 'absolute', values: [124, 127, 130, 133, 136] },
+      // 5년 CDS 700bp → ≈775bp [VERIFY — facts.ts 주석의 해소 문서: FCIC 자료실 Markit 계열]
+      { path: 'market.ownCdsBp', mode: 'absolute', values: [700, 725, 745, 762, 775] },
+    ],
+  },
+  interrupts: [t3FrbnySummons],
   events: [
     {
       id: 't3-memo-pool',
       kind: 'memo',
+      atTick: 0,
       time: '07:10',
       from: '자금부장',
       to: 'CEO · Treasurer',
@@ -1097,6 +1433,7 @@ export const t3: T = {
     {
       id: 't3-call-frbny',
       kind: 'call',
+      atTick: 1,
       time: '10:00',
       caller: '뉴욕연준 총재',
       callee: 'CEO',
@@ -1120,6 +1457,7 @@ export const t3: T = {
       id: 't3-news-buyers',
       kind: 'newswire',
       outlet: 'Bloomberg',
+      atTick: 2,
       time: '12:00',
       headline: '뱅크오브아메리카·바클레이스, 메리디언 인수 검토 — 정부 손실 보증 요구',
       body: '두 인수 후보 모두 상업용 부동산 북에 대한 손실 보증 없이는 주말 내 완결이 어렵다는 입장을 전한 것으로 알려졌다. 재무부는 보증에 부정적이다.',
@@ -1130,6 +1468,7 @@ export const t3: T = {
     {
       id: 't3-memo-legal',
       kind: 'memo',
+      atTick: 2,
       time: '14:00',
       from: '법무실장',
       to: '경영진',
@@ -1143,6 +1482,7 @@ export const t3: T = {
       id: 't3-memo-pdcf-drawn',
       kind: 'memo',
       when: { flag: 'pdcf_prepositioned' },
+      atTick: 2,
       time: '14:30',
       from: '브로커딜러 자금팀',
       to: 'Treasurer',
@@ -1161,6 +1501,12 @@ export const t3: T = {
       select: { min: 1, max: 2 },
       requiredConcepts: ['fdic-resolution-weekend'],
       dimensions: ['policy', 'compliance', 'communication'],
+      // 저녁 회동(틱 4, 18:00) 전까지가 시한이다. 인수 후보·연준·재무부 접촉은 정오(틱 2) 보도
+      // 이후에 의미가 생기므로 그때 열린다.
+      availableFrom: 2,
+      deadlineTick: 3,
+      defaultOptionId: 't3-a',
+      timeLimitSec: 120,
       options: [
         {
           id: 't3-a',
@@ -1255,6 +1601,11 @@ export const t3: T = {
       select: { min: 1, max: 2 },
       requiredConcepts: ['discount-window-fhlb-btfp'],
       dimensions: ['liquidity', 'solvency', 'timeliness'],
+      // 자금 조치는 개장(틱 1)부터 가능하고 장 마감(틱 3, 16:00)이 시한이다.
+      availableFrom: 1,
+      deadlineTick: 3,
+      defaultOptionId: 't3-d2-e',
+      timeLimitSec: 120,
       options: [
         {
           id: 't3-d2-a',

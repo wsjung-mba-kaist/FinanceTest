@@ -36,6 +36,14 @@ describe('svb-2023 scenario', () => {
     )
     const t4 = s.metricsHistory.find((m) => m.turnIndex === 4)!
     const t5 = s.metricsHistory.find((m) => m.turnIndex === 5)!
+    // 체크포인트 게이트: 3/9 유출 $42B ±15% · 3/9 마감 연준 잔고 −$958M
+    console.log(
+      '[historical] CHECKPOINT T4 cumulativeOutflow =',
+      t4.metrics.cumulativeOutflow!.value.toFixed(3),
+      '(expected 42 ±15%) · T5 cash =',
+      t5.metrics.cash!.value.toFixed(3),
+      '(expected -0.958)',
+    )
     expect(Math.abs(t4.metrics.cumulativeOutflow!.value - 42) / 42).toBeLessThan(0.15)
     expect(t5.metrics.cash!.value).toBeLessThan(0)
     expect(t5.metrics.cash!.value).toBeGreaterThan(-3)

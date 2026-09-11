@@ -3,12 +3,16 @@ import type {
   FeedItem,
   GameEvent,
   GameState,
+  KpiSpec,
   MetricDelta,
   Mode,
+  Option,
   ScenarioDefinition,
+  Turn,
   TurnView,
 } from '../../engine'
 import { getTurnView } from '../../engine'
+import { firstSentence, splitOptionLabel, truncateKo } from '../../lib/text'
 import type { SettingsState } from '../../persistence/schema'
 
 export const MODE_LABELS: Record<Mode, string> = {
@@ -53,6 +57,13 @@ export function rationaleTiming(
   return 'endOfScenario'
 }
 
+/** Interrupt answering time is a mode setting, never a scenario one: 안내 ×2 · 표준 ×1.5 · 전문가 ×1. */
+export const MODE_TIMEOUT_MULTIPLIER: Record<Mode, number> = {
+  guided: 2,
+  standard: 1.5,
+  expert: 1,
+}
+
 export interface TimerConfig {
   limitMs: number
   pausable: boolean
@@ -71,6 +82,63 @@ export function timerConfig(
 
 export function letterFor(index: number): string {
   return String.fromCharCode(65 + Math.min(index, 25))
+}
+
+/**
+ * Keyboard digit shown on a dialogue reply. Replies are capped at 4 by the authoring lint, so the
+ * conversation always fits on 1–4 and never collides with the option list's own 1–5.
+ */
+export function replyKeyFor(index: number): string {
+  return String(Math.min(index, 3) + 1)
+}
+
+// ---------------------------------------------------------------- sub-turn ticks
+
+/** Authored clock label of a tick (`'09:00'`), falling back to `틱 n`. */
+export function tickLabelOf(turn: Turn, tick: number): string {
+  return turn.tickLabels?.[tick] ?? `틱 ${tick + 1}`
+}
+
+/** Deadline caption of a decision: `마감 11:00 · 2틱 남음`. Empty on an un-ticked turn. */
+export function deadlineCaption(turn: Turn, decision: Decision, tick: number): string {
+  const deadline = decision.deadlineTick
+  if (deadline === undefined) return ''
+  const left = deadline - tick
+  const remaining = left > 0 ? ` · ${left}틱 남음` : ' · 마감'
+  return `마감 ${tickLabelOf(turn, deadline)}${remaining}`
+}
+
+/** The tick a feed item or authored event belongs to (0 when it is not tick-scheduled). */
+export function tickOfEntry(entry: WireEntry, state: GameState): number {
+  if (entry.feed) return entry.feed.tick ?? 0
+  const e = entry.event
+  if (!e) return 0
+  return state.tickSchedule[e.id] ?? e.atTick ?? 0
+}
+
+function arrowsFor(direction: 'up' | 'down' | 'flat', magnitude: number): string {
+  if (direction === 'flat') return '→'
+  return (direction === 'up' ? '▲' : '▼').repeat(Math.max(1, Math.min(3, magnitude)))
+}
+
+/**
+ * The single 핵심 효과 line under an option title.
+ * Priority: authored `preview` hints → the part of the label after `: ` → the first sentence
+ * of the description. Never longer than one line at the play column width.
+ */
+export function optionEffectLine(option: Option, kpis: KpiSpec[]): string {
+  if (option.preview && option.preview.length > 0) {
+    return option.preview
+      .slice(0, 3)
+      .map((h) => {
+        const label = kpis.find((k) => k.metric === h.metric)?.label ?? h.metric
+        return `${label} ${arrowsFor(h.direction, h.magnitude)}`
+      })
+      .join(' · ')
+  }
+  const { tail } = splitOptionLabel(option.label)
+  if (tail) return truncateKo(tail, 60)
+  return firstSentence(option.description, 60).head
 }
 
 // ---------------------------------------------------------------- wire feed entries
