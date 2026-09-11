@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`autoplayer > fixture: expert-path primary KPI series matches the snapshot 1`] = `
+[
+  {
+    "survivalDays": 26.51,
+    "turn": "t0",
+  },
+  {
+    "survivalDays": 99,
+    "turn": "t1",
+  },
+  {
+    "survivalDays": 99,
+    "turn": "t2",
+  },
+  {
+    "survivalDays": 99,
+    "turn": "t3",
+  },
+]
+`;
