@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { GameState, MetricSnapshot, Mode, ScenarioDefinition } from '../../engine/types'
+import type { MetricSnapshot, Mode, ScenarioDefinition } from '../../engine/types'
 import type { BriefingSummary } from '../../lib/briefingSummary'
-import { formatMetric } from '../../lib/format'
 import {
   MODE_DESCRIPTIONS,
   MODE_LABELS,
@@ -14,9 +13,10 @@ import type { InProgressSave } from '../../persistence/schema'
 import { useGameStore } from '../../store/gameStore'
 import { useProgressStore } from '../../store/progressStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { RoleFramePanel } from '../help/RoleFramePanel'
 import { Markdown } from '../knowledge/Markdown'
-import { Badge, Button, Card, ConfirmDialog, StatusBadge } from '../ui'
+import { KeyDecisions } from './KeyDecisions'
+import { Watchpoints } from './Watchpoints'
+import { Badge, Button, Card, ConfirmDialog } from '../ui'
 import { Icon } from '../ui/Icon'
 
 const MODES: Mode[] = ['guided', 'standard', 'expert']
@@ -83,13 +83,13 @@ function StartCard({
   const { inProgress, stale, restoreError } = actions
 
   return (
-    <Card className="card-key scroll-mt-4 p-4" id="bf-start" aria-labelledby="bf-start-h">
-      <h2 id="bf-start-h" className="text-md font-semibold">
+    <Card tier="key" className="scroll-mt-4 p-4" id="bf-start" aria-labelledby="bf-start-h">
+      <h2 id="bf-start-h" className="text-lg font-semibold">
         시작하기
       </h2>
 
       {inProgress && (
-        <div className="mt-2 rounded-md border border-info/40 bg-info-bg p-2 text-sm">
+        <div className="mt-2 rounded-md border border-info-border bg-info-bg p-2 text-sm">
           <div className="font-medium text-info">진행 중인 플레이가 있습니다</div>
           <div className="num mt-0.5">
             {turnProgressLabel(inProgress.turnIndex, scenario.meta.durationTurns)} ·{' '}
@@ -145,7 +145,7 @@ function StartCard({
         aria-expanded={detail}
         aria-controls="bf-mode-detail"
         onClick={() => setDetail((v) => !v)}
-        className="mt-2 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-accent"
+        className="mt-2 inline-flex min-h-tap-dense items-center gap-1 border-0 bg-transparent text-sm text-accent"
       >
         자세히
         <Icon name={detail ? 'chevron-down' : 'chevron-right'} size={14} />
@@ -201,15 +201,12 @@ export function ExecutiveSummary({
   scenario,
   summary,
   baseline,
-  baselineState,
   mode,
   setMode,
 }: {
   scenario: ScenarioDefinition
   summary: BriefingSummary
   baseline: MetricSnapshot | undefined
-  /** T0 state, so the role frame can show the baseline value of each metric it reads. */
-  baselineState: GameState | undefined
   mode: Mode
   setMode: (m: Mode) => void
 }) {
@@ -220,17 +217,22 @@ export function ExecutiveSummary({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
           <section aria-labelledby="bf-situation-h">
-            <h2 id="bf-situation-h" className="text-md font-semibold">
+            <h2 id="bf-situation-h" className="text-lg font-semibold">
               상황
             </h2>
             <Markdown className="prose-col mt-1">{summary.situation}</Markdown>
+            {/* The dossier carries the same ground in full. Saying so here is what lets the
+                summary stop at 220 characters instead of becoming a second copy of it. */}
+            <p className="mt-1 text-sm">
+              <a href="#bf-dossier-h">전체 상황 개요 · 기관 현황 · 시장 배경 →</a>
+            </p>
           </section>
 
           {/* 역할·권한 and 목표 are each a sentence or two, so they sit side by side rather than
               stacking two mostly-empty rows down a column that is ~700px wide. */}
           <div className="grid gap-4 md:grid-cols-2">
             <section aria-labelledby="bf-mandate-h" className="min-w-0">
-              <h2 id="bf-mandate-h" className="text-md font-semibold">
+              <h2 id="bf-mandate-h" className="text-lg font-semibold">
                 역할·권한
               </h2>
               <p className="mt-1 text-sm text-muted">
@@ -241,7 +243,7 @@ export function ExecutiveSummary({
 
             {summary.objective && (
               <section aria-labelledby="bf-objective-h" className="min-w-0">
-                <h2 id="bf-objective-h" className="text-md font-semibold">
+                <h2 id="bf-objective-h" className="text-lg font-semibold">
                   목표
                 </h2>
                 <Markdown className="mt-1">{summary.objective}</Markdown>
@@ -249,30 +251,7 @@ export function ExecutiveSummary({
             )}
           </div>
 
-          {summary.keyJudgements.length > 0 && (
-            <section aria-labelledby="bf-judgements-h">
-              <h2 id="bf-judgements-h" className="text-md font-semibold">
-                중요한 판단 {summary.keyJudgements.length}가지
-              </h2>
-              {/* Three short judgements read better as a row of cards than as a tall list that
-                  leaves the right half of the column empty. */}
-              <ol className="m-0 mt-2 grid list-none gap-2 p-0 md:grid-cols-3">
-                {summary.keyJudgements.map((j, i) => (
-                  <li
-                    key={j.id}
-                    className="flex min-w-0 flex-col rounded-lg border border-border bg-surface p-3"
-                  >
-                    <span className="num text-sm text-muted">판단 {i + 1}</span>
-                    <span className="mt-0.5 min-w-0 flex-1">{j.text}</span>
-                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <Badge tone="neutral">{j.competencyLabel}</Badge>
-                      <span className="num text-sm text-muted">관련 결정 {j.decisionCount}개</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
+          <KeyDecisions scenario={scenario} />
         </div>
 
         {/* Only the start action belongs beside the prose. The baseline figures and the role frame
@@ -283,37 +262,16 @@ export function ExecutiveSummary({
         </aside>
       </div>
 
-      <section className="mt-4" aria-labelledby="bf-kpi-h">
-        <h2 id="bf-kpi-h" className="text-md font-semibold">
-          핵심 지표 기준선
-        </h2>
-        {baseline ? (
-          <ul className="m-0 mt-2 grid list-none gap-2 p-0 sm:grid-cols-2 xl:grid-cols-4">
-            {summary.kpis.map(({ kpi, value, status }) => (
-              <li key={kpi.metric} className="min-w-0 rounded-lg border border-border bg-surface p-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm text-muted">{kpi.label}</span>
-                  <StatusBadge status={status} />
-                </div>
-                <div className="num-lg mt-0.5">
-                  {value === undefined
-                    ? '—'
-                    : formatMetric(value, kpi.unit, scenario.units, kpi.decimals)}
-                </div>
-                {kpi.referenceLabel && (
-                  <div className="text-sm text-muted">{kpi.referenceLabel}</div>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-1 text-sm text-critical">기준선을 계산하지 못했습니다.</p>
-        )}
-      </section>
-
-      <section className="mt-4">
-        <RoleFramePanel scenario={scenario} state={baselineState} layout="grid" />
-      </section>
+      {/*
+        One section where there were three. 핵심 지표 기준선 printed the T0 figures, the role
+        frame printed them again beside its four questions, and 시작 전 확인 printed them a third
+        time — the same numbers, up to four times on one screen counting the dossier. They are
+        joined on the metric each item reads, and this is now the only place the summary shows a
+        T0 value.
+      */}
+      <div className="mt-4">
+        <Watchpoints scenario={scenario} baseline={baseline} />
+      </div>
 
       {/* Mobile: the start action follows the reader down the page. */}
       <div

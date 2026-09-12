@@ -125,8 +125,13 @@ describe('live simulation clock', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getAllByText('파운더스 파트너').length).toBeGreaterThan(0)
     expect(useGameStore.getState().state?.openInterrupts).toEqual(['i1_partner_call'])
-    // The clock stops on its own and says so — the player's own 재생 intent is untouched.
-    expect(screen.getByText('전화 응답 대기 — 시계가 멈췄습니다')).toBeInTheDocument()
+    // The clock stops on its own and says so — twice, on purpose: once as the pause button's
+    // accessible name (which is all a sighted user used to get, via a tooltip) and once as the
+    // ribbon under the strip, which is the visible answer to "why isn't time passing".
+    const held = screen.getAllByText('전화 응답 대기 — 시계가 멈췄습니다')
+    expect(held.length).toBeGreaterThanOrEqual(1)
+    // At least one of them is the ribbon: a live region, not a tooltip.
+    expect(held.some((el) => el.closest('[role="status"]') !== null)).toBe(true)
     expect(useGameStore.getState().clock.running).toBe(true)
 
     // 0.3 s × 표준 1.5 = 450 ms, then the authored default answer is committed for the player.

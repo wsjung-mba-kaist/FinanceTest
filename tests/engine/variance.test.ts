@@ -54,8 +54,7 @@ describe('live-play volatility (variance 1)', () => {
       expect(expected, '정본 경로에 종료 사유가 없습니다').toBeDefined()
 
       const reasons = SEEDS.map(
-        (seed) =>
-          autoplay(def, 'historical', { seed, variance: 1 }).state.ended?.reason,
+        (seed) => autoplay(def, 'historical', { seed, variance: 1 }).state.ended?.reason,
       )
       const same = reasons.filter((r) => r === expected).length
       // A single seed may legitimately tip a borderline scenario; a pattern of them is calibration.
@@ -108,8 +107,9 @@ describe('live-play volatility (variance 1)', () => {
       const r = autoplay(def, 'historical', { seed: 3, variance: 1 })
       if (r.state.rng === r.history[0]!.rng) inert.push(def.meta.id)
     }
-    expect(inert, `noise를 선언했지만 variance 1에서 난수를 쓰지 않습니다: ${inert.join(', ')}`).toEqual(
-      [],
-    )
+    expect(
+      inert,
+      `noise를 선언했지만 variance 1에서 난수를 쓰지 않습니다: ${inert.join(', ')}`,
+    ).toEqual([])
   })
 })

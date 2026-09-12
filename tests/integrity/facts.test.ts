@@ -72,7 +72,10 @@ describe('fact ledgers describe the initial state they cite', () => {
     // A ledger can exist before the scenario is registered; skip rather than fail in that window.
     if (!scenario) return
 
-    const init = { ...scenario.initialState, regulatorLevel: scenario.initialState.regulatorLevel ?? 0 }
+    const init = {
+      ...scenario.initialState,
+      regulatorLevel: scenario.initialState.regulatorLevel ?? 0,
+    }
     const drift: string[] = []
     const unresolved: string[] = []
     let checked = 0

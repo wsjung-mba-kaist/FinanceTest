@@ -192,8 +192,7 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
       unit: 'ccy',
       primary: true,
       sparkline: true,
-      description:
-        '해외 증거금 납입에 쓸 수 있는 유일한 재원. 원화 현금은 여기에 포함되지 않는다',
+      description: '해외 증거금 납입에 쓸 수 있는 유일한 재원. 원화 현금은 여기에 포함되지 않는다',
       referenceLabel: '사후 규제 기준: 자체헤지 잔액의 10~20%',
       decimals: 0,
     },

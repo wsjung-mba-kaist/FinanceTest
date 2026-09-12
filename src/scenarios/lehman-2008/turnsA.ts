@@ -1413,6 +1413,31 @@ export const t3: T = {
   interrupts: [t3FrbnySummons],
   events: [
     {
+      /**
+       * The correction to `t2-news-buyers`. Both halves of the report held: BofA really was in the
+       * data room, and "공적 자금은 없다" really was the position — it was stated to the CEOs' faces
+       * at the Friday meeting and never moved.
+       *
+       * The lesson is that a confirmed rumour is not necessarily a useful one. Knowing a buyer is
+       * looking tells you nothing about whether they will bid, and the reader who treated the
+       * first half as good news spent Thursday not raising liquidity.
+       */
+      id: 't3-news-buyers-confirmed',
+      kind: 'newswire',
+      outlet: '통신사',
+      atTick: 0,
+      time: '07:00',
+      headline: '[확인] 어제 보도는 사실 — BofA 실사 진행 중, 재무부는 "공적 자금 없다" 공식화',
+      body:
+        '어제 확인되지 않은 채 전해진 두 가지가 모두 사실로 굳었다. BofA는 실사를 진행 중이고, ' +
+        '재무부의 "공적 자금은 없다"는 입장은 비공식 전언이 아니라 오늘 회의에서 직접 전달됐다. ' +
+        '다만 실사 착수는 인수 의사가 아니며, 어느 후보도 아직 가격을 제시하지 않았다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't2-news-buyers',
+      sourceRefs: [S.fcic, S.val],
+    },
+    {
       id: 't3-memo-pool',
       kind: 'memo',
       atTick: 0,

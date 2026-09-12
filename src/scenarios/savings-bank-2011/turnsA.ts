@@ -188,7 +188,8 @@ export const t0: T = {
             '부산·대전에 대한 부실금융기관 결정 안건이 금융위원회에 올라갑니다. 계열 3개사는 검사를 계속합니다.',
           historical: true,
           feasibility: {
-            basis: '금융산업의 구조개선에 관한 법률상 부실금융기관 결정 및 상호저축은행법상 영업정지 명령',
+            basis:
+              '금융산업의 구조개선에 관한 법률상 부실금융기관 결정 및 상호저축은행법상 영업정지 명령',
             sourceRefs: [S.finAct, S.msbAct],
           },
         },
@@ -519,7 +520,8 @@ export const t1: T = {
               '영업정지 직전의 예금 인출은 이후 국정조사와 수사에서 다루어진 사실이다.',
             sourceRefs: [S.inquiry],
           },
-          consequences: '명단은 대외주의로 관리됩니다. 언론 문의에는 "확인해 드릴 수 없다"로 답합니다.',
+          consequences:
+            '명단은 대외주의로 관리됩니다. 언론 문의에는 "확인해 드릴 수 없다"로 답합니다.',
           historical: true,
         },
         {
@@ -614,8 +616,7 @@ export const t1: T = {
             rating: 65,
             rationale:
               '반드시 해야 하는 준비이고 실제로 이루어졌다. 다만 이것만으로는 재원의 크기가 달라지지 않는다 — 절차를 준비하는 것과 돈을 만드는 것은 다른 문제다.',
-            historicalNote:
-              '가지급금은 영업정지 며칠 뒤부터 한도 내에서 지급되었다.',
+            historicalNote: '가지급금은 영업정지 며칠 뒤부터 한도 내에서 지급되었다.',
             sourceRefs: [S.dpAct, S.diagnosis],
           },
           consequences: '가지급금 지급 절차와 전산이 점검되었습니다.',
@@ -640,7 +641,8 @@ export const t1: T = {
               '가장 빠른 재원이다. 다만 계정 간 차입은 상환 의무가 있고, 다른 업권 부보기관의 보험료로 저축은행 부실을 메운다는 문제 제기를 부른다 — 그 논쟁은 두 달 뒤 특별계정 설계에서 정면으로 다뤄지게 된다.',
             sourceRefs: [S.dpAct, S.dpAct2011],
           },
-          consequences: '계정 간 차입 1조원이 집행되었습니다. 타 업권 협회가 의견서를 보내왔습니다.',
+          consequences:
+            '계정 간 차입 1조원이 집행되었습니다. 타 업권 협회가 의견서를 보내왔습니다.',
         },
         {
           id: 't1-d2-c',
@@ -903,7 +905,8 @@ const t2PeerCall: Interrupt<CentralBankState> = {
           '틀린 답은 아니지만, 지원 창구가 열려 있다는 사실조차 전하지 않으면 업계는 "당국이 손을 놓았다"로 읽는다.',
         sourceRefs: [S.liquidity],
       },
-      consequences: '통화가 짧게 끝났습니다. 업계 게시판에 "당국은 아무 말도 안 한다"가 올라왔습니다.',
+      consequences:
+        '통화가 짧게 끝났습니다. 업계 게시판에 "당국은 아무 말도 안 한다"가 올라왔습니다.',
     },
   ],
 }
@@ -1007,9 +1010,7 @@ export const t2: T = {
       id: 't2-backstop-lateadd',
       when: { flag: 'backstop_partial' },
       description: '발표 당일 크레딧라인 협의 — 1.5조원만 추가 확보(총 4.5조원)',
-      effects: [
-        sbFx.backstop({ amount: 1.5, label: '당일 협의로 추가 확보한 크레딧라인' }),
-      ],
+      effects: [sbFx.backstop({ amount: 1.5, label: '당일 협의로 추가 확보한 크레딧라인' })],
     },
   ],
   eachTick: [
@@ -1052,6 +1053,32 @@ export const t2: T = {
       severity: 'critical',
       sourceRefs: [S.busan, S.finAct, S.msbAct],
       relatedMetrics: ['failedBanks', 'usableReserves'],
+    },
+    {
+      /**
+       * The correction to `t1-rumor-branch`, and the uncomfortable one: the rumour was **right**.
+       *
+       * "내일 문 닫는다" was unverified when it spread, and the next morning two of the five did
+       * close. A scenario that only ever corrects rumours *downwards* teaches players to discount
+       * them; this one has to teach the harder thing, which is that an unverified claim the
+       * authorities will not confirm is not therefore false — and that the silence itself is what
+       * made the queue grow overnight.
+       */
+      id: 't2-news-rumour-confirmed',
+      kind: 'newswire',
+      outlet: '통신사',
+      time: '08:10',
+      atTick: 0,
+      headline: '[확인] 어제 돌던 "내일 문 닫는다"는 사실이었다 — 계열 2개사 영업정지',
+      body:
+        '어제 지점 앞에서 돌던 이야기는 오늘 아침 사실로 확인됐다. 다만 대상은 계열 전체가 아니라 ' +
+        '2개사이며, 나머지 계열사는 정상 영업 중이다. 어제 시점에 이를 확인해 줄 수 있는 곳은 ' +
+        '없었고, 그 사이 대기 행렬은 밤새 길어졌다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't1-rumor-branch',
+      sourceRefs: [S.busan],
+      cardRefs: ['bank-run-dynamics'],
     },
     {
       id: 't2-news-queue',
@@ -1122,7 +1149,11 @@ export const t2: T = {
               afterTurns: 1,
               description: '현금 수송·예탁금 방출로 다음 영업일 창구 대기 완화 (완화 ×0.92)',
               effects: [
-                sbFx.setDampener({ factor: 0.92, reason: '창구 현금 공급', label: '현금 수송 효과' }),
+                sbFx.setDampener({
+                  factor: 0.92,
+                  reason: '창구 현금 공급',
+                  label: '현금 수송 효과',
+                }),
               ],
             },
           ],
@@ -1408,7 +1439,12 @@ const t3KdicCall: Interrupt<CentralBankState> = {
   title: '예금보험공사 담당 임원',
   prompt: '추가 정지를 의결하기 전에 재원 문제가 올라왔습니다. 어떻게 처리하시겠습니까?',
   dimensions: ['liquidity', 'compliance'],
-  source: { kind: 'call', caller: '예금보험공사 정리담당 임원', agency: '예금보험공사', tone: 'urgent' },
+  source: {
+    kind: 'call',
+    caller: '예금보험공사 정리담당 임원',
+    agency: '예금보험공사',
+    tone: 'urgent',
+  },
   lines: [
     {
       speaker: '예금보험공사 정리담당 임원',
@@ -1432,16 +1468,15 @@ const t3KdicCall: Interrupt<CentralBankState> = {
           '실제로 간 길이다. 예금자보호법은 한 달 반 뒤 상호저축은행 구조조정 특별계정을 설치했고 재원은 정부 출연금과 전 업권 보험료의 45%였다. 다만 입법이 끝날 때까지의 공백은 계정 간 차입이 메워야 한다.',
         sourceRefs: [S.dpAct2011],
       },
-      consequences: '계정 간 차입으로 이번 주 소요를 감당하기로 했습니다. 개정안 준비가 시작됩니다.',
+      consequences:
+        '계정 간 차입으로 이번 주 소요를 감당하기로 했습니다. 개정안 준비가 시작됩니다.',
       historical: true,
     },
     {
       id: 't3-i1-b',
       label: '대지급 개시를 늦춰 재원 부담을 뒤로 미룬다',
       description: '가지급금 지급 일정을 늦춰 이번 달 소요를 줄인다.',
-      effects: [
-        sbFx.unsafeAct({ reason: '법정 절차 밖의 대지급 지연', label: '대지급 지연' }),
-      ],
+      effects: [sbFx.unsafeAct({ reason: '법정 절차 밖의 대지급 지연', label: '대지급 지연' })],
       expert: {
         rating: 0,
         rationale:
@@ -1664,7 +1699,11 @@ export const t3: T = {
             '중앙회 유동성콜과 긴급대출로 계열 잔여 3개사의 지급을 받치고, 검사가 끝날 때까지 영업을 유지한다. 이틀 전 발표와 모순되지 않는다.',
           when: { path: 'institution.custom.depBusan', gt: 0.1 },
           effects: [
-            sbFx.supportFund({ amount: 0.8, reason: '계열 잔여사 유동성 지원', label: '유동성 지원' }),
+            sbFx.supportFund({
+              amount: 0.8,
+              reason: '계열 잔여사 유동성 지원',
+              label: '유동성 지원',
+            }),
             flag('affiliate_support'),
           ],
           delayedEffects: [
@@ -1684,8 +1723,7 @@ export const t3: T = {
               '발표를 지키는 가장 쉬운 방법이지만, 지급 불능이 임박한 기관에 유동성을 넣는 것은 예금자에게 빠져나갈 시간을 사 주는 것이다. 남은 예금자는 줄고 잔여 자산도 줄어 대지급 소요만 커진다.',
             sourceRefs: [S.more4, S.finAct],
           },
-          consequences:
-            '유동성이 투입되었습니다. 창구는 열려 있고, 인출은 계속되고 있습니다.',
+          consequences: '유동성이 투입되었습니다. 창구는 열려 있고, 인출은 계속되고 있습니다.',
           trap: true,
           trapExplanation:
             '"약속을 지켰다"는 것 말고는 남는 것이 없다. 지급 불능이 임박한 기관을 열어 두면 먼저 움직인 예금자만 온전히 받고, 늦게 온 예금자와 예금보험기금이 그 차액을 나눠 진다.',
@@ -1759,8 +1797,7 @@ export const t3: T = {
         {
           id: 't3-d1-e',
           label: 'BIS 5% 미만 기관까지 확대해 이번 주에 정리를 끝낸다',
-          description:
-            '불확실성을 한 번에 없앤다. 계열 밖 취약 기관 일곱 곳을 함께 정지한다.',
+          description: '불확실성을 한 번에 없앤다. 계열 밖 취약 기관 일곱 곳을 함께 정지한다.',
           effects: [
             sbFx.suspend({
               group: 'peer',
@@ -1810,7 +1847,8 @@ export const t3: T = {
             historicalNote: '2월 19일 발표의 사유가 이 문장이었다.',
             sourceRefs: [S.more4],
           },
-          consequences: '사유가 설명되었습니다. 후속 질문은 "그럼 그때 그 말은 무엇이었나"였습니다.',
+          consequences:
+            '사유가 설명되었습니다. 후속 질문은 "그럼 그때 그 말은 무엇이었나"였습니다.',
           historical: true,
         },
         {
@@ -1858,7 +1896,11 @@ export const t3: T = {
           description:
             '설명보다 절차를 준다. 주말 콜센터를 증설하고, 정지 기관 예금자의 가지급금 지급 개시일을 날짜로 공표한다.',
           effects: [
-            sbFx.setDampener({ factor: 0.9, reason: '주말 콜센터·지급 일정 공표', label: '주말 대응' }),
+            sbFx.setDampener({
+              factor: 0.9,
+              reason: '주말 콜센터·지급 일정 공표',
+              label: '주말 대응',
+            }),
             flag('weekend_channel'),
             counter('explanationGiven', 1),
           ],
@@ -1893,5 +1935,3 @@ export const t3: T = {
 }
 
 export const turnsA: T[] = [t0, t1, t2, t3]
-
-

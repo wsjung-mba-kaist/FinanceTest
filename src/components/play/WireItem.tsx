@@ -132,7 +132,7 @@ function EventBody({ e, fill }: { e: GameEvent; fill: (s: string) => string }) {
     case 'dialogue':
       return <Lines lines={e.lines} />
     default:
-      return <Markdown className="mt-1 text-base leading-relaxed">{fill(e.body)}</Markdown>
+      return <Markdown className="mt-1 text-base">{fill(e.body)}</Markdown>
   }
 }
 
@@ -202,7 +202,8 @@ export function WireItem({
       <button
         type="button"
         ref={ref as React.RefObject<HTMLButtonElement>}
-        className={`flex min-h-[2.75rem] w-full items-center gap-2 rounded-md border border-border border-l-4 bg-surface px-2 py-1.5 text-left hover:bg-surface-2 ${BORDER[severity]}`}
+        id={`wire-${entry.id}`}
+        className={`flex min-h-tap-min w-full items-center gap-2 scroll-mt-4 rounded-md border border-border border-l-4 bg-surface px-2 py-1.5 text-left hover:bg-surface-2 ${BORDER[severity]}`}
         onClick={() => {
           onRead(entry.id)
           onOpen?.(entry.id)
@@ -225,7 +226,11 @@ export function WireItem({
   return (
     <article
       ref={ref}
-      className={`relative rounded-md border border-border border-l-4 bg-surface px-3 py-2 ${BORDER[severity]}`}
+      // Addressable, so the compact copy in the situation column can hand off to *this* item in
+      // the full feed. Without an id the round trip dropped the item and just opened the tab —
+      // the reader arrived at the top of the feed and had to find the story again by eye.
+      id={`wire-${entry.id}`}
+      className={`relative scroll-mt-4 rounded-md border border-border border-l-4 bg-surface px-3 py-2 ${BORDER[severity]}`}
       aria-label={`${header.tag} ${title}`}
       onClick={() => unread && onRead(entry.id)}
     >
@@ -243,9 +248,7 @@ export function WireItem({
         {e?.reliability === 'unconfirmed' && <Badge tone="warning">미확인 정보</Badge>}
         {e?.reliability === 'false' && <Badge tone="critical">오보</Badge>}
         {e?.correctionOf && (
-          <span className="text-muted">
-            정정: {correctedTitle ?? '앞선 보도'}
-          </span>
+          <span className="text-muted">정정: {correctedTitle ?? '앞선 보도'}</span>
         )}
         <span className="ml-auto flex items-center gap-1.5">
           {severityBadge(severity)}
@@ -256,7 +259,7 @@ export function WireItem({
       {e ? (
         <EventBody e={e} fill={fill} />
       ) : f ? (
-        <Markdown className="mt-1 text-base leading-relaxed">{fill(f.body)}</Markdown>
+        <Markdown className="mt-1 text-base">{fill(f.body)}</Markdown>
       ) : null}
       {e?.sourceRefs && e.sourceRefs.length > 0 && (
         <div className="mt-1 text-xs text-muted">

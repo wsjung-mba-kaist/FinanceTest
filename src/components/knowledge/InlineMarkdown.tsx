@@ -24,7 +24,8 @@ export function InlineMarkdown({ children, className }: { children: string; clas
           ol: ({ children: c }) => <>{c}</>,
           li: ({ children: c }) => <>{c}</>,
           a: ({ href, children: c }) => {
-            if (href?.startsWith('term:')) return <GlossaryTerm id={href.slice(5)}>{c}</GlossaryTerm>
+            if (href?.startsWith('term:'))
+              return <GlossaryTerm id={href.slice(5)}>{c}</GlossaryTerm>
             return (
               <a href={href} target="_blank" rel="noreferrer">
                 {c}

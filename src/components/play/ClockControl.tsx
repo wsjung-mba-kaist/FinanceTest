@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from '../../lib/useMediaQuery'
+import { useTickProgress, type ProgressStore } from '../../lib/useSimulationClock'
 import { Icon } from '../ui/Icon'
 import { ScenarioClock } from './ScenarioClock'
 
@@ -7,14 +8,17 @@ export type ClockSpeed = 1 | 2 | 4
 
 /** Live-clock state owned by the store. Absent ⇒ the turn has no sub-turn ticks: render nothing. */
 export interface ClockState {
+  /** Actually moving: the player wants it to run *and* nothing is holding it. */
   running: boolean
+  /** What the player asked for. Differs from `running` while `holdReason` is set. */
+  intent: boolean
   speed: ClockSpeed
   tick: number
   ticks: number
   /** Clock label of the current tick, e.g. '09:00'. */
   tickLabel?: string
-  /** 0..1 of the way through the current tick (drives the dot fill). */
-  progress?: number
+  /** 0..1 through the current tick, subscribed to by `TickDots` alone (see useSimulationClock). */
+  progressStore?: ProgressStore
   /** Why the clock stopped on its own, shown next to the dots. */
   holdReason?: string
   onPause?: () => void
@@ -29,14 +33,16 @@ function TickDots({
   tick,
   ticks,
   running,
-  progress,
+  progressStore,
 }: {
   tick: number
   ticks: number
   running: boolean
-  progress: number
+  progressStore?: ProgressStore
 }) {
   const reduced = useReducedMotion()
+  // The one subscriber. Everything else on the play screen re-renders on real events only.
+  const progress = useTickProgress(progressStore)
   return (
     <span
       className="flex items-center gap-0.5"
@@ -97,7 +103,7 @@ function SpeedMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="num rounded-md border border-border px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+        className="num inline-flex min-h-tap-compact items-center rounded-md border border-border-control px-1.5 text-xs text-muted hover:bg-surface-2 hover:text-text"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`시계 속도 ${label}`}
@@ -118,7 +124,7 @@ function SpeedMenu({
               type="button"
               role="menuitemradio"
               aria-checked={running && speed === s}
-              className="block w-full rounded px-2 py-1.5 text-left text-base hover:bg-surface-2"
+              className="block w-full rounded-sm px-2 py-1.5 text-left text-base hover:bg-surface-2"
               onClick={() => {
                 setOpen(false)
                 onSpeed?.(s)
@@ -132,7 +138,7 @@ function SpeedMenu({
             type="button"
             role="menuitemradio"
             aria-checked={!running}
-            className="block w-full rounded px-2 py-1.5 text-left text-base hover:bg-surface-2"
+            className="block w-full rounded-sm px-2 py-1.5 text-left text-base hover:bg-surface-2"
             onClick={() => {
               setOpen(false)
               onPause?.()
@@ -166,6 +172,9 @@ export function ClockControl({
   compact?: boolean
   clock?: ClockState
 }) {
+  // Held: the player wants it running but something (a required decision's deadline, the help
+  // sheet, a hidden tab) is stopping it. That is a third visual state, not "paused".
+  const held = !!clock && clock.intent && !clock.running
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <ScenarioClock
@@ -178,30 +187,32 @@ export function ClockControl({
       {clock && clock.ticks > 1 && (
         <div className="flex items-center gap-1" role="group" aria-label="시뮬레이션 시계">
           {clock.tickLabel && (
-            <span className="num rounded border border-border bg-surface-2 px-1.5 py-0.5 text-sm text-text">
+            <span className="num rounded-sm border border-border bg-surface-2 px-1.5 py-0.5 text-sm text-text">
               {clock.tickLabel}
             </span>
           )}
           <button
             type="button"
-            className="rounded-md border border-border px-1.5 py-1 text-muted hover:bg-surface-2 hover:text-text"
-            aria-label={clock.running ? '시계 일시정지' : '시계 재개'}
-            aria-pressed={clock.running}
+            className={`min-h-tap-compact rounded-md border px-1.5 py-1 hover:bg-surface-2 hover:text-text ${
+              held ? 'border-warning-border text-warning' : 'border-border-control text-muted'
+            }`}
+            aria-label={clock.intent ? '시계 일시정지' : '시계 재개'}
+            aria-pressed={clock.intent}
             aria-keyshortcuts="Space"
-            title={clock.holdReason ?? (clock.running ? '시계 일시정지' : '시계 재개')}
-            onClick={() => (clock.running ? clock.onPause?.() : clock.onResume?.())}
+            title={clock.holdReason ?? (clock.intent ? '시계 일시정지' : '시계 재개')}
+            onClick={() => (clock.intent ? clock.onPause?.() : clock.onResume?.())}
           >
-            <Icon name={clock.running ? 'pause' : 'play'} size={14} />
+            <Icon name={clock.intent ? 'pause' : 'play'} size={14} />
           </button>
           <TickDots
             tick={clock.tick}
             ticks={clock.ticks}
-            running={clock.running && (clock.progress ?? 0) > 0}
-            progress={clock.progress ?? 0}
+            running={clock.running}
+            progressStore={clock.progressStore}
           />
           <SpeedMenu
             speed={clock.speed}
-            running={clock.running}
+            running={clock.intent}
             onSpeed={clock.onSpeed}
             onPause={clock.onPause}
           />

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, EmptyState } from '../components/ui'
+import { Badge, Button, Chip, EmptyState } from '../components/ui'
 import { READING_LIST } from '../content'
 import type { ReadingItem } from '../content/types'
+import { gridClass } from '../lib/grid'
 
 export default function ReadingListPage() {
   const [tag, setTag] = useState<string | undefined>()
@@ -40,24 +41,18 @@ export default function ReadingListPage() {
       </header>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1" role="group" aria-label="태그 필터">
-          <button
-            type="button"
-            aria-pressed={!tag}
-            onClick={() => setTag(undefined)}
-            className={`rounded-full border px-2.5 py-0.5 text-sm ${!tag ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
-          >
+          <Chip selected={!tag} aria-pressed={!tag} onClick={() => setTag(undefined)}>
             전체
-          </button>
+          </Chip>
           {tags.map(([t, n]) => (
-            <button
+            <Chip
               key={t}
-              type="button"
+              selected={tag === t}
               aria-pressed={tag === t}
               onClick={() => setTag(tag === t ? undefined : t)}
-              className={`rounded-full border px-2.5 py-0.5 text-sm ${tag === t ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
             >
-              {t} <span className="num opacity-70">{n}</span>
-            </button>
+              {t} <span className="num text-muted">{n}</span>
+            </Chip>
           ))}
         </div>
       )}
@@ -74,11 +69,11 @@ export default function ReadingListPage() {
       ) : (
         groups.map(([g, items]) => (
           <section key={g} aria-labelledby={`rl-${g}`}>
-            <h2 id={`rl-${g}`} className="mb-1 text-base font-semibold">
+            <h2 id={`rl-${g}`} className="mb-1 text-lg font-semibold">
               #{g}
             </h2>
             {/* Short bibliographic rows: two columns halve the scroll without hurting the read. */}
-            <ul className="m-0 grid list-none gap-1.5 p-0 lg:grid-cols-2">
+            <ul className={`m-0 grid list-none gap-1.5 p-0 ${gridClass('link', items.length)}`}>
               {items.map((r, i) => (
                 <li
                   key={`${r.title}-${i}`}

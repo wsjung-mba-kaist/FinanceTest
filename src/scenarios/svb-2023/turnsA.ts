@@ -1693,7 +1693,10 @@ export const t4: T = {
               trap: true,
               trapExplanation:
                 '감독당국은 결제 시스템에서 실제 수치를 보고 있다. 범위 제시는 축소 보고로 읽혀 이후 모든 요청의 신뢰를 깎는다.',
-              expert: { rating: 30, rationale: '정보 비대칭이 없는 상대에게 쓰는 완충 화법은 역효과다.' },
+              expert: {
+                rating: 30,
+                rationale: '정보 비대칭이 없는 상대에게 쓰는 완충 화법은 역효과다.',
+              },
             },
             {
               id: 't4-d2-r-hold',
@@ -1718,14 +1721,18 @@ export const t4: T = {
               next: 't4-d2-eta',
               expert: {
                 rating: 85,
-                rationale: '야간 지원은 사전 접촉 없이 열리지 않는다. 요청 자체가 T5의 선택지를 만든다.',
+                rationale:
+                  '야간 지원은 사전 접촉 없이 열리지 않는다. 요청 자체가 T5의 선택지를 만든다.',
               },
             },
             {
               id: 't4-d2-r-statutory',
               label: '요청하지 않고 법정 보고만 유지',
               resolvesTo: 't4-d2-b',
-              expert: { rating: 35, rationale: '위반은 아니지만 마감 후 지원을 요청할 채널이 없다.' },
+              expert: {
+                rating: 35,
+                rationale: '위반은 아니지만 마감 후 지원을 요청할 채널이 없다.',
+              },
             },
           ],
         },

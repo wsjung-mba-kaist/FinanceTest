@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { getCard } from '../../content'
+
 import { createGame, latestSnapshot } from '../../engine'
 import type { BankState, ScenarioDefinition, ScoreDimension } from '../../engine/types'
 import { SCORE_DIMENSIONS } from '../../engine/types/common'
@@ -8,8 +8,9 @@ import { DIMENSION_LABELS, DIMENSION_LABELS_EN, SOURCE_KIND_LABELS } from '../..
 import { useProgressStore } from '../../store/progressStore'
 import { GlossaryTerm } from '../knowledge/GlossaryTerm'
 import { Markdown } from '../knowledge/Markdown'
-import { Badge, StatusBadge } from '../ui'
+import { Badge, Card, StatusBadge } from '../ui'
 import { Icon } from '../ui/Icon'
+import { gridClass } from '../../lib/grid'
 
 /**
  * The full dossier. Every section is collapsed by default on every breakpoint — the executive
@@ -22,9 +23,8 @@ export const DOSSIER_SECTIONS = [
   { id: 'market', n: 3, title: '시장 배경' },
   { id: 'stakeholders', n: 4, title: '이해관계자' },
   { id: 'regulation', n: 5, title: '규제·제도' },
-  { id: 'concepts', n: 6, title: '핵심 개념' },
-  { id: 'scoring', n: 7, title: '평가 기준' },
-  { id: 'sources', n: 8, title: '출처·단순화 노트' },
+  { id: 'scoring', n: 6, title: '평가 기준' },
+  { id: 'sources', n: 7, title: '출처·단순화 노트' },
 ] as const
 export type DossierSectionId = (typeof DOSSIER_SECTIONS)[number]['id']
 
@@ -48,13 +48,8 @@ function Section({
   const headingId = `sec-${id}-h`
   const panelId = `sec-${id}-panel`
   return (
-    <section
-      id={`sec-${id}`}
-      data-section={id}
-      aria-labelledby={headingId}
-      className="scroll-mt-4 rounded-lg border border-border bg-surface"
-    >
-      <h3 id={headingId} className="m-0">
+    <Card id={`sec-${id}`} data-section={id} aria-labelledby={headingId} className="scroll-mt-4">
+      <h3 id={headingId} className="text-md m-0">
         <button
           type="button"
           aria-expanded={open}
@@ -71,7 +66,7 @@ function Section({
       <div id={panelId} hidden={!open} className="px-4 py-4">
         {children}
       </div>
-    </section>
+    </Card>
   )
 }
 
@@ -156,70 +151,10 @@ function BankBalanceSheet({ b, scenario }: { b: BankState; scenario: ScenarioDef
   )
 }
 
-function ConceptCard({
-  cardId,
-  viewed,
-  onView,
-}: {
-  cardId: string
-  viewed: boolean
-  onView: () => void
-}) {
-  const card = getCard(cardId)
-  const [open, setOpen] = useState(false)
-  const panelId = `card-${cardId}`
-  if (!card) {
-    return (
-      <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted">
-        카드 <code className="font-mono">{cardId}</code> 을(를) 찾을 수 없습니다.
-      </div>
-    )
-  }
-  return (
-    <article className="rounded-md border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => {
-          const next = !open
-          setOpen(next)
-          if (next) onView()
-        }}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <span className="flex-1 font-medium">
-          {card.title}
-          {card.titleEn && <span className="text-muted font-normal"> ({card.titleEn})</span>}
-        </span>
-        <Badge tone="neutral">{card.level}</Badge>
-        {viewed && <Badge tone="positive">열람</Badge>}
-        <span aria-hidden="true" className="text-muted">
-          {open ? '−' : '+'}
-        </span>
-      </button>
-      <div id={panelId} hidden={!open} className="border-t border-border px-3 py-3">
-        <Markdown>{card.body}</Markdown>
-        {card.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {card.tags.map((t) => (
-              <Badge key={t} tone="neutral">
-                #{t}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-    </article>
-  )
-}
-
 export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
   const id = scenario.meta.id
   const progress = useProgressStore((s) => s.scenarios[id])
-  const cardsViewed = useProgressStore((s) => s.learning.cardsViewed)
   const markBriefingSection = useProgressStore((s) => s.markBriefingSection)
-  const markCardViewed = useProgressStore((s) => s.markCardViewed)
   const viewedSections = useMemo(
     () => new Set(progress?.briefingSectionsViewed ?? []),
     [progress?.briefingSectionsViewed],
@@ -426,7 +361,9 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
             case 'stakeholders':
               return (
                 <Section key={s.id} {...common}>
-                  <ul className="grid gap-2 sm:grid-cols-2 list-none p-0 m-0">
+                  <ul
+                    className={`grid gap-2 list-none p-0 m-0 ${gridClass('prose', scenario.briefing.stakeholders.length)}`}
+                  >
                     {scenario.briefing.stakeholders.map((st) => (
                       <li key={st.name} className="rounded-md border border-border p-3 text-sm">
                         <div className="font-semibold text-base">{st.name}</div>
@@ -445,25 +382,6 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
               return (
                 <Section key={s.id} {...common}>
                   <Markdown>{scenario.briefing.regulatoryFramework}</Markdown>
-                </Section>
-              )
-            case 'concepts':
-              return (
-                <Section key={s.id} {...common}>
-                  {scenario.briefing.cardRefs.length === 0 ? (
-                    <p className="text-sm text-muted">이 시나리오에 연결된 개념 카드가 없습니다.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {scenario.briefing.cardRefs.map((c) => (
-                        <ConceptCard
-                          key={c}
-                          cardId={c}
-                          viewed={cardsViewed.includes(c)}
-                          onView={() => markCardViewed(c)}
-                        />
-                      ))}
-                    </div>
-                  )}
                 </Section>
               )
             case 'scoring':

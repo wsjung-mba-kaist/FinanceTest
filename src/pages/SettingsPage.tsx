@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, ConfirmDialog } from '../components/ui'
+import { Button, Card, ConfirmDialog } from '../components/ui'
 import { downloadJson, stampedFilename } from '../lib/download'
 import { MODE_DESCRIPTIONS, MODE_LABELS, shortDate } from '../lib/labels'
 import {
@@ -15,7 +15,7 @@ import { useSettingsStore } from '../store/settingsStore'
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="grid gap-1 border-b border-border py-3 last:border-0 sm:grid-cols-[220px_1fr] sm:gap-4">
+    <div className="grid gap-1 border-b border-border py-3 last:border-0 sm:grid-cols-[minmax(0,14rem)_minmax(0,30rem)] sm:gap-4">
       <div>
         <div className="font-medium">{label}</div>
         {hint && <div className="text-xs text-muted">{hint}</div>}
@@ -158,7 +158,7 @@ export default function SettingsPage() {
 
       {(progressCorrupt || settingsCorrupt) && (
         <p
-          className="rounded-md border border-warning/40 bg-warning-bg p-2 text-sm text-warning"
+          className="rounded-md border border-warning-border bg-warning-bg p-2 text-sm text-warning"
           role="alert"
         >
           저장된{' '}
@@ -173,7 +173,7 @@ export default function SettingsPage() {
       )}
       {lastSaveResult !== 'ok' && (
         <p
-          className="rounded-md border border-critical/40 bg-critical-bg p-2 text-sm text-critical"
+          className="rounded-md border border-critical-border bg-critical-bg p-2 text-sm text-critical"
           role="alert"
         >
           {lastSaveResult === 'quota'
@@ -182,11 +182,8 @@ export default function SettingsPage() {
         </p>
       )}
 
-      <section
-        aria-labelledby="st-display"
-        className="rounded-lg border border-border bg-surface px-4"
-      >
-        <h2 id="st-display" className="pt-3 text-base font-semibold">
+      <Card aria-labelledby="st-display" className="px-4">
+        <h2 id="st-display" className="pt-3 text-lg font-semibold">
           표시
         </h2>
         <Field label="테마">
@@ -249,13 +246,10 @@ export default function SettingsPage() {
             label={s.reducedMotion ? '켬' : '끔'}
           />
         </Field>
-      </section>
+      </Card>
 
-      <section
-        aria-labelledby="st-play"
-        className="rounded-lg border border-border bg-surface px-4"
-      >
-        <h2 id="st-play" className="pt-3 text-base font-semibold">
+      <Card aria-labelledby="st-play" className="px-4">
+        <h2 id="st-play" className="pt-3 text-lg font-semibold">
           플레이
         </h2>
         <Field label="기본 모드" hint="브리핑에서 미리 선택되는 모드">
@@ -294,23 +288,17 @@ export default function SettingsPage() {
             label={s.timersEnabled ? '켬' : '끔'}
           />
         </Field>
-      </section>
+      </Card>
 
-      <section
-        aria-labelledby="st-sim"
-        className="rounded-lg border border-border bg-surface px-4"
-      >
-        <h2 id="st-sim" className="pt-3 text-base font-semibold">
+      <Card aria-labelledby="st-sim" className="px-4">
+        <h2 id="st-sim" className="pt-3 text-lg font-semibold">
           시뮬레이션
         </h2>
         <p className="pt-1 text-sm text-muted">
           일부 시나리오는 한 턴이 여러 시각(틱)으로 나뉘어 시계가 실제로 흐릅니다. 아래 설정은 그런
           턴에만 영향을 줍니다.
         </p>
-        <Field
-          label="시계 속도"
-          hint="한 틱이 몇 초인지 (×1 기준). 짧을수록 시간 압박이 커집니다."
-        >
+        <Field label="시계 속도" hint="한 틱이 몇 초인지 (×1 기준). 짧을수록 시간 압박이 커집니다.">
           <div className="flex flex-wrap items-center gap-3">
             <input
               id={clockId}
@@ -349,18 +337,15 @@ export default function SettingsPage() {
             onChange={(v) => set('variance', Number(v) as 0 | 0.5 | 1)}
           />
         </Field>
-      </section>
+      </Card>
 
-      <section
-        aria-labelledby="st-data"
-        className="rounded-lg border border-border bg-surface px-4 pb-3"
-      >
-        <h2 id="st-data" className="pt-3 text-base font-semibold">
+      <Card aria-labelledby="st-data" className="px-4 pb-3">
+        <h2 id="st-data" className="pt-3 text-lg font-semibold">
           데이터
         </h2>
         {importError && (
           <p
-            className="mt-2 rounded-md border border-critical/40 bg-critical-bg p-2 text-sm text-critical"
+            className="mt-2 rounded-md border border-critical-border bg-critical-bg p-2 text-sm text-critical"
             role="alert"
           >
             {importError}
@@ -368,7 +353,7 @@ export default function SettingsPage() {
         )}
         {importOk && (
           <p
-            className="mt-2 rounded-md border border-positive/40 bg-positive-bg p-2 text-sm text-positive"
+            className="mt-2 rounded-md border border-positive-border bg-positive-bg p-2 text-sm text-positive"
             role="status"
           >
             진행 데이터를 가져왔습니다. <Link to="/progress">진행 현황 보기</Link>
@@ -439,7 +424,7 @@ export default function SettingsPage() {
             )}
           </div>
         </Field>
-      </section>
+      </Card>
 
       <ConfirmDialog
         open={confirmReset}

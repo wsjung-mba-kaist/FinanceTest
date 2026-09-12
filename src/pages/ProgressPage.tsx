@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ProgressMap } from '../components/progress/ProgressMap'
 import { Badge, Card, EmptyState } from '../components/ui'
+import { buttonClass } from '../components/ui/buttonStyles'
 import { formatNumber } from '../lib/format'
 import {
   DIMENSION_LABELS,
@@ -49,7 +50,7 @@ export default function ProgressPage() {
 
       {lastSaveResult !== 'ok' && (
         <p
-          className="rounded-md border border-warning/40 bg-warning-bg p-2 text-sm text-warning"
+          className="rounded-md border border-warning-border bg-warning-bg p-2 text-sm text-warning"
           role="alert"
         >
           {lastSaveResult === 'quota'
@@ -59,7 +60,7 @@ export default function ProgressPage() {
       )}
 
       <section aria-labelledby="pg-mastery">
-        <h2 id="pg-mastery" className="mb-2 text-md font-semibold">
+        <h2 id="pg-mastery" className="mb-2 text-lg font-semibold">
           역량 숙련도
         </h2>
         <p className="prose-col mb-2 text-sm text-muted">
@@ -72,9 +73,9 @@ export default function ProgressPage() {
 
       <section
         aria-labelledby="pg-next"
-        className="rounded-lg border border-accent/40 bg-accent-soft p-3"
+        className="rounded-lg border border-accent-border bg-accent-soft p-3"
       >
-        <h2 id="pg-next" className="text-md font-semibold">
+        <h2 id="pg-next" className="text-lg font-semibold">
           다음 추천
         </h2>
         <p className="prose-col mt-1 text-sm">
@@ -102,7 +103,7 @@ export default function ProgressPage() {
 
       {inProgress.length > 0 && (
         <section aria-labelledby="pg-inprogress">
-          <h2 id="pg-inprogress" className="mb-2 text-md font-semibold">
+          <h2 id="pg-inprogress" className="mb-2 text-lg font-semibold">
             진행 중
           </h2>
           <ul className="m-0 list-none space-y-1.5 p-0">
@@ -120,7 +121,11 @@ export default function ProgressPage() {
                   </span>
                   <Link
                     to={`/play/${s.id}`}
-                    className="ml-auto inline-flex items-center rounded-md border border-accent bg-accent px-3 py-1 text-sm font-medium text-accent-fg no-underline hover:opacity-90"
+                    className={buttonClass({
+                      variant: 'primary',
+                      size: 'sm',
+                      className: 'ml-auto',
+                    })}
                   >
                     이어하기
                   </Link>
@@ -132,7 +137,7 @@ export default function ProgressPage() {
       )}
 
       <section aria-labelledby="pg-recent">
-        <h2 id="pg-recent" className="mb-2 text-md font-semibold">
+        <h2 id="pg-recent" className="mb-2 text-lg font-semibold">
           최근 플레이 5회
         </h2>
         {recent.length === 0 ? (

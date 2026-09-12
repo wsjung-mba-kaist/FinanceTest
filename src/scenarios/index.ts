@@ -405,9 +405,7 @@ const available: ScenarioRegistryEntry[] = [
       ],
     },
     load: () =>
-      import('./ltcm-1998/scenario').then(
-        (m) => m.default as ScenarioDefinition<InstitutionState>,
-      ),
+      import('./ltcm-1998/scenario').then((m) => m.default as ScenarioDefinition<InstitutionState>),
   },
   {
     summary: {

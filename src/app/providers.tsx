@@ -1,9 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import {
-  applySettingsToDocument,
-  useSettingsStore,
-  watchSystemTheme,
-} from '../store/settingsStore'
+import { applySettingsToDocument, useSettingsStore, watchSystemTheme } from '../store/settingsStore'
 
 export function Providers({ children }: { children: ReactNode }) {
   const settings = useSettingsStore()

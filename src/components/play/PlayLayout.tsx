@@ -1,6 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { ZONE_IDS } from '../../lib/keyboard'
+import { useTabListKeys } from '../ui/useTabListKeys'
 import type { Breakpoint } from '../../lib/useMediaQuery'
+import { CountPill } from '../ui'
 
 export type InfoTab = 'situation' | 'dashboard' | 'feed' | 'log' | 'balance'
 export type MobileTab = 'situation' | 'decide' | 'metrics' | 'more'
@@ -30,13 +32,29 @@ const MOBILE_TABS: { id: MobileTab; label: string }[] = [
 
 const MORE_TABS: InfoTab[] = ['feed', 'log', 'balance']
 
-/** A scrollable zone with a real (visible) heading, an id for Alt+n and a focus ring. */
+/** Tab ids in visual order, for the arrow-key contract. */
+const INFO_TAB_IDS = INFO_TABS.map((t) => t.id)
+const MOBILE_TAB_IDS = MOBILE_TABS.map((t) => t.id)
+
+/**
+ * A scrollable zone with a real (visible) heading, an id for Alt+n and a focus ring.
+ *
+ * `footer` is the zone's non-scrolling bottom edge. The primary action used to live *inside* the
+ * scroll area and try to hold itself in place with `sticky bottom-0` — which failed, because an
+ * ancestor carried `overflow-hidden` and killed the stickiness, so the 다음 턴 button started
+ * every turn below the fold. A sibling of the scroll box cannot scroll away, so the whole class of
+ * bug stops existing. See docs/ui-conventions.md §8.
+ */
+const ZONE_FOCUS =
+  'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent'
+
 function Zone({
   id,
   heading,
   hideHeading,
   scrollRef,
   className = '',
+  footer,
   children,
 }: {
   id: string
@@ -44,22 +62,51 @@ function Zone({
   hideHeading?: boolean
   scrollRef?: (el: HTMLElement | null) => void
   className?: string
+  footer?: ReactNode
   children: ReactNode
 }) {
-  return (
-    <section
-      id={id}
-      ref={scrollRef}
-      tabIndex={-1}
-      aria-label={heading}
-      className={`h-full min-h-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${className}`}
-    >
+  const body = (
+    <>
       {hideHeading ? (
         <h2 className="sr-only">{heading}</h2>
       ) : (
         <h2 className="label-caps border-b border-border px-3 py-1">{heading}</h2>
       )}
       {children}
+    </>
+  )
+  if (!footer)
+    return (
+      <section
+        id={id}
+        ref={scrollRef}
+        tabIndex={-1}
+        aria-label={heading}
+        // `data-zone-scroll` marks whichever element actually scrolls — the section itself here,
+        // the inner div when the zone has a footer. One selector either way.
+        data-zone-scroll
+        className={`h-full min-h-0 overflow-y-auto ${ZONE_FOCUS} ${className}`}
+      >
+        {body}
+      </section>
+    )
+  // With a footer the zone is a column: the scroll box is the ref target (that is what
+  // `scrollResetKey` resets), and the footer is its sibling.
+  return (
+    <section
+      id={id}
+      tabIndex={-1}
+      aria-label={heading}
+      className={`flex h-full min-h-0 flex-col ${ZONE_FOCUS} ${className}`}
+    >
+      <div
+        ref={scrollRef as ((el: HTMLDivElement | null) => void) | undefined}
+        data-zone-scroll
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
+        {body}
+      </div>
+      <div className="shrink-0 border-t border-border bg-surface">{footer}</div>
     </section>
   )
 }
@@ -73,11 +120,15 @@ function InfoTabs({
   onChange: (t: InfoTab) => void
   unreadCount: number
 }) {
+  const onKeyDown = useTabListKeys(INFO_TAB_IDS, value, onChange, {
+    idFor: (id) => `info-tab-${id}`,
+  })
   return (
     <div
       role="tablist"
       aria-label="정보 열"
       className="flex shrink-0 overflow-x-auto border-b border-border bg-surface"
+      onKeyDown={onKeyDown}
     >
       {INFO_TABS.map((t) => {
         const active = value === t.id
@@ -90,16 +141,15 @@ function InfoTabs({
             aria-selected={active}
             aria-controls={t.zoneId}
             aria-keyshortcuts={t.shortcut}
-            className={`-mb-px min-h-[40px] whitespace-nowrap border-b-2 px-3 py-2 text-base ${
+            tabIndex={active ? 0 : -1}
+            className={`-mb-px min-h-tap-min whitespace-nowrap border-b-2 px-3 py-2 text-base ${
               active ? 'border-accent font-semibold text-text' : 'border-transparent text-muted'
             }`}
             onClick={() => onChange(t.id)}
           >
             {t.label}
-            {t.id === 'feed' && unreadCount > 0 && (
-              <span className="num ml-1 rounded-full bg-accent px-1.5 text-xs text-accent-fg">
-                {unreadCount}
-              </span>
+            {t.id === 'feed' && (
+              <CountPill count={unreadCount} label="읽지 않은 소식" className="ml-1" />
             )}
           </button>
         )
@@ -122,6 +172,7 @@ export function PlayLayout({
   strip,
   panels,
   dock,
+  dockAction,
   infoTab,
   onInfoTab,
   mobileTab,
@@ -134,6 +185,8 @@ export function PlayLayout({
   strip: ReactNode
   panels: Record<InfoTab, ReactNode>
   dock: ReactNode
+  /** The dock's primary action, rendered outside the scroll box so it cannot scroll away. */
+  dockAction?: ReactNode
   infoTab: InfoTab
   onInfoTab: (t: InfoTab) => void
   mobileTab: MobileTab
@@ -153,7 +206,17 @@ export function PlayLayout({
     }
   }, [scrollResetKey, infoTab, mobileTab])
 
+  const moreKeys = useTabListKeys(MORE_TABS, infoTab, onInfoTab, {
+    idFor: (id) => `more-tab-${id}`,
+  })
+  const mobileKeys = useTabListKeys(MOBILE_TAB_IDS, mobileTab, onMobileTab, {
+    idFor: (id) => `mtab-${id}`,
+  })
+
   const activeInfo = INFO_TABS.find((t) => t.id === infoTab) ?? INFO_TABS[0]!
+  // Reading panels are capped and centred on very wide screens; the dashboard is not — see
+  // `--w-play-col` in index.css.
+  const capped = infoTab !== 'dashboard'
   const infoZone = (
     <>
       <InfoTabs value={infoTab} onChange={onInfoTab} unreadCount={unreadCount} />
@@ -164,7 +227,9 @@ export function PlayLayout({
         scrollRef={register}
         className="flex-1"
       >
-        {panels[infoTab]}
+        <div className={capped ? 'mx-auto w-full max-w-play-col' : undefined}>
+          {panels[infoTab]}
+        </div>
       </Zone>
     </>
   )
@@ -172,7 +237,7 @@ export function PlayLayout({
   if (bp !== 'mobile') {
     const cols = bp === 'desktop' ? 'grid-cols-[58%_42%]' : 'grid-cols-[55%_45%]'
     return (
-      <div className="flex h-[calc(100dvh-3rem)] flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {strip}
         <div className={`grid min-h-0 flex-1 ${cols} overflow-hidden`}>
           <div className="flex min-h-0 flex-col border-r border-border">{infoZone}</div>
@@ -181,7 +246,7 @@ export function PlayLayout({
             heading="결정 독"
             hideHeading
             scrollRef={register}
-            className="relative"
+            footer={dockAction}
           >
             {dock}
           </Zone>
@@ -191,7 +256,7 @@ export function PlayLayout({
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="sticky top-0 z-20 shrink-0">{strip}</div>
       <div className="min-h-0 flex-1" role="tabpanel" aria-labelledby={`mtab-${mobileTab}`}>
         {mobileTab === 'situation' && (
@@ -200,7 +265,13 @@ export function PlayLayout({
           </Zone>
         )}
         {mobileTab === 'decide' && (
-          <Zone id={ZONE_IDS[2]} heading="결정 독" hideHeading scrollRef={register}>
+          <Zone
+            id={ZONE_IDS[2]}
+            heading="결정 독"
+            hideHeading
+            scrollRef={register}
+            footer={dockAction}
+          >
             {dock}
           </Zone>
         )}
@@ -215,6 +286,7 @@ export function PlayLayout({
               role="tablist"
               aria-label="더보기"
               className="flex shrink-0 border-b border-border"
+              onKeyDown={moreKeys}
             >
               {MORE_TABS.map((t) => {
                 const active = infoTab === t
@@ -223,8 +295,10 @@ export function PlayLayout({
                     key={t}
                     type="button"
                     role="tab"
+                    id={`more-tab-${t}`}
                     aria-selected={active}
-                    className={`min-h-[44px] flex-1 border-b-2 text-base ${
+                    tabIndex={active ? 0 : -1}
+                    className={`min-h-tap-min flex-1 border-b-2 text-base ${
                       active ? 'border-accent font-semibold' : 'border-transparent text-muted'
                     }`}
                     onClick={() => onInfoTab(t)}
@@ -249,6 +323,7 @@ export function PlayLayout({
         role="tablist"
         aria-label="플레이 화면 영역"
         className="grid shrink-0 grid-cols-4 border-t border-border bg-surface"
+        onKeyDown={mobileKeys}
       >
         {MOBILE_TABS.map((t) => {
           const active = mobileTab === t.id
@@ -260,7 +335,8 @@ export function PlayLayout({
               role="tab"
               id={`mtab-${t.id}`}
               aria-selected={active}
-              className={`flex min-h-[44px] items-center justify-center gap-1 border-t-2 text-base ${
+              tabIndex={active ? 0 : -1}
+              className={`flex min-h-tap-min items-center justify-center gap-1 border-t-2 text-base ${
                 active ? 'border-accent font-semibold text-text' : 'border-transparent text-muted'
               }`}
               onClick={() => {
@@ -269,14 +345,17 @@ export function PlayLayout({
               }}
             >
               {t.label}
-              {badge > 0 && (
-                <span
-                  className="num rounded-full bg-accent px-1.5 text-xs font-semibold text-accent-fg"
-                  aria-label={`${badge}건`}
-                >
-                  {t.id === 'decide' ? '●' : badge}
-                </span>
-              )}
+              {badge > 0 &&
+                (t.id === 'decide' ? (
+                  // 결정 shows a dot, not a number: "there is something waiting" is the whole
+                  // message, and a count would invite counting instead of deciding.
+                  <span
+                    className="inline-block h-2 w-2 rounded-full bg-accent"
+                    aria-label={`${badge}건 대기`}
+                  />
+                ) : (
+                  <CountPill count={badge} label="읽지 않은 소식" />
+                ))}
             </button>
           )
         })}

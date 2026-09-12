@@ -691,6 +691,30 @@ export const t4: T = {
   interrupts: [t4FedSummons],
   events: [
     {
+      /**
+       * The correction to `t3-news-liquidity`. The floor talk about a prime broker demanding
+       * settlement collateral was about the reader's own fund, and it was right.
+       *
+       * The sequencing is the lesson: a counterparty tightening terms is visible to the market
+       * before it is admitted by the fund, because the counterparty tells its own desks first.
+       * By the time the fund confirms it, the price of everything it holds has already moved.
+       */
+      id: 't4-news-collateral-confirmed',
+      kind: 'newswire',
+      outlet: 'Dow Jones',
+      atTick: 0,
+      time: '07:15',
+      headline: '[확인] 어제의 담보 요구 보도는 사실 — 거래상대들이 일제히 조건을 조였다',
+      body:
+        '어제 플로어에 돌던 "청산 대리인의 결제 익스포저 담보 요구"는 사실로 확인됐다. ' +
+        '요구는 한 곳에서 끝나지 않았고, 복수의 거래상대가 같은 주에 증거금률과 헤어컷을 ' +
+        '동시에 올렸다. 어느 쪽도 공개적으로 밝히지 않았지만 시장은 이미 그렇게 값을 매기고 있었다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't3-news-liquidity',
+      sourceRefs: [S.pwg, S.gao],
+    },
+    {
       id: 't4-dialogue-core',
       kind: 'dialogue',
       atTick: 0,
@@ -1091,6 +1115,12 @@ export const t5: T = {
 
 제안 주체의 구성과 금액은 확인되지 않았습니다 — 기록에 남은 것은 제안의 존재와 12시 30분이라는 시한뿐입니다.`,
       severity: 'critical',
+      // This memo already *was* the answer to `t5-news-offer`; it simply was not wired to it, so
+      // the feed left the 미확인 정보 badge standing on a rumour it had resolved forty lines above.
+      // What it confirms is the existence and the deadline, which is all the record carries — the
+      // body is explicit that the identity and the amount stayed unconfirmed.
+      reliability: 'confirmed',
+      correctionOf: 't5-news-offer',
       sourceRefs: [S.mcd, S.pressOffer],
     },
     {

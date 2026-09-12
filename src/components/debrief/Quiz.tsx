@@ -5,7 +5,7 @@ import { formatNumber } from '../../lib/format'
 import { shortDate } from '../../lib/labels'
 import { useProgressStore } from '../../store/progressStore'
 import { Citation } from '../knowledge/Citation'
-import { Badge, Button } from '../ui'
+import { Badge, Button, Card } from '../ui'
 
 type Answer = string[] | number | boolean
 
@@ -61,7 +61,7 @@ function QuestionCard({
     !(Array.isArray(answer) && answer.length === 0) &&
     !(typeof answer === 'number' && Number.isNaN(answer))
   return (
-    <li className="rounded-lg border border-border bg-surface p-3">
+    <Card as="li" className="p-3">
       <fieldset className="m-0 border-0 p-0" disabled={submitted}>
         <legend className="text-base font-medium">
           <span className="num text-muted">Q{index + 1}.</span> {q.prompt}
@@ -75,7 +75,7 @@ function QuestionCard({
               return (
                 <label
                   key={c.id}
-                  className="flex items-start gap-2 rounded px-1 py-0.5 hover:bg-surface-2"
+                  className="flex items-start gap-2 rounded-sm px-1 py-0.5 hover:bg-surface-2"
                 >
                   <input
                     type={q.type === 'single' ? 'radio' : 'checkbox'}
@@ -105,7 +105,7 @@ function QuestionCard({
                 step="any"
                 value={typeof answer === 'number' && !Number.isNaN(answer) ? answer : ''}
                 onChange={(e) => onAnswer(e.target.value === '' ? NaN : Number(e.target.value))}
-                className="w-40 rounded border border-border bg-bg px-2 py-1 num"
+                className="w-40 rounded-sm border border-border bg-bg px-2 py-1 num"
                 aria-label={`답 (${q.unit})`}
               />
               <span className="text-muted">{q.unit}</span>
@@ -115,7 +115,7 @@ function QuestionCard({
             [true, false].map((v) => (
               <label
                 key={String(v)}
-                className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-surface-2"
+                className="flex items-center gap-2 rounded-sm px-1 py-0.5 hover:bg-surface-2"
               >
                 <input
                   type="radio"
@@ -137,7 +137,7 @@ function QuestionCard({
         </div>
       ) : (
         <div
-          className={`mt-2 rounded-md border p-2 text-sm ${correct ? 'border-positive/40 bg-positive-bg' : 'border-critical/40 bg-critical-bg'}`}
+          className={`mt-2 rounded-md border p-2 text-sm ${correct ? 'border-positive-border bg-positive-bg' : 'border-critical-border bg-critical-bg'}`}
           role="status"
         >
           <div className={`font-semibold ${correct ? 'text-positive' : 'text-critical'}`}>
@@ -155,7 +155,7 @@ function QuestionCard({
           </p>
         </div>
       )}
-    </li>
+    </Card>
   )
 }
 
@@ -213,10 +213,7 @@ export function Quiz({
         ))}
       </ol>
       {done && (
-        <p
-          className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-sm"
-          role="status"
-        >
+        <p className="mt-3 rounded-md border border-border bg-surface-2 p-2 text-sm" role="status">
           결과:{' '}
           <b className="num">
             {correctCount}/{questions.length}

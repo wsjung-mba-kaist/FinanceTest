@@ -18,8 +18,10 @@
             (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
           var root = document.documentElement
           root.setAttribute('data-theme', dark ? 'dark' : 'light')
-          if (s && typeof s.fontScale === 'number')
-            root.style.fontSize = Math.round(14 * s.fontScale) + 'px'
+          // Only the scale — the base size stays in CSS so media queries still reach it.
+          // Skipping scale 1 keeps the default first paint free of any inline style at all.
+          if (s && typeof s.fontScale === 'number' && s.fontScale !== 1)
+            root.style.setProperty('--fs-scale', String(s.fontScale))
           if (s && s.reducedMotion) root.setAttribute('data-reduced-motion', 'true')
           if (s && s.useSystemFont) root.setAttribute('data-system-font', 'true')
         } catch (e) {

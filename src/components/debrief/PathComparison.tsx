@@ -8,7 +8,7 @@ import type {
   ScenarioDefinition,
 } from '../../engine/types'
 import { decisionAnchorId } from '../../lib/catalog'
-import { Button, Badge } from '../ui'
+import { Badge, Button, Card } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Citation } from '../knowledge/Citation'
 import { InlineMarkdown } from '../knowledge/InlineMarkdown'
@@ -114,10 +114,11 @@ export function PathComparison({
         const panelId = `path-${key}-panel`
         const open = Boolean(forceExpanded) || alwaysOpen.has(rec.decisionId) || opened.has(key)
         return (
-          <li
+          <Card
+            as="li"
             key={key}
             id={decisionAnchorId(rec.decisionId)}
-            className="rounded-lg border border-border bg-surface scroll-mt-4"
+            className="scroll-mt-4"
             tabIndex={-1}
           >
             <div
@@ -131,17 +132,28 @@ export function PathComparison({
               {rec.timedOut && <Badge tone="warning">시간 초과</Badge>}
               {rec.hintsUsed ? <Badge tone="neutral">힌트 {rec.hintsUsed}단계</Badge> : null}
               <span className="ml-auto flex items-center gap-1">
-                {!open && (
-                  <button
-                    type="button"
-                    aria-expanded={false}
+                {/*
+                  A symmetric toggle. The control used to only ever `add` to the set, so once a
+                  comparison was opened there was no way to close it again — on a long debrief that
+                  meant the page only ever grew.
+                */}
+                {!alwaysOpen.has(key) && (
+                  <Button
+                    variant="link"
+                    aria-expanded={open}
                     aria-controls={panelId}
-                    onClick={() => setOpened((s2) => new Set(s2).add(key))}
-                    className="inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-accent"
+                    onClick={() =>
+                      setOpened((s2) => {
+                        const next = new Set(s2)
+                        if (next.has(key)) next.delete(key)
+                        else next.add(key)
+                        return next
+                      })
+                    }
                   >
-                    경로 비교 보기
-                    <Icon name="chevron-right" size={14} />
-                  </button>
+                    경로 비교 {open ? '접기' : '보기'}
+                    <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} />
+                  </Button>
                 )}
                 <Button size="sm" variant="secondary" onClick={() => onFork(rec.turnIndex)}>
                   T+{rec.turnIndex}부터 다시 하기
@@ -159,7 +171,7 @@ export function PathComparison({
                   chosen.map((o) => <OptionCell key={o.id} option={o} scenario={scenario} />)
                 )}
                 {rec.memo && (
-                  <p className="mt-2 rounded border border-border bg-surface-2 p-2 text-sm">
+                  <p className="mt-2 rounded-sm border border-border bg-surface-2 p-2 text-sm">
                     <span className="text-muted">메모: </span>
                     {rec.memo}
                   </p>
@@ -188,7 +200,7 @@ export function PathComparison({
                 )}
               </div>
             </div>
-          </li>
+          </Card>
         )
       })}
     </ol>

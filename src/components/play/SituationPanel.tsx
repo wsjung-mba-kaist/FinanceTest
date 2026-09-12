@@ -7,7 +7,6 @@ import { Badge, Button, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Citation } from '../knowledge/Citation'
 import { Markdown } from '../knowledge/Markdown'
-import { StatusBoard } from './StatusBoard'
 import { WireItem } from './WireItem'
 import { usePlay } from './playContext'
 import { turnEntries, type WireEntry } from './playHelpers'
@@ -78,7 +77,7 @@ function Headline({ entry, fill }: { entry: WireEntry; fill: (s: string) => stri
   return (
     <article
       aria-labelledby="situation-headline"
-      className={`card-key border-l-4 p-3 ${
+      className={`rounded-lg border border-border-strong bg-surface shadow-card border-l-4 p-3 ${
         severity === 'critical'
           ? 'border-l-critical'
           : severity === 'warning'
@@ -95,7 +94,7 @@ function Headline({ entry, fill }: { entry: WireEntry; fill: (s: string) => stri
         {e?.reliability === 'unconfirmed' && <Badge tone="warning">미확인 정보</Badge>}
         {e?.time && <span className="num ml-auto text-sm text-muted">{e.time}</span>}
       </div>
-      <h3 id="situation-headline" className="prose-col mt-1 text-lg font-semibold">
+      <h3 id="situation-headline" className="prose-col mt-1 text-md font-semibold">
         {title}
       </h3>
       {open ? (
@@ -129,7 +128,7 @@ function Headline({ entry, fill }: { entry: WireEntry; fill: (s: string) => stri
 function RecentResult({ items, fill }: { items: FeedItem[]; fill: (s: string) => string }) {
   if (items.length === 0) {
     return (
-      <section aria-labelledby="recent-result-title" className="card-quiet p-3">
+      <section aria-labelledby="recent-result-title" className="rounded-lg bg-surface-2 p-3">
         <h3 id="recent-result-title" className="label-caps">
           최근 결과
         </h3>
@@ -138,7 +137,7 @@ function RecentResult({ items, fill }: { items: FeedItem[]; fill: (s: string) =>
     )
   }
   return (
-    <section aria-labelledby="recent-result-title" className="card-quiet p-3">
+    <section aria-labelledby="recent-result-title" className="rounded-lg bg-surface-2 p-3">
       <h3 id="recent-result-title" className="label-caps">
         최근 결과
       </h3>
@@ -161,7 +160,7 @@ function RecentResult({ items, fill }: { items: FeedItem[]; fill: (s: string) =>
  * 상황실 tab: one headline read large, two or three supporting one-liners, the result of the
  * last decision, and the status board. Everything else lives in 피드 전체.
  */
-export function SituationPanel({ onOpenFeed }: { onOpenFeed: () => void }) {
+export function SituationPanel({ onOpenFeed }: { onOpenFeed: (entryId?: string) => void }) {
   const { scenario, state, view } = usePlay()
   const entries = useMemo(() => turnEntries(view), [view])
   const events = useMemo(() => entries.filter((e) => e.event), [entries])
@@ -191,8 +190,8 @@ export function SituationPanel({ onOpenFeed }: { onOpenFeed: () => void }) {
     <div className="space-y-3 p-3">
       <LiveRegion message={announce} />
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <h2 id="turn-header-current" tabIndex={-1} className="text-md font-semibold outline-none">
-          <span className="num rounded bg-surface-2 px-1.5 py-0.5">{turn.label}</span>{' '}
+        <h2 id="turn-header-current" tabIndex={-1} className="label-caps font-semibold">
+          <span className="num rounded-sm bg-surface-2 px-1.5 py-0.5">{turn.label}</span>{' '}
           {turn.timeLabel}
           {turn.title ? ` · ${turn.title}` : ''}
         </h2>
@@ -202,7 +201,7 @@ export function SituationPanel({ onOpenFeed }: { onOpenFeed: () => void }) {
       {headline ? (
         <Headline entry={headline} fill={fill} />
       ) : (
-        <p className="card-quiet p-3 text-base text-muted">
+        <p className="rounded-lg bg-surface-2 p-3 text-base text-muted">
           이번 턴에는 새로 들어온 소식이 없습니다. 현황판과 결정을 확인해 주세요.
         </p>
       )}
@@ -229,15 +228,20 @@ export function SituationPanel({ onOpenFeed }: { onOpenFeed: () => void }) {
         </section>
       )}
 
+      {/*
+        최근 결과 moved above the fold and 창구·거래상대 현황판 moved to the dashboard tab.
+        The board is a standing reference — it takes ~460px and changes slowly — and it was
+        pushing "what did my last decision actually do" off the bottom of the column every turn.
+        The situation column answers "what just happened"; a table of counterparties does not.
+      */}
+      <RecentResult items={feedItems.slice(-2)} fill={fill} />
+
       <div className="flex justify-end">
-        <Button size="sm" variant="ghost" onClick={onOpenFeed}>
+        <Button size="sm" variant="ghost" onClick={() => onOpenFeed()}>
           피드 전체 보기
           <Icon name="arrow-right" size={14} />
         </Button>
       </div>
-
-      <RecentResult items={feedItems.slice(-2)} fill={fill} />
-      <StatusBoard />
     </div>
   )
 }

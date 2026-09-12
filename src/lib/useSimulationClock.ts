@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { getTurnView, tickCount, type GameState, type ScenarioDefinition } from '../engine'
 import { useGameStore, type ClockSpeed } from '../store/gameStore'
 
@@ -10,8 +10,15 @@ export interface SimulationClock {
   running: boolean
   /** What the player asked for. A hold stops the clock without changing this. */
   intent: boolean
-  /** 0..1 of the way through the current tick. */
-  progress: number
+  /**
+   * 0..1 through the current tick, as a subscribable store rather than a value.
+   *
+   * As state this re-rendered the entire play tree ten times a second for the length of a run —
+   * every chart, the wire feed, the decision dock — to animate one dot. `useTickProgress(store)`
+   * lets the single component that draws it subscribe, and leaves everyone else re-rendering on
+   * events that actually happened.
+   */
+  progressStore: ProgressStore
   /** Current sub-turn tick and the turn's tick count. */
   tick: number
   ticks: number
@@ -70,6 +77,45 @@ function holdReasonFor(
   return undefined
 }
 
+/**
+ * A one-number external store. Deliberately not `useState`: the value changes ten times a second
+ * and exactly one component cares.
+ */
+export interface ProgressStore {
+  get: () => number
+  set: (v: number) => void
+  subscribe: (fn: () => void) => () => void
+}
+
+function createProgressStore(): ProgressStore {
+  let value = 0
+  const listeners = new Set<() => void>()
+  return {
+    get: () => value,
+    set: (v: number) => {
+      if (v === value) return
+      value = v
+      for (const fn of listeners) fn()
+    },
+    subscribe: (fn) => {
+      listeners.add(fn)
+      return () => {
+        listeners.delete(fn)
+      }
+    },
+  }
+}
+
+/** Subscribe to tick progress. The only caller is `TickDots`. */
+export function useTickProgress(store: ProgressStore | undefined): number {
+  const subscribe = store?.subscribe ?? noopSubscribe
+  const get = store?.get ?? zero
+  return useSyncExternalStore(subscribe, get, get)
+}
+
+const noopSubscribe = () => () => {}
+const zero = () => 0
+
 function documentHidden(): boolean {
   if (typeof document === 'undefined') return false
   return document.visibilityState === 'hidden'
@@ -97,7 +143,19 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
   const setStoreSpeed = useGameStore((s) => s.setSpeed)
 
   const [hidden, setHidden] = useState(documentHidden)
-  const [progress, setProgress] = useState(0)
+  /**
+   * Tick progress lives outside React state.
+   *
+   * `setProgress` ten times a second re-rendered the whole play tree — the decision dock, the wire
+   * feed, every Recharts chart on the dashboard tab — for thirty to fifty minutes, to move one
+   * dot's opacity. The only component that reads it is `TickDots`. An external store means the
+   * dot subscribes, everything else re-renders on the events that actually happened: a tick
+   * advancing, a decision committing.
+   */
+  const storeRef = useRef<ProgressStore>(undefined as unknown as ProgressStore)
+  if (!storeRef.current) storeRef.current = createProgressStore()
+  const progressStore = storeRef.current
+  const setProgress = progressStore.set
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -129,7 +187,7 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
   useEffect(() => {
     accRef.current = 0
     setProgress(0)
-  }, [tick, turnIndex, running])
+  }, [tick, turnIndex, running, setProgress])
 
   const tickAdvanceRef = useRef(tickAdvance)
   tickAdvanceRef.current = tickAdvance
@@ -150,7 +208,7 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
       tickAdvanceRef.current()
     }, CLOCK_STEP_MS)
     return () => window.clearInterval(id)
-  }, [running, clock.baseTickMs, clock.speed])
+  }, [running, clock.baseTickMs, clock.speed, setProgress])
 
   const toggle = useCallback(() => {
     if (useGameStore.getState().clock.running) pause()
@@ -160,7 +218,7 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
   return {
     running,
     intent: clock.running,
-    progress: running ? progress : 0,
+    progressStore,
     tick,
     ticks,
     holdReason,

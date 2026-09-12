@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RUN_STATE_LABELS, runStateFromCi } from '../../metrics/runoff'
 import { useHelp } from '../help/helpContext'
-import { Badge, Button, type Tone } from '../ui'
+import { Badge, Button, CountPill, type Tone } from '../ui'
 import { Icon } from '../ui/Icon'
 import { ClockControl, type ClockState } from './ClockControl'
 import { usePlay } from './playContext'
@@ -74,7 +74,7 @@ export function StatusBar({
   const turn = scenario.turns[state.turnIndex]
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-surface px-2 text-base">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 text-base">
       <Link
         to="/"
         className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-muted no-underline hover:bg-surface-2 hover:text-text"
@@ -82,9 +82,11 @@ export function StatusBar({
         <Icon name="arrow-left" size={14} />
         {compact ? '' : '카탈로그'}
       </Link>
-      <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
-        <span className="truncate font-semibold">{scenario.meta.title}</span>
-        {!compact && <span className="truncate text-muted">· {scenario.meta.roleTitle}</span>}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap">
+        <span className="min-w-0 truncate font-semibold">{scenario.meta.title}</span>
+        {!compact && (
+          <span className="min-w-0 truncate text-muted">· {scenario.meta.roleTitle}</span>
+        )}
         <Badge tone={mode === 'expert' ? 'warning' : mode === 'guided' ? 'info' : 'neutral'}>
           {MODE_LABELS[mode]}
         </Badge>
@@ -112,11 +114,7 @@ export function StatusBar({
         >
           <Icon name="help" size={14} />
           도움
-          {help.badge > 0 && (
-            <span className="num ml-0.5 rounded-full bg-accent px-1 text-xs text-accent-fg">
-              {help.badge}
-            </span>
-          )}
+          <CountPill count={help.badge} label="새 도움말" className="ml-0.5" />
         </Button>
         <div className="relative" ref={menuRef}>
           <Button
@@ -144,7 +142,7 @@ export function StatusBar({
                         key={i}
                         type="button"
                         role="menuitem"
-                        className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
+                        className="block w-full rounded-sm px-2 py-1.5 text-left hover:bg-surface-2"
                         onClick={() => {
                           setMenuOpen(false)
                           onRewind(i)
@@ -166,7 +164,7 @@ export function StatusBar({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
+                className="block w-full rounded-sm px-2 py-1.5 text-left hover:bg-surface-2"
                 onClick={() => {
                   setMenuOpen(false)
                   onShortcuts()
@@ -177,7 +175,7 @@ export function StatusBar({
               <Link
                 role="menuitem"
                 to="/settings"
-                className="block w-full rounded px-2 py-1.5 text-left text-text no-underline hover:bg-surface-2"
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-text no-underline hover:bg-surface-2"
               >
                 설정
               </Link>
@@ -185,7 +183,7 @@ export function StatusBar({
               <button
                 type="button"
                 role="menuitem"
-                className="block w-full rounded px-2 py-1.5 text-left text-critical hover:bg-surface-2"
+                className="block w-full rounded-sm px-2 py-1.5 text-left text-critical hover:bg-surface-2"
                 onClick={() => {
                   setMenuOpen(false)
                   onAbandon()

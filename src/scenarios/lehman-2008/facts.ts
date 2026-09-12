@@ -477,7 +477,9 @@ export const LEHMAN_FACTS: FactRow[] = [
     note:
       '**해소 문서**: `api.stlouisfed.org/fred/series/observations?series_id=BAMLC0A0CM&observation_date=2008-09-09` ' +
       '(무료 FRED API 키 필요). 익명 CSV(`fredgraph.csv?id=BAMLC0A0CM`)는 날짜 파라미터를 붙여도 최근 3년만 ' +
-      '반환한다(docs/research/data-sources-global.md §2). 교차 확인(공개 계열로 직접 조회): 2008-09-09 ' +
+      '반환한다(docs/research/data-sources-global.md §2). **2026-09-12 재확인: 여전히 2023-09-12부터만 ' +
+      '온다.** 같은 요청 형태의 `DGS10`은 2008-09-02부터 정상 반환되므로 다운로드 상한이 아니라 ICE ' +
+      '라이선스 제약이다. DBnomics에도 FRED 미러는 없다. 교차 확인(공개 계열로 직접 조회): 2008-09-09 ' +
       'DBAA 6.97% · DAAA 5.37% · DGS10 3.62% → Baa−10y 335bp, Aaa−10y 175bp — 300bp는 그 사이에 든다',
   },
   {

@@ -22,7 +22,7 @@ export function ScenarioClock({
       {!compact && <span aria-hidden="true">◷</span>}
       {!compact && <span className="text-text">{timeLabel}</span>}
       <span
-        className="num rounded border border-border bg-surface-2 px-1.5 py-0.5 text-text"
+        className="num rounded-sm border border-border bg-surface-2 px-1.5 py-0.5 text-text"
         title={turnLabel}
       >
         {progress}

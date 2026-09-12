@@ -9,7 +9,7 @@ import {
   type SearchKind,
 } from '../../lib/search'
 import { Icon } from '../ui/Icon'
-import { EmptyState, LiveRegion } from '../ui'
+import { EmptyState, LiveRegion, SearchField } from '../ui'
 
 const PAGE = 5
 
@@ -20,11 +20,14 @@ const PAGE = 5
 export function KnowledgeSearch({
   initialQuery = '',
   onNavigate,
+  onQueryChange,
   autoFocus = true,
 }: {
   initialQuery?: string
   /** 결과를 눌러 이동할 때(시트를 닫는 등). */
   onNavigate?: () => void
+  /** 질의가 바뀔 때 — 지식 베이스 페이지는 이걸로 `?q=`를 유지한다. */
+  onQueryChange?: (q: string) => void
   autoFocus?: boolean
 }) {
   const [q, setQ] = useState(initialQuery)
@@ -37,24 +40,25 @@ export function KnowledgeSearch({
     setQ(initialQuery)
   }, [initialQuery])
 
+  // Deferred, so the URL is rewritten once the user stops typing rather than per keystroke.
+  useEffect(() => {
+    onQueryChange?.(deferred)
+    // `onQueryChange` is a stable callback at every call site; listing it would re-run this on
+    // every parent render and fight the deferral it exists to respect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deferred])
+
   const trimmed = deferred.trim()
   return (
     <div className="space-y-3">
-      <label className="block">
-        <span className="sr-only">지식 베이스 검색</span>
-        <span className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5">
-          <Icon name="search" size={16} />
-          <input
-            type="search"
-            autoFocus={autoFocus}
-            className="w-full bg-transparent text-base outline-none"
-            placeholder="용어·규정·카드 검색 (예: LCR, margin call, 예금자보호)"
-            aria-label="지식 베이스 검색"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </span>
-      </label>
+      <SearchField
+        label="지식 베이스 검색"
+        icon={<Icon name="search" size={16} />}
+        autoFocus={autoFocus}
+        placeholder="용어·규정·카드 검색 (예: LCR, margin call, 예금자보호)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
 
       <LiveRegion message={trimmed ? `검색 결과 ${total}건` : ''} />
 

@@ -34,7 +34,7 @@ export function InlineCard({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-[36px] w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm"
+        className="flex min-h-tap-min w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm"
       >
         {prefix && <span className="text-muted">{prefix}</span>}
         <span className="font-medium">{card.title}</span>
@@ -46,7 +46,7 @@ export function InlineCard({
       </button>
       {open && (
         <div className="border-t border-border px-3 py-2">
-          <Markdown className="text-base leading-relaxed">{card.body}</Markdown>
+          <Markdown className="text-base">{card.body}</Markdown>
           {card.sources.length > 0 && (
             <div className="mt-1 text-xs text-muted">
               출처

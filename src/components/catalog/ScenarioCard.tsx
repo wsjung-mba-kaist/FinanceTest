@@ -4,6 +4,7 @@ import type { ScenarioProgress } from '../../persistence/schema'
 import { catalogStatusOf, catalogStatusText } from '../../lib/catalog'
 import { DIFFICULTY_LABELS, ROLE_SHORT } from '../../lib/labels'
 import { Badge, type Tone } from '../ui'
+import { cardClass } from '../ui/cardStyles'
 
 const STATUS_TONE: Record<ReturnType<typeof catalogStatusOf>, Tone> = {
   available: 'info',
@@ -43,15 +44,12 @@ export function ScenarioCard({
       </p>
     </>
   )
-  const cls = 'block h-full rounded-lg border border-border bg-surface p-4 transition-colors'
+  const cls = cardClass('base', 'block h-full p-4 transition-colors')
   if (planned) {
     return (
-      <article
-        className={`${cls} opacity-60`}
-        aria-disabled="true"
-        aria-label={`${summary.title} — 준비 중`}
-      >
+      <article className={`${cls} bg-disabled-bg text-disabled-fg`} aria-disabled="true">
         {body}
+        <span className="sr-only"> — 준비 중</span>
       </article>
     )
   }
@@ -59,9 +57,16 @@ export function ScenarioCard({
     <Link
       to={`/scenarios/${summary.id}`}
       className={`${cls} text-text no-underline hover:border-accent focus-visible:border-accent`}
-      aria-label={`${summary.title} 브리핑으로 이동`}
     >
+      {/*
+        No `aria-label` on the card. An `aria-label` *replaces* an element's contents in the
+        accessibility tree, so "SVB 브리핑으로 이동" was all a screen-reader user ever heard —
+        the role, the running time, the difficulty and the completion badge, all of which are on
+        screen, were erased by the label meant to help. The card reads itself; only the action
+        needs adding.
+      */}
       {body}
+      <span className="sr-only"> — 브리핑으로 이동</span>
     </Link>
   )
 }

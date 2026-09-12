@@ -166,7 +166,7 @@ export const SVB_FACTS: FactRow[] = [
       '$1 billion borrowings with maturities on November 1 and 2, 2023." 합계 $15.0B. FHLB 담보 장부가 ' +
       '$44.9B 중 $25.9B가 추가 차입 여력으로 남아 있었다. **모형 주의**: 장기 FHLB $2.0B는 총장기부채 ' +
       '$5,370M(= 선순위채·후순위사채 $3,370M + FHLB 장기 $2,000M)에도 들어 있으므로 ' +
-      '`unsecuredLong` 5.4와 $2.0B만큼 겹친다 — 양쪽을 다 세지 않도록 `otherLiabilities` 플러그가 흡수한다'
+      '`unsecuredLong` 5.4와 $2.0B만큼 겹친다 — 양쪽을 다 세지 않도록 `otherLiabilities` 플러그가 흡수한다',
   },
   {
     path: 'institution.wholesale.cbFacilityCapacity',

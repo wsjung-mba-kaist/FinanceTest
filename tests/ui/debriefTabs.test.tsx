@@ -113,4 +113,41 @@ describe.skipIf(!scenario)('DebriefPage tabs', () => {
     const panel = await screen.findByRole('tabpanel')
     expect(panel).toHaveAccessibleName('퀴즈')
   })
+
+  /**
+   * The decisive assertion for print. `beforeprint` is the browser's last synchronous moment
+   * before it snapshots the page, so whether the hidden panels made it onto the paper depended on
+   * React flushing a batched `setState` in time — a race that usually lost. `flushSync` in
+   * `usePrintMode` makes it deterministic, and "deterministic" is exactly what this checks:
+   * immediately after dispatching the event, with no `await`, every panel must already be there.
+   */
+  it('renders every panel synchronously when the browser asks to print', async () => {
+    renderDebrief(scenario!)
+    await screen.findByRole('tablist', { name: '디브리핑 상세' })
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+
+    window.dispatchEvent(new Event('beforeprint'))
+    // No await: if this needed one, the print snapshot would already have been taken.
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(TAB_NAMES.length)
+
+    window.dispatchEvent(new Event('afterprint'))
+    await waitFor(() => expect(screen.getAllByRole('tabpanel')).toHaveLength(1))
+  })
+
+  /** The summary is meant to be read in one screen; the comparison table belongs to its own tab. */
+  it('keeps the one-page summary to a headline, a sentence and two decisions', async () => {
+    renderDebrief(scenario!)
+    await screen.findByRole('heading', { level: 1 })
+
+    // The 종합 점수 card is the page's single loudest panel.
+    expect(screen.getByLabelText('종합 점수')).toBeInTheDocument()
+    // The divergence is stated, not tabulated…
+    await waitFor(() =>
+      expect(
+        screen.getByText(/전문가 경로와 가장 크게 갈린 지표|사실상 같은 자리에서 끝났습니다/),
+      ).toBeInTheDocument(),
+    )
+    // …and the reader is told where to go next.
+    expect(screen.getByRole('navigation', { name: '다음 단계' })).toBeInTheDocument()
+  })
 })

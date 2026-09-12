@@ -129,7 +129,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   rationaleReveal: 'mode',
   timersEnabled: true,
   useSystemFont: false,
-  defaultMode: 'standard',
+  defaultMode: 'guided',
   clockTickSec: DEFAULT_CLOCK_TICK_SEC,
   variance: 1,
 }

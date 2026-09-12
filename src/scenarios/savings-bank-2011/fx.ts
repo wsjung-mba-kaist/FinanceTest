@@ -140,8 +140,7 @@ function multiplySpill(d: SbDraft, group: SbGroup, factor: number): void {
 /** 대시보드 표시용 사본을 상태와 맞춘다. 모든 효과의 마지막 줄에서 호출된다. */
 export function sync(d: SbDraft): void {
   const s = cb(d)
-  s.custom.depositsSector =
-    cnum(s, 'depBusan') + cnum(s, 'depPeer') + cnum(s, 'depSound')
+  s.custom.depositsSector = cnum(s, 'depBusan') + cnum(s, 'depPeer') + cnum(s, 'depSound')
   s.custom.suspendedBanks = s.bankingSystem.failedBanks
   s.custom.specialAccountTn = s.imf.committed
   s.custom.backstopRemaining = Math.max(0, cnum(s, 'backstopRemaining'))

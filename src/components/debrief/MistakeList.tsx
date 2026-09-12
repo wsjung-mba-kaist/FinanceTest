@@ -3,7 +3,7 @@ import { advanceTurn, applyDecision, findDecision, findOption, getTurnView } fro
 import type { GameState, KpiSpec, ScenarioDefinition } from '../../engine/types'
 import type { decisionRegrets } from '../../engine'
 import { formatMetric } from '../../lib/format'
-import { Badge, Button } from '../ui'
+import { Badge, Button, Card } from '../ui'
 import { InlineMarkdown } from '../knowledge/InlineMarkdown'
 
 type Regret = ReturnType<typeof decisionRegrets>[number]
@@ -153,7 +153,7 @@ export function MistakeList({
         const best = findOption(decision, r.best)
         const wi = whatIfs?.[i]
         return (
-          <li key={r.decisionId} className="rounded-lg border border-border bg-surface p-3">
+          <Card as="li" key={r.decisionId} className="p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="num text-md font-semibold text-muted">#{i + 1}</span>
               <Badge tone="neutral" className="num">
@@ -254,7 +254,7 @@ export function MistakeList({
                 대안 경로를 재실행할 수 없어 what-if 수치는 생략합니다.
               </p>
             )}
-          </li>
+          </Card>
         )
       })}
     </ol>

@@ -156,7 +156,13 @@ describe('autoplayer', () => {
   })
 
   describe('checkpoint tolerance', () => {
-    const base: Checkpoint = { turnId: 't1', metric: 'cash', expected: -0.958, tolerance: 0.15, label: '마감 잔고' }
+    const base: Checkpoint = {
+      turnId: 't1',
+      metric: 'cash',
+      expected: -0.958,
+      tolerance: 0.15,
+      label: '마감 잔고',
+    }
 
     it('fails a value outside the relative band', () => {
       expect(checkpointFailure(base, -1.6, 1)).toMatch(/rel\. error/)

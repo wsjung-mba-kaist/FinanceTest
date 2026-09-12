@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 import { Icon } from './Icon'
+import { useFocusTrap } from './useFocusTrap'
 
 /**
  * Desktop slide-over / mobile bottom sheet with Esc, focus containment and
@@ -25,50 +26,10 @@ export function SideSheet({
   labelledBy?: string
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const restoreRef = useRef<HTMLElement | null>(null)
   const autoId = useId()
   const titleId = labelledBy ?? `sheet-${autoId}`
 
-  useEffect(() => {
-    if (!open) return
-    restoreRef.current = document.activeElement as HTMLElement | null
-    const first = panelRef.current?.querySelector<HTMLElement>(
-      'input, button, [href], select, textarea, [tabindex]:not([tabindex="-1"])',
-    )
-    first?.focus()
-    return () => {
-      restoreRef.current?.focus?.()
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-        return
-      }
-      if (e.key !== 'Tab' || !panelRef.current) return
-      const items = Array.from(
-        panelRef.current.querySelectorAll<HTMLElement>(
-          'input:not([disabled]), button:not([disabled]), [href], select, textarea, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((el) => el.offsetParent !== null)
-      if (items.length === 0) return
-      const first = items[0]!
-      const last = items[items.length - 1]!
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
+  useFocusTrap(open, panelRef, onClose)
 
   if (!open) return null
 
@@ -100,7 +61,7 @@ export function SideSheet({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-text"
+            className="ml-auto inline-flex min-h-tap-compact min-w-tap-compact items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-text"
           >
             <Icon name="x" label="닫기" />
           </button>

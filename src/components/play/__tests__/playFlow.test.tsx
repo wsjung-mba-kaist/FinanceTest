@@ -109,7 +109,11 @@ describe('situation-room turn flow', () => {
     renderPlay()
     await screen.findByRole('heading', { name: /지금 요청받은 것/ })
 
-    const dock = document.getElementById('zone-decisions')
+    // The element that scrolls, which is the zone itself or — once the zone has a
+    // non-scrolling action footer — the box inside it.
+    const dock = document.querySelector(
+      '#zone-decisions [data-zone-scroll], #zone-decisions[data-zone-scroll]',
+    )
     expect(dock).not.toBeNull()
     let scrollTop = 420
     Object.defineProperty(dock as HTMLElement, 'scrollTop', {

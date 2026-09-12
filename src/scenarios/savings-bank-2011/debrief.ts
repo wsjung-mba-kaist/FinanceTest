@@ -33,7 +33,11 @@ export const sbDebrief: DebriefSpec = {
       {
         turnId: 't5',
         note: '예금자보호법 개정(법률 제10476호) 공포 3/29·시행 4/1로 상호저축은행 구조조정 특별계정 설치. 재원은 정부 출연금과 부보금융기관 연간 보험료의 45%, 2011.1.1 이후 보험사고분부터 이전. 6/24 구조조정기금 2차 PF채권 매입(45개사, 원금 1.9조원 → 1.4조원). 6/29 국정조사계획서 의결.',
-        sourceRefs: ['depositor-protection-act-2011', 'fsc-pf-fund-2011-06-24', 'assembly-inquiry-2011'],
+        sourceRefs: [
+          'depositor-protection-act-2011',
+          'fsc-pf-fund-2011-06-24',
+          'assembly-inquiry-2011',
+        ],
       },
       {
         turnId: 't6',

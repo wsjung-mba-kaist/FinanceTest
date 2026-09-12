@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Citation } from '../components/knowledge/Citation'
 import { Markdown } from '../components/knowledge/Markdown'
-import { Badge, EmptyState } from '../components/ui'
+import { Badge, Card, EmptyState } from '../components/ui'
 import { getCard, getFramework } from '../content'
 import { scenariosUsingCards } from '../lib/catalog'
 import { ROLE_SHORT } from '../lib/labels'
+import { uniqueSlugs } from '../lib/slug'
 import { getScenarioSummary } from '../scenarios'
 
-/** `## ` headings of the markdown source, parsed from the text (never from the DOM). */
+/**
+ * `## ` headings of the markdown source, parsed from the text (never from the DOM).
+ * The ids come from `uniqueSlugs`, the same function `<Markdown>` uses to stamp the headings and
+ * the search index uses to build its hrefs — so a ToC entry, a search result and a regulation
+ * reference all name the same anchor.
+ */
 function parseToc(md: string): { id: string; title: string }[] {
-  const out: { id: string; title: string }[] = []
-  const seen = new Map<string, number>()
+  const titles: string[] = []
   let inFence = false
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd()
@@ -23,13 +28,9 @@ function parseToc(md: string): { id: string; title: string }[] {
     const m = /^##\s+(.+?)\s*#*$/.exec(line)
     if (!m) continue
     const title = m[1]!.replace(/[*_`]/g, '').trim()
-    if (!title) continue
-    const base = title.replace(/\s+/g, '-').toLowerCase()
-    const n = (seen.get(base) ?? 0) + 1
-    seen.set(base, n)
-    out.push({ id: n === 1 ? base : `${base}-${n}`, title })
+    if (title) titles.push(title)
   }
-  return out
+  return uniqueSlugs(titles).map((id, i) => ({ id, title: titles[i]! }))
 }
 
 export default function FrameworkPage() {
@@ -57,6 +58,21 @@ export default function FrameworkPage() {
   }, [framework])
 
   const toc = useMemo(() => (body ? parseToc(body) : []), [body])
+  const hash = decodeURIComponent(useLocation().hash.replace(/^#/, ''))
+
+  /**
+   * Scroll to the section the hash names, once the document has rendered.
+   *
+   * The browser will not do this itself: under hash routing the fragment *is* the router's route,
+   * not an element id. Waiting on `body` is the point — a link arriving from search lands before
+   * the markdown has loaded, which is why every such deep link used to leave the reader at the top
+   * of the document.
+   */
+  useEffect(() => {
+    if (!hash || body === undefined) return
+    document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [hash, body])
+
   const usedBy = useMemo(() => {
     if (!framework) return []
     return scenariosUsingCards(framework.relatedCards)
@@ -96,46 +112,53 @@ export default function FrameworkPage() {
             ))}
           </div>
         )}
-        <div className="mt-4 rounded-lg border border-border bg-surface p-4">
+        <Card as="div" className="mt-4 p-4">
           {error && <p className="text-critical">문서를 불러오지 못했습니다: {error}</p>}
           {body === undefined && !error && (
             <p className="text-muted" role="status">
               불러오는 중…
             </p>
           )}
-          {body !== undefined && <Markdown className="prose-col">{body}</Markdown>}
-        </div>
+          {body !== undefined && (
+            <Markdown className="prose-col" headingIds>
+              {body}
+            </Markdown>
+          )}
+        </Card>
       </article>
       <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
         {toc.length > 1 && (
-          <nav aria-label="문서 목차" className="rounded-lg border border-border bg-surface p-3">
-            <h2 className="text-base font-semibold">목차</h2>
+          <Card as="nav" aria-label="문서 목차" className="p-3">
+            <h2 className="text-lg font-semibold">목차</h2>
             <ol className="m-0 mt-1 list-none space-y-0.5 border-l border-border p-0 text-sm">
               {toc.map((t) => (
                 <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const el = [...document.querySelectorAll('.md h2')].find(
-                        (n) => n.textContent?.trim() === t.title,
-                      )
-                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }}
-                    className="-ml-px block w-full border-0 border-l-2 border-transparent bg-transparent px-3 py-1 text-left text-muted hover:border-accent hover:text-text"
+                  {/*
+                    A real anchor, not a button that hunts the DOM for a heading whose text
+                    happens to match. The hash belongs to the router, so `Link` writes it and the
+                    effect above scrolls — which is also what makes an *incoming* deep link from
+                    search work, and that never did.
+                  */}
+                  <Link
+                    to={{ hash: t.id }}
+                    replace
+                    aria-current={hash === t.id ? 'location' : undefined}
+                    className={`-ml-px block border-l-2 px-3 py-1 no-underline ${
+                      hash === t.id
+                        ? 'border-accent font-medium text-text'
+                        : 'border-transparent text-muted hover:border-accent hover:text-text'
+                    }`}
                   >
                     {t.title}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ol>
-          </nav>
+          </Card>
         )}
         {usedBy.length > 0 && (
-          <section
-            aria-labelledby="fw-scenarios"
-            className="rounded-lg border border-border bg-surface p-3"
-          >
-            <h2 id="fw-scenarios" className="text-base font-semibold">
+          <Card aria-labelledby="fw-scenarios" className="p-3">
+            <h2 id="fw-scenarios" className="text-lg font-semibold">
               이 프레임워크가 쓰인 시나리오
             </h2>
             <ul className="m-0 mt-1 list-none space-y-1 p-0 text-sm">
@@ -146,14 +169,11 @@ export default function FrameworkPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </Card>
         )}
         {related.length > 0 && (
-          <section
-            aria-labelledby="fw-related"
-            className="rounded-lg border border-border bg-surface p-3"
-          >
-            <h2 id="fw-related" className="text-base font-semibold">
+          <Card aria-labelledby="fw-related" className="p-3">
+            <h2 id="fw-related" className="text-lg font-semibold">
               관련 개념 카드
             </h2>
             <ul className="m-0 mt-1 list-none space-y-1 p-0 text-sm">
@@ -164,20 +184,17 @@ export default function FrameworkPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </Card>
         )}
         {framework.sources.length > 0 && (
-          <section
-            aria-labelledby="fw-sources"
-            className="rounded-lg border border-border bg-surface p-3 text-sm"
-          >
-            <h2 id="fw-sources" className="text-base font-semibold">
+          <Card aria-labelledby="fw-sources" className="p-3 text-sm">
+            <h2 id="fw-sources" className="text-lg font-semibold">
               출처
             </h2>
             <p className="mt-1">
               <Citation ids={framework.sources} />
             </p>
-          </section>
+          </Card>
         )}
       </aside>
     </div>

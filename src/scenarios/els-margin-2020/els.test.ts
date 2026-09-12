@@ -60,7 +60,9 @@ function drive(perTurn: Record<number, [string, string[]][]>): State {
       const open = view.interrupts.find((i) => !i.resolved)
       if (open) {
         const named = wanted.find(([id]) => id === open.decision.id)
-        const ids = named ? named[1] : [(open.decision as Interrupt<SecuritiesState>).defaultOptionId]
+        const ids = named
+          ? named[1]
+          : [(open.decision as Interrupt<SecuritiesState>).defaultOptionId]
         s = applyDecision(s, scenario, open.decision.id, ids)
         if (named) done.add(named[0])
         if (s.phase === 'ended') break
@@ -263,7 +265,10 @@ describe('els-margin-2020 scenario', () => {
         failures.push(`${cp.label}: ${target} 값을 얻지 못했습니다`)
         continue
       }
-      const rel = cp.expected === 0 ? Math.abs(actual) : Math.abs(actual - cp.expected) / Math.abs(cp.expected)
+      const rel =
+        cp.expected === 0
+          ? Math.abs(actual)
+          : Math.abs(actual - cp.expected) / Math.abs(cp.expected)
       const abs = Math.abs(actual - cp.expected)
       const ok = rel <= cp.tolerance || (cp.absTolerance !== undefined && abs <= cp.absTolerance)
       console.log(

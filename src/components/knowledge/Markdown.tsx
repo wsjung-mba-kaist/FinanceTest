@@ -10,6 +10,7 @@ import {
 } from '../../lib/glossaryMatch'
 import { GlossaryTerm } from './GlossaryTerm'
 import { Citation } from './Citation'
+import { createSlugger } from '../../lib/slug'
 
 /**
  * 한 패널 안에서 "용어 첫 등장에만 밑줄"이 되도록 범위를 만든다.
@@ -36,10 +37,17 @@ export function Markdown({
   children,
   className,
   autoGlossary = false,
+  headingIds = false,
 }: {
   children: string
   className?: string
   autoGlossary?: boolean
+  /**
+   * Give `h2`/`h3` an `id` from `sectionSlug`, so a section can be linked to. Off by default
+   * because a page with two `<Markdown>` blocks would otherwise mint duplicate ids; the long-form
+   * documents that own their page turn it on.
+   */
+  headingIds?: boolean
 }) {
   const scope = useGlossaryScope()
   const owner = useId()
@@ -55,6 +63,9 @@ export function Markdown({
   }
   const inline = (nodes: ReactNode): ReactNode =>
     withInline(nodes, autoGlossary ? accept : undefined)
+  // One slugger per render, so repeated headings get `-2`, `-3`… in document order.
+  const slug = headingIds ? createSlugger() : undefined
+  const headingId = (c: ReactNode): string | undefined => (slug ? slug(plainText(c)) : undefined)
 
   return (
     <div className={`md ${className ?? ''}`}>
@@ -70,15 +81,37 @@ export function Markdown({
               </a>
             )
           },
+          h2: ({ children: c }) => <h2 id={headingId(c)}>{c}</h2>,
+          h3: ({ children: c }) => <h3 id={headingId(c)}>{c}</h3>,
           p: ({ children: c }) => <p>{inline(c)}</p>,
           li: ({ children: c }) => <li>{inline(c)}</li>,
           td: ({ children: c }) => <td>{inline(c)}</td>,
+          // Scrolling lives on a wrapper, never on the <table>. `display: block` on a table makes
+          // it scroll, and also removes it from the accessibility tree *as a table* — the rows and
+          // header cells stop being announced as such, in a product whose regulatory tables are
+          // the point. `role="group"` + tabIndex makes the scroll box reachable by keyboard.
+          table: ({ children: c }) => (
+            <div className="md-table-scroll" role="group" tabIndex={0} aria-label="표">
+              <table>{c}</table>
+            </div>
+          ),
         }}
       >
         {children}
       </ReactMarkdown>
     </div>
   )
+}
+
+/** Flattens a heading's rendered children back to text, for slugging. */
+function plainText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(plainText).join('')
+  if (node && typeof node === 'object' && 'props' in node) {
+    const props = (node as { props?: { children?: ReactNode } }).props
+    return plainText(props?.children)
+  }
+  return ''
 }
 
 const CITE = /\[출처:\s*([a-zA-Z0-9-_.,\s]+)\]/g

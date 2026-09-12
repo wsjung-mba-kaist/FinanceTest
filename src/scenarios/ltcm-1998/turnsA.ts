@@ -350,6 +350,29 @@ export const t1: T = {
   ],
   events: [
     {
+      /**
+       * The correction to `t0-rumor-desks`. The unnamed "큰 수렴 계정" was the reader's own fund,
+       * and the letter naming it is the first item of this turn — so the rumour is answered by the
+       * scenario's own escalation rather than by a wire clarification.
+       *
+       * The lesson is the ordering: the desks knew a week before the letter, which means the
+       * counterparties pricing your collateral had already reached their conclusion while you were
+       * still deciding whether to confirm anything.
+       */
+      id: 't1-news-rumour-named',
+      kind: 'newswire',
+      outlet: '통신사',
+      time: '11:55',
+      headline: '[확인] 지난주 데스크에서 돌던 "큰 수렴 계정"은 LTCM이었다',
+      body:
+        '어느 계정인지 특정되지 않은 채 일주일을 돌던 이야기는 투자자 서한이 알려지면서 확인됐다. ' +
+        '거래상대들은 이름이 공개되기 전부터 해당 계정의 담보를 다르게 매기고 있었다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't0-rumor-desks',
+      sourceRefs: [S.mcd, S.pwg],
+    },
+    {
       id: 't1-news-letter',
       kind: 'newswire',
       outlet: 'Bloomberg',

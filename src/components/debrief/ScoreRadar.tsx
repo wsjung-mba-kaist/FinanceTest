@@ -15,6 +15,7 @@ import { formatNumber } from '../../lib/format'
 import { DIMENSION_HELP, DIMENSION_LABELS, DIMENSION_LABELS_SHORT } from '../../lib/labels'
 import { Button } from '../ui'
 import { InfoTip } from '../ui/InfoTip'
+import { useChartType } from '../dashboard/useChartType'
 
 interface Row {
   dim: ScoreDimension
@@ -53,6 +54,8 @@ export function ScoreRadar({
   /** Printing: render the table so the chart is never measured at zero width. */
   forceTable?: boolean
 }) {
+  // Chart labels follow the reader's type scale; Recharts takes numbers, not CSS.
+  const chart = useChartType()
   const [table, setTable] = useState(false)
   const showTable = forceTable || table
   const rows: Row[] = SCORE_DIMENSIONS.map((d) => ({
@@ -67,7 +70,7 @@ export function ScoreRadar({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold">7차원 점수</h3>
+        <h3 className="text-md font-semibold">7차원 점수</h3>
         {!forceTable && (
           <Button
             size="sm"
@@ -117,11 +120,14 @@ export function ScoreRadar({
           <ResponsiveContainer width="100%" height={320}>
             <RadarChart data={rows} outerRadius="70%">
               <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis dataKey="short" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+              <PolarAngleAxis
+                dataKey="short"
+                tick={{ fill: 'var(--text-muted)', fontSize: chart.label }}
+              />
               <PolarRadiusAxis
                 domain={[0, 100]}
                 tickCount={5}
-                tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                tick={{ fill: 'var(--text-muted)', fontSize: chart.tick }}
                 axisLine={false}
               />
               <Radar

@@ -112,7 +112,9 @@ function collectTurnText(node: unknown, out: string[], key?: string): void {
 }
 
 /** Evaluates every authored checkpoint against a finished run. */
-function checkpointReport(s: State): { label: string; expected: number; actual: number; ok: boolean }[] {
+function checkpointReport(
+  s: State,
+): { label: string; expected: number; actual: number; ok: boolean }[] {
   return (scenario.checkpoints ?? []).map((c) => {
     const turnIndex = scenario.turns.findIndex((t) => t.id === c.turnId)
     const snap = s.metricsHistory.find((m) => m.turnIndex === turnIndex)
@@ -505,11 +507,7 @@ describe('savings-bank-2011 scenario', () => {
     const rec = r.decisions.find((d) => d.decisionId === 't2-d1')
     expect(rec).toBeDefined()
     expect(rec!.optionIds).toEqual(['t2-d1-b'])
-    expect(rec!.path).toEqual([
-      'forum-joint',
-      'pledgedBackstopTn-6',
-      'pledgedNoSuspensionDays-120',
-    ])
+    expect(rec!.path).toEqual(['forum-joint', 'pledgedBackstopTn-6', 'pledgedNoSuspensionDays-120'])
     expect(r.state.counters.pledgedBackstopTn).toBe(6)
     expect(r.state.counters.pledgedNoSuspensionDays).toBe(120)
     const back = replay(scenario, { seed: 1, decisions: r.decisions })
@@ -623,9 +621,7 @@ describe('savings-bank-2011 scenario', () => {
       metricAt(st, 5, 'usableReserves') - metricAt(st, 6, 'usableReserves')
     console.log('[forbearance] T6 fund drop — forbear', drop(forbear), 'clean', drop(clean))
     expect(drop(forbear)).toBeGreaterThan(drop(clean) * 1.2)
-    expect(computeScore(forbear, scenario).total).toBeLessThan(
-      computeScore(clean, scenario).total,
-    )
+    expect(computeScore(forbear, scenario).total).toBeLessThan(computeScore(clean, scenario).total)
   })
 
   it('worst and random policies complete without NaN and score within [0, 100]', () => {

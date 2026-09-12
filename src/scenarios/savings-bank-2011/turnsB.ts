@@ -49,7 +49,8 @@ export const t4: T = {
     },
     {
       id: 't4-stabilise',
-      description: '지역 합동 대책회의와 구조조정기금 매입 예고로 3월 수신이 순유입 전환 (신뢰 +12)',
+      description:
+        '지역 합동 대책회의와 구조조정기금 매입 예고로 3월 수신이 순유입 전환 (신뢰 +12)',
       effects: [
         confidence(12, '3월 업권 수신 순유입 전환'),
         sbFx.setDampener({ factor: 0.95, reason: '지역 합동 대책', label: '3월 진정' }),
@@ -151,8 +152,7 @@ export const t4: T = {
             rating: 72,
             rationale:
               '법을 지키면서 다툴 여지가 있는 부분을 절차로 보내는 현실적인 답이다. 후순위채의 쟁점은 보호 여부가 아니라 **어떻게 팔렸는가**이며, 그 판단은 검사와 분쟁조정, 최종적으로는 법원의 몫이다.',
-            historicalNote:
-              '후순위채 불완전판매 문제는 이후 분쟁조정과 소송 절차로 다뤄졌다.',
+            historicalNote: '후순위채 불완전판매 문제는 이후 분쟁조정과 소송 절차로 다뤄졌다.',
             sourceRefs: [S.dpAct, S.supervision],
           },
           consequences:
@@ -282,8 +282,7 @@ export const t4: T = {
         {
           id: 't4-d2-c',
           label: '감독 강화는 시장이 진정된 뒤로 미룬다',
-          description:
-            '지금 규제를 조이면 업권이 더 흔들린다. 정리가 끝난 뒤에 제도를 손본다.',
+          description: '지금 규제를 조이면 업권이 더 흔들린다. 정리가 끝난 뒤에 제도를 손본다.',
           effects: [
             counter('forbearanceCost', 0.12),
             confidence(1, '규제 강화 유보에 따른 업권 안도'),
@@ -622,7 +621,8 @@ export const t5: T = {
               '부담 주체가 가장 명확하고 규모도 확실하지만, 국회 동의와 예산 절차 동안 정리는 멈추지 않는다. 재원이 늦게 도착하면 그 공백이 곧 유예의 명분이 된다.',
             sourceRefs: [S.dpAct2011],
           },
-          consequences: '공적자금 조성 협의가 시작되었습니다. 이번 분기 안에는 결론이 나기 어렵습니다.',
+          consequences:
+            '공적자금 조성 협의가 시작되었습니다. 이번 분기 안에는 결론이 나기 어렵습니다.',
         },
         {
           id: 't5-d1-c',
@@ -704,8 +704,7 @@ export const t5: T = {
             {
               afterTurns: 1,
               when: { counter: 'capitalDeadlineDays', lte: 60 },
-              description:
-                '경영진단 전에 자구계획 일부가 도착 (저축은행계정 +0.6조, 신뢰지수 +4)',
+              description: '경영진단 전에 자구계획 일부가 도착 (저축은행계정 +0.6조, 신뢰지수 +4)',
               effects: [
                 sbFx.specialAccount({ stage: 'agreed', draw: 0.6, label: '자구계획 이행분 도착' }),
                 confidence(4, '자구계획 이행분 도착'),
@@ -724,13 +723,13 @@ export const t5: T = {
               '약정에 기한과 강제수단이 함께 있으면 자구계획은 판단 자료가 된다. 없으면 명분이 된다.',
             sourceRefs: [S.msbAct, S.finAct],
           },
-          consequences: '서면 약정이 체결되었습니다. 이행 기한과 미이행 시 조치가 함께 기재되었습니다.',
+          consequences:
+            '서면 약정이 체결되었습니다. 이행 기한과 미이행 시 조치가 함께 기재되었습니다.',
         },
         {
           id: 't5-d2-b',
           label: '규모는 받되 이행 기한은 자율에 맡긴다',
-          description:
-            '자구계획을 제출받되 기한은 대주주의 사정에 맡긴다. 협상은 원만하게 끝난다.',
+          description: '자구계획을 제출받되 기한은 대주주의 사정에 맡긴다. 협상은 원만하게 끝난다.',
           effects: [flag('capital_agreement_soft'), counter('capitalAgreement', 1)],
           delayedEffects: [
             {
@@ -773,8 +772,7 @@ export const t5: T = {
         {
           id: 't5-d2-c',
           label: '협상 없이 적기시정조치를 기준대로 집행한다',
-          description:
-            '자구계획에 기대지 않고 감독규정 기준대로 경영개선 절차를 진행한다.',
+          description: '자구계획에 기대지 않고 감독규정 기준대로 경영개선 절차를 진행한다.',
           effects: [flag('pca_enforced'), counter('forbearanceCost', -0.08)],
           expert: {
             rating: 62,
@@ -782,7 +780,8 @@ export const t5: T = {
               '유예의 여지를 없애는 가장 확실한 방법이지만, 대주주가 낼 수 있었을 자본까지 포기하는 것이다. 기금 부담이 그만큼 커진다.',
             sourceRefs: [S.msbAct],
           },
-          consequences: '적기시정조치가 기준대로 집행되었습니다. 대주주 측은 협상 중단을 통보했습니다.',
+          consequences:
+            '적기시정조치가 기준대로 집행되었습니다. 대주주 측은 협상 중단을 통보했습니다.',
         },
         {
           id: 't5-d2-d',
@@ -843,7 +842,12 @@ const t6AssemblyCall: Interrupt<CentralBankState> = {
   title: '국회 정무위원회 의원실',
   prompt: '발표 직전 의원실에서 연락이 왔습니다. 무엇을 답하시겠습니까?',
   dimensions: ['communication', 'compliance'],
-  source: { kind: 'regulator', caller: '국회 정무위원회 의원실 보좌관', agency: '국회', tone: 'urgent' },
+  source: {
+    kind: 'regulator',
+    caller: '국회 정무위원회 의원실 보좌관',
+    agency: '국회',
+    tone: 'urgent',
+  },
   lines: [
     {
       speaker: '정무위원회 보좌관',
@@ -899,8 +903,7 @@ const t6AssemblyCall: Interrupt<CentralBankState> = {
           '감독당국이 스스로 무엇을 확인했는지 밝히는 것이 신뢰를 회복하는 유일한 경로다. 확인한 사실만 말하고 판단은 수사와 국정조사에 넘기면, 단정하지 않으면서도 책임을 지는 답이 된다.',
         sourceRefs: [S.inquiry, S.msbAct],
       },
-      consequences:
-        '자체 조사 결과의 범위와 수사 의뢰 방침이 발표 자료에 포함되었습니다.',
+      consequences: '자체 조사 결과의 범위와 수사 의뢰 방침이 발표 자료에 포함되었습니다.',
     },
     {
       id: 't6-i1-d',
@@ -909,8 +912,7 @@ const t6AssemblyCall: Interrupt<CentralBankState> = {
       effects: [confidence(-3, '국회 질의에 대한 무응답')],
       expert: {
         rating: 30,
-        rationale:
-          '오늘 하루는 벌지만, 답하지 않은 질문은 국정감사에서 더 큰 형태로 돌아온다.',
+        rationale: '오늘 하루는 벌지만, 답하지 않은 질문은 국정감사에서 더 큰 형태로 돌아온다.',
         sourceRefs: [S.inquiry],
       },
       consequences: '답변이 유보되었습니다. 의원실이 자료 제출을 공식 요구했습니다.',
@@ -1191,8 +1193,7 @@ export const t6: T = {
         {
           id: 't6-d1-d',
           label: '13개사를 모두 정지해 불확실성을 한 번에 없앤다',
-          description:
-            '자구계획 진행 여부와 무관하게 기준에 걸린 모든 기관을 정지한다.',
+          description: '자구계획 진행 여부와 무관하게 기준에 걸린 모든 기관을 정지한다.',
           effects: [
             sbFx.suspend({
               group: 'peer',
@@ -1364,7 +1365,8 @@ export const t7: T = {
     },
     {
       id: 't7-market',
-      description: '11/23 종가: 국고채 3년 3.36%, 회사채 AA− 4.21%, KOSPI 1,783.10, 원/달러 1,152.0',
+      description:
+        '11/23 종가: 국고채 3년 3.36%, 회사채 AA− 4.21%, KOSPI 1,783.10, 원/달러 1,152.0',
       effects: [
         op('market.custom.govt3y', 'set', 336, '국고채 3년 11/23 종가'),
         op('market.custom.corpAa3y', 'set', 421, '회사채 AA− 3년 11/23 종가'),
@@ -1547,8 +1549,7 @@ export const t7: T = {
             rating: 78,
             rationale:
               '2010년 검사에서 부실이 걸러지지 않았다는 것이 이 사태의 출발점이므로 검사 체계 개편은 필요조건이다. 다만 조직과 절차를 바꾸는 것만으로는 유예를 막지 못한다.',
-            historicalNote:
-              '사태 이후 금융감독 체계 개편 논의가 정부 차원에서 진행되었다.',
+            historicalNote: '사태 이후 금융감독 체계 개편 논의가 정부 차원에서 진행되었다.',
             sourceRefs: [S.inquiry, S.supervision],
           },
           consequences: '감독체계 개편안이 마련되었습니다.',

@@ -471,7 +471,10 @@ export const t5: T = {
               id: 't5-d2-r-alone',
               label: '단독으로 진행',
               resolvesTo: 't5-d2-b',
-              expert: { rating: 40, rationale: '순수 민간 거래는 실사 시간과 가격 모두에서 불리하다.' },
+              expert: {
+                rating: 40,
+                rationale: '순수 민간 거래는 실사 시간과 가격 모두에서 불리하다.',
+              },
             },
           ],
         },

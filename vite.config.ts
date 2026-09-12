@@ -20,6 +20,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // `tests/visual/*` drives a real browser against a running dev server. It is a deliberate act
+    // (`pnpm test:visual`), not part of the default run: it needs `pnpm dev` up, takes ~20s, and
+    // would otherwise skip silently on every CI run and look like it was passing.
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/visual/**'],
     setupFiles: ['./tests/setup.ts'],
   },
 })

@@ -48,7 +48,7 @@ export function TerminalCard({ onDebrief }: { onDebrief: () => void }) {
       <h2 id="terminal-title" className="text-lg font-semibold leading-tight">
         {title}
       </h2>
-      {narrative && <Markdown className="text-base leading-relaxed">{narrative}</Markdown>}
+      {narrative && <Markdown className="text-base">{narrative}</Markdown>}
       {ruleText && (
         <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
           <span className="font-semibold text-muted">발동 규칙</span>

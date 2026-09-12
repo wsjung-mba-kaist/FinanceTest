@@ -3,7 +3,7 @@ import type { MetricDelta, MetricUnit, Units } from '../../engine'
 import { formatDelta, formatMetric } from '../../lib/format'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { firstSentence } from '../../lib/text'
-import { Badge, Button, LiveRegion, StatusBadge } from '../ui'
+import { Badge, Button, Card, LiveRegion, StatusBadge } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Markdown } from '../knowledge/Markdown'
 import { useRollingNumber } from './useRollingNumber'
@@ -62,7 +62,7 @@ function MarketRow({
 function Step({ step, units, animate }: { step: ReelStep; units: Units; animate: boolean }) {
   return (
     <section
-      className={`card-quiet p-2.5 ${animate ? 'reel-step-in' : ''}`}
+      className={`rounded-lg bg-surface-2 p-2.5 ${animate ? 'reel-step-in' : ''}`}
       aria-label={REEL_STEP_TITLES[step.kind]}
     >
       <h4 className="label-caps">{REEL_STEP_TITLES[step.kind]}</h4>
@@ -163,7 +163,7 @@ export function ConsequenceReel({
   if (steps.length === 0) return null
 
   return (
-    <div className="card-surface space-y-2 p-3" aria-labelledby="reel-title">
+    <Card as="div" className="space-y-2 p-3" aria-labelledby="reel-title">
       <div className="flex flex-wrap items-center gap-2">
         <h3 id="reel-title" className="text-md font-semibold">
           결과 요약
@@ -188,6 +188,6 @@ export function ConsequenceReel({
           <Step key={`${s.kind}-${i}`} step={s} units={units} animate={!reduced} />
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

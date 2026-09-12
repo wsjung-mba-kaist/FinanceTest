@@ -108,7 +108,9 @@ export function marginCallStep(p: MarginStep & { label?: string }): Effect<Secur
         s.liquidity.fxLiquid += back
         d.counters.marginPosted = posted - back
         d.counters.marginReleased = (d.counters.marginReleased ?? 0) + fromPending + back
-        ctx.log(`증거금 환급 ${(fromPending + back).toFixed(0)} (외화 유동자산 +${back.toFixed(0)})`)
+        ctx.log(
+          `증거금 환급 ${(fromPending + back).toFixed(0)} (외화 유동자산 +${back.toFixed(0)})`,
+        )
       }
       if (ctx.isLastTick) d.counters.marginWindowBase = 0
     },
@@ -118,18 +120,22 @@ export function marginCallStep(p: MarginStep & { label?: string }): Effect<Secur
 
 /** 일중 환율 변동을 미납 증거금 잔액에 반영한다(외화 표시 채무의 원화 환산). */
 export function marginFxDrift(p: { fxAtTurnStart: number }): Effect<SecuritiesState> {
-  return fnEffect<SecuritiesState>('marginFxDrift', { fxAtTurnStart: p.fxAtTurnStart }, (d, ctx) => {
-    const s = sec(d)
-    if (s.hedge.marginCallPending <= 0) return
-    const factor = d.market.fxUsdLocal / p.fxAtTurnStart
-    if (!Number.isFinite(factor) || factor === 1) return
-    const delta = s.hedge.marginCallPending * (factor - 1)
-    s.hedge.marginCallPending += delta
-    d.counters.marginFxRevalue = (d.counters.marginFxRevalue ?? 0) + delta
-    ctx.log(
-      `환율 재평가: 미납 증거금 ${delta >= 0 ? '+' : ''}${delta.toFixed(0)} (원/달러 ${p.fxAtTurnStart.toFixed(0)} → ${d.market.fxUsdLocal.toFixed(0)})`,
-    )
-  })
+  return fnEffect<SecuritiesState>(
+    'marginFxDrift',
+    { fxAtTurnStart: p.fxAtTurnStart },
+    (d, ctx) => {
+      const s = sec(d)
+      if (s.hedge.marginCallPending <= 0) return
+      const factor = d.market.fxUsdLocal / p.fxAtTurnStart
+      if (!Number.isFinite(factor) || factor === 1) return
+      const delta = s.hedge.marginCallPending * (factor - 1)
+      s.hedge.marginCallPending += delta
+      d.counters.marginFxRevalue = (d.counters.marginFxRevalue ?? 0) + delta
+      ctx.log(
+        `환율 재평가: 미납 증거금 ${delta >= 0 ? '+' : ''}${delta.toFixed(0)} (원/달러 ${p.fxAtTurnStart.toFixed(0)} → ${d.market.fxUsdLocal.toFixed(0)})`,
+      )
+    },
+  )
 }
 
 /**
@@ -272,7 +278,9 @@ export function drawFxLine(p: {
       s.liquidity.fxLiquid += got
       d.counters.fxLineDrawn = (d.counters.fxLineDrawn ?? 0) + got
       d.counters.fundingCostBp = Math.max(d.counters.fundingCostBp ?? 0, p.rateBp)
-      ctx.log(`외화 크레딧라인 인출 ${got.toFixed(0)} / 신청 ${p.amount} (잔여 한도 ${(room - got).toFixed(0)})`)
+      ctx.log(
+        `외화 크레딧라인 인출 ${got.toFixed(0)} / 신청 ${p.amount} (잔여 한도 ${(room - got).toFixed(0)})`,
+      )
     },
     p.label,
   )
@@ -299,7 +307,9 @@ export function bokSwapBid(p: {
       d.counters.fundingCostBp = Math.max(d.counters.fundingCostBp ?? 0, p.rateBp)
       d.flags.bok_swap_used = true
       d.flagTurns.bok_swap_used ??= d.turnIndex
-      ctx.log(`통화스와프자금 낙찰 ${got.toFixed(0)} (응찰 ${p.amount}, 배정 한도 ${p.allocationCap})`)
+      ctx.log(
+        `통화스와프자금 낙찰 ${got.toFixed(0)} (응찰 ${p.amount}, 배정 한도 ${p.allocationCap})`,
+      )
     },
   )
 }
@@ -308,7 +318,9 @@ export function bokSwapBid(p: {
  * 함정: 원화·외화 확정 라인을 한 번에 전액 인출한다. 오늘의 결제는 해결되지만 주거래은행 전부가
  * 같은 날 같은 신호를 읽는다 — 신뢰지수가 떨어지고 다음 턴 한도가 축소된다.
  */
-export function drawAllLines(p: { ciPenalty: number } = { ciPenalty: 12 }): Effect<SecuritiesState> {
+export function drawAllLines(
+  p: { ciPenalty: number } = { ciPenalty: 12 },
+): Effect<SecuritiesState> {
   return fnEffect<SecuritiesState>('drawAllLines', { ciPenalty: p.ciPenalty }, (d, ctx) => {
     const s = sec(d)
     const krw = Math.max(0, s.liquidity.creditLines - s.liquidity.creditLinesDrawn)
@@ -543,7 +555,11 @@ export function equityFundContribution(p: { amount: number }): Effect<Securities
 }
 
 /** RP 매도 확대(담보부 원화 조달). 담보 여력 = 미담보 채권 × (1 − 헤어컷). */
-export function repoRaise(p: { amount: number; haircut: number; rateBp: number }): Effect<SecuritiesState> {
+export function repoRaise(p: {
+  amount: number
+  haircut: number
+  rateBp: number
+}): Effect<SecuritiesState> {
   return fnEffect<SecuritiesState>('repoRaise', { ...p }, (d, ctx) => {
     const s = sec(d)
     const cap = s.liquidity.sellableSecurities * (1 - p.haircut)
@@ -588,7 +604,9 @@ export function discloseFxPosition(p: { minCover: number }): Effect<SecuritiesSt
       d.confidence.index = clamp(d.confidence.index - 6, 0, 100)
       d.flags.fx_disclosure_backfired = true
       d.flagTurns.fx_disclosure_backfired ??= d.turnIndex
-      ctx.log(`외화 유동성 공표: ${s.liquidity.fxLiquid.toFixed(0)} < ${p.minCover} → 부족이 드러남, ΔCI −6`)
+      ctx.log(
+        `외화 유동성 공표: ${s.liquidity.fxLiquid.toFixed(0)} < ${p.minCover} → 부족이 드러남, ΔCI −6`,
+      )
     }
   })
 }
@@ -596,7 +614,7 @@ export function discloseFxPosition(p: { minCover: number }): Effect<SecuritiesSt
 /** 자사 CP 발행금리 갱신(시장 CP91 + 프리미엄). */
 export function setOwnCpRate(p: { premiumBp: number }): Effect<SecuritiesState> {
   return fnEffect<SecuritiesState>('setOwnCpRate', { premiumBp: p.premiumBp }, (d) => {
-    const own = (d.counters.ownCpPremiumBp ?? 0)
+    const own = d.counters.ownCpPremiumBp ?? 0
     d.market.custom.ownCpRate = ((d.market.custom.cp91 ?? 0) + p.premiumBp + own) / 100
   })
 }

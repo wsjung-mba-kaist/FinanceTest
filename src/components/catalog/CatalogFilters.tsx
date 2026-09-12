@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { CATALOG_SORT_LABELS, type CatalogSort } from '../../lib/catalog'
-import { Button } from '../ui'
+import { Button, Card, Chip } from '../ui'
 import { Icon } from '../ui/Icon'
 
 export type FilterKey = 'role' | 'region' | 'decade' | 'difficulty' | 'competency' | 'status'
@@ -26,19 +26,9 @@ function ChipGroup({
       {options.map((o) => {
         const on = selected.has(o.id)
         return (
-          <button
-            key={o.id}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onToggle(o.id)}
-            className={`rounded-full border px-2.5 py-0.5 text-sm transition-colors ${
-              on
-                ? 'border-accent bg-accent text-accent-fg'
-                : 'border-border bg-surface text-muted hover:text-text'
-            }`}
-          >
+          <Chip key={o.id} selected={on} aria-pressed={on} onClick={() => onToggle(o.id)}>
             {o.label}
-          </button>
+          </Chip>
         )
       })}
     </div>
@@ -81,7 +71,7 @@ export function CatalogFilters({
   const anyFilter = (Object.keys(filters) as FilterKey[]).some((k) => filters[k].size > 0)
 
   return (
-    <section aria-label="카탈로그 필터" className="rounded-lg border border-border bg-surface p-3">
+    <Card aria-label="카탈로그 필터" className="p-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <ChipGroup
           label="상태"
@@ -95,7 +85,7 @@ export function CatalogFilters({
             id={sortId}
             value={sort}
             onChange={(e) => onSort(e.target.value as CatalogSort)}
-            className="rounded border border-border bg-bg px-2 py-1 text-sm text-text"
+            className="rounded-sm border border-border-control bg-bg px-2 py-1 text-sm text-text"
           >
             {(Object.keys(CATALOG_SORT_LABELS) as CatalogSort[]).map((s) => (
               <option key={s} value={s}>
@@ -125,7 +115,7 @@ export function CatalogFilters({
           aria-expanded={more}
           aria-controls={panelId}
           onClick={() => setMore((v) => !v)}
-          className="ml-auto inline-flex items-center gap-1 border-0 bg-transparent p-0 text-sm text-accent"
+          className="ml-auto inline-flex min-h-tap-dense items-center gap-1 border-0 bg-transparent text-sm text-accent"
         >
           <Icon name="filter" size={14} />더 많은 필터
           <Icon name={more ? 'chevron-down' : 'chevron-right'} size={14} />
@@ -175,6 +165,6 @@ export function CatalogFilters({
           </Button>
         )}
       </p>
-    </section>
+    </Card>
   )
 }

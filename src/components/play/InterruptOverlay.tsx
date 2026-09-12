@@ -4,6 +4,7 @@ import { hasDialogue, isInterrupt } from '../../engine'
 import { useGameStore } from '../../store/gameStore'
 import { Badge, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
+import { Dialog } from '../ui/Dialog'
 import { CountdownRing } from './CountdownRing'
 import { DialoguePanel } from './DialoguePanel'
 import { usePlay } from './playContext'
@@ -33,8 +34,6 @@ const KIND_LABEL: Record<Interrupt['source']['kind'], string> = {
 export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswered: () => void }) {
   const { scenario, mode } = usePlay()
   const respondInterrupt = useGameStore((s) => s.respondInterrupt)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const restoreRef = useRef<HTMLElement | null>(null)
   const firedRef = useRef(false)
   const startedAt = useRef(Date.now())
   const [announce, setAnnounce] = useState('')
@@ -65,35 +64,6 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
     },
     [decision.id, respondInterrupt, onAnswered],
   )
-
-  // --------------------------------------------------------------- focus trap + return
-  useEffect(() => {
-    restoreRef.current = (document.activeElement as HTMLElement | null) ?? null
-    const first = panelRef.current?.querySelector<HTMLElement>('button:not([disabled])')
-    first?.focus()
-    return () => restoreRef.current?.focus?.()
-  }, [])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !panelRef.current) return
-      const items = Array.from(
-        panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href]'),
-      )
-      if (items.length === 0) return
-      const first = items[0]!
-      const last = items[items.length - 1]!
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [])
 
   // --------------------------------------------------------------- countdown
   useEffect(() => {
@@ -138,90 +108,84 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
   const descId = `interrupt-${decision.id}-desc`
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"
-      data-noprint
+    // No `onClose` and no `onDismiss`: an interrupt is a forced decision, so neither Esc nor a
+    // click on the backdrop may dismiss it — and Esc must not be swallowed on its way elsewhere.
+    <Dialog
+      open
+      role="alertdialog"
+      labelledBy={titleId}
+      describedBy={descId}
+      size="lg"
+      align="bottom-on-mobile"
     >
-      <div
-        ref={panelRef}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descId}
-        className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-lg border border-border-strong bg-surface p-4 shadow-xl"
-      >
-        <LiveRegion message={announce} assertive />
-        <LiveRegion message={notice} assertive={notice.includes('10초')} />
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge
-                tone={tone === 'urgent' ? 'critical' : tone === 'concerned' ? 'warning' : 'neutral'}
-              >
-                {KIND_LABEL[interrupt.source.kind]} · {TONE_LABEL[tone]}
-              </Badge>
-              <span className="text-base font-semibold">{interrupt.source.caller}</span>
-              {interrupt.source.agency && (
-                <span className="text-sm text-muted">{interrupt.source.agency}</span>
-              )}
-            </div>
-            <h2 id={titleId} className="prose-col mt-1 text-lg font-semibold">
-              {decision.title}
-            </h2>
+      <LiveRegion message={announce} assertive />
+      <LiveRegion message={notice} assertive={notice.includes('10초')} />
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge
+              tone={tone === 'urgent' ? 'critical' : tone === 'concerned' ? 'warning' : 'neutral'}
+            >
+              {KIND_LABEL[interrupt.source.kind]} · {TONE_LABEL[tone]}
+            </Badge>
+            <span className="text-base font-semibold">{interrupt.source.caller}</span>
+            {interrupt.source.agency && (
+              <span className="text-sm text-muted">{interrupt.source.agency}</span>
+            )}
           </div>
-          <CountdownRing remainingMs={remainingMs} totalMs={totalMs} size={56} />
+          <h2 id={titleId} className="prose-col mt-1 text-lg font-semibold">
+            {decision.title}
+          </h2>
         </div>
+        <CountdownRing remainingMs={remainingMs} totalMs={totalMs} size={56} />
+      </div>
 
-        <div id={descId} className="mt-2 space-y-1.5">
-          {interrupt.lines.map((l, i) => (
-            <p key={`${l.speaker}-${i}`} className="prose-col text-base">
-              <span className="font-semibold text-muted">{l.speaker}</span>{' '}
-              <InlineMarkdown>{l.text}</InlineMarkdown>
-            </p>
-          ))}
-          <p className="prose-col text-base font-medium">
-            <InlineMarkdown>{decision.prompt}</InlineMarkdown>
+      <div id={descId} className="mt-2 space-y-1.5">
+        {interrupt.lines.map((l, i) => (
+          <p key={`${l.speaker}-${i}`} className="prose-col text-base">
+            <span className="font-semibold text-muted">{l.speaker}</span>{' '}
+            <InlineMarkdown>{l.text}</InlineMarkdown>
           </p>
-        </div>
-
-        {hasDialogue(decision) ? (
-          <div className="mt-3">
-            <DialoguePanel
-              dv={dv}
-              onResolve={(optionId, path) => answer([optionId], false, path)}
-            />
-          </div>
-        ) : (
-          <div role="group" aria-labelledby={titleId} className="mt-3 space-y-2">
-            {dv.options.map((ov, i) => (
-              <button
-                key={ov.option.id}
-                type="button"
-                disabled={!ov.available}
-                className="flex w-full min-h-[56px] items-start gap-2 rounded-md border border-border bg-bg px-3 py-2 text-left hover:border-accent hover:bg-surface-2 disabled:opacity-50"
-                onClick={() => answer([ov.option.id], false)}
-              >
-                <span className="num mt-0.5 shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-sm">
-                  {letterFor(i)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-medium">{ov.option.label}</span>
-                  <span className="block text-sm text-muted">
-                    {ov.available
-                      ? optionEffectLine(ov.option, scenario.kpis)
-                      : (ov.reason ?? '지금은 선택할 수 없습니다')}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <p className="mt-2 flex items-center gap-1 text-sm text-muted">
-          <Icon name="clock" size={14} />
-          응답이 없으면 기본 응답으로 처리됩니다
+        ))}
+        <p className="prose-col text-base font-medium">
+          <InlineMarkdown>{decision.prompt}</InlineMarkdown>
         </p>
       </div>
-    </div>
+
+      {hasDialogue(decision) ? (
+        <div className="mt-3">
+          <DialoguePanel dv={dv} onResolve={(optionId, path) => answer([optionId], false, path)} />
+        </div>
+      ) : (
+        <div role="group" aria-labelledby={titleId} className="mt-3 space-y-2">
+          {dv.options.map((ov, i) => (
+            <button
+              key={ov.option.id}
+              type="button"
+              disabled={!ov.available}
+              className="flex w-full min-h-tap-min items-start gap-2 rounded-md border border-border bg-bg px-3 py-2 text-left hover:border-accent hover:bg-surface-2 disabled:bg-disabled-bg disabled:text-disabled-fg"
+              onClick={() => answer([ov.option.id], false)}
+            >
+              <span className="num mt-0.5 shrink-0 rounded-sm bg-surface-2 px-1.5 py-0.5 text-sm">
+                {letterFor(i)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-medium">{ov.option.label}</span>
+                <span className="block text-sm text-muted">
+                  {ov.available
+                    ? optionEffectLine(ov.option, scenario.kpis)
+                    : (ov.reason ?? '지금은 선택할 수 없습니다')}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2 flex items-center gap-1 text-sm text-muted">
+        <Icon name="clock" size={14} />
+        응답이 없으면 기본 응답으로 처리됩니다
+      </p>
+    </Dialog>
   )
 }

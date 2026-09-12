@@ -6,7 +6,9 @@ import {
   firstSentence,
   headline,
   kpiComparison,
+  largestExpertGap,
   worstDecision,
+  type KpiComparisonRow,
 } from './debriefSummary'
 
 const registry = await loadAvailableScenariosSafe()
@@ -81,4 +83,35 @@ describe('debrief summary derivations', () => {
       })
     })
   }
+})
+
+describe('largestExpertGap', () => {
+  const row = (metric: string, player?: number, expert?: number): KpiComparisonRow => ({
+    kpi: { metric, label: metric, unit: '%' },
+    player,
+    historical: undefined,
+    expert,
+  })
+
+  it('picks the biggest *relative* divergence, not the biggest absolute one', () => {
+    // 2 vs 4 is a 50% divergence; 1000 vs 1100 is 9%. The small metric moved further.
+    const got = largestExpertGap([row('ratio', 2, 4), row('krw', 1000, 1100)])
+    expect(got?.row.kpi.metric).toBe('ratio')
+  })
+
+  it('says nothing when the paths effectively agree', () => {
+    expect(largestExpertGap([row('lcr', 100, 100.5)])).toBeUndefined()
+  })
+
+  it('ignores metrics that have no value on one of the paths', () => {
+    // The expert autoplay has not finished, so nothing can be compared yet.
+    expect(largestExpertGap([row('lcr', 100, undefined)])).toBeUndefined()
+    expect(largestExpertGap([row('lcr', undefined, 100)])).toBeUndefined()
+  })
+
+  it('survives a zero on the expert path without dividing by it', () => {
+    const got = largestExpertGap([row('outflow', 12, 0)])
+    expect(got?.row.kpi.metric).toBe('outflow')
+    expect(Number.isFinite(got!.relative)).toBe(true)
+  })
 })

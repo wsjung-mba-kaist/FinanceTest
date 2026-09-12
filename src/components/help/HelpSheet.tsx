@@ -18,7 +18,7 @@ function titleFor(context: HelpContextValue): string {
 }
 
 /**
- * 맥락형 도움 시트. `SideSheet`(포커스 트랩 · Esc · 포커스 복귀) 위에 실제 탭 목록(`role="tablist"`)을 얹는다.
+ * 맥락형 도움 시트. `SideSheet`(포커스 트랩 · Esc · 포커스 복귀) 위에 `<Tabs>` 프리미티브를 얹는다.
  *
  * 보통은 `HelpProvider`가 이 컴포넌트를 렌더하고 페이지는 `useHelp().open(...)`만 호출한다.
  */

@@ -237,7 +237,13 @@ const scenario: ScenarioDefinition<CentralBankState> = defineScenario<CentralBan
   turns: [...turnsA, ...turnsB],
   // 크기(magnitude) 노이즈와 틱 지터만 — 분기는 만들지 않는다. variance 0에서는 엔진이 RNG를 당기지
   // 않으므로 체크포인트와 정본 경로는 불변이다. 근거는 calibration.md §8.
-  noise: { runoffSigma: 0.14, runoffCap: 0.28, tickerSigma: 0.008, tickerSigmaBp: 2, eventJitter: 1 },
+  noise: {
+    runoffSigma: 0.14,
+    runoffCap: 0.28,
+    tickerSigma: 0.008,
+    tickerSigmaBp: 2,
+    eventJitter: 1,
+  },
   gameOver: [
     {
       id: 'unsafe_act',
@@ -247,8 +253,7 @@ const scenario: ScenarioDefinition<CentralBankState> = defineScenario<CentralBan
       narrative:
         '예금자보호법이 정한 절차 밖에서 지급을 제한하거나 지연했다는 사실이 알려졌습니다. 예금보험은 지급 약속이고, 그 약속의 이행을 당국이 임의로 멈춘 순간 보호받는 예금까지 인출 대상이 되었습니다. 국회와 감사기구가 직접 개입했고 대응 권한은 회수되었습니다.',
       failed: true,
-      ruleText:
-        '대응 단계가 R4에 도달하면 종료됩니다 (법정 절차 밖의 지급 제한·지연, 허위 공표).',
+      ruleText: '대응 단계가 R4에 도달하면 종료됩니다 (법정 절차 밖의 지급 제한·지연, 허위 공표).',
     },
     {
       id: 'fund_exhausted',
@@ -358,7 +363,8 @@ const scenario: ScenarioDefinition<CentralBankState> = defineScenario<CentralBan
       expected: 0,
       tolerance: 0.2,
       absTolerance: 0.05,
-      label: '2/16까지 예금보험기금 투입 0 — 영업정지 전이므로 대지급 소요가 없다 (0 근처 목표라 absTolerance)',
+      label:
+        '2/16까지 예금보험기금 투입 0 — 영업정지 전이므로 대지급 소요가 없다 (0 근처 목표라 absTolerance)',
     },
     {
       turnId: 't1',

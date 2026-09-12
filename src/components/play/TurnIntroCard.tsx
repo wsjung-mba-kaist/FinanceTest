@@ -32,13 +32,15 @@ export function TurnIntroCard({ onStart }: { onStart: () => void }) {
   return (
     <section
       aria-labelledby="turn-intro-title"
-      className="card-key border-l-4 border-l-accent p-3"
+      className="rounded-lg border border-border-strong bg-surface shadow-card border-l-4 border-l-accent p-3"
       data-turn-intro={turn.id}
     >
-      <LiveRegion message={`${turn.label} ${turn.timeLabel} · 시작하려면 시작 버튼을 눌러 주세요`} />
+      <LiveRegion
+        message={`${turn.label} ${turn.timeLabel} · 시작하려면 시작 버튼을 눌러 주세요`}
+      />
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="label-caps">이 턴의 과제</span>
-        <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-sm">{turn.label}</span>
+        <span className="num rounded-sm bg-surface-2 px-1.5 py-0.5 text-sm">{turn.label}</span>
         <span className="text-sm text-muted">{turn.timeLabel}</span>
         <Badge tone="neutral">{view.ticks}틱</Badge>
       </div>
@@ -86,7 +88,7 @@ export function TurnIntroCard({ onStart }: { onStart: () => void }) {
         <Button
           ref={startRef}
           variant="primary"
-          className="min-h-[44px] sm:min-h-0"
+          className=""
           aria-keyshortcuts="Space"
           onClick={onStart}
         >

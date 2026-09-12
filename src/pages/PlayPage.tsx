@@ -3,8 +3,9 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import type { GameState, ScenarioDefinition } from '../engine'
 import { BalanceSheetMini } from '../components/dashboard/BalanceSheetMini'
 import { Dashboard } from '../components/dashboard/Dashboard'
-import { DecisionDock } from '../components/play/DecisionDock'
+import { DecisionDock, DockActionBar } from '../components/play/DecisionDock'
 import { InterruptOverlay } from '../components/play/InterruptOverlay'
+import { HoldRibbon } from '../components/play/HoldRibbon'
 import { LiquidityStrip } from '../components/play/LiquidityStrip'
 import { LogPanel } from '../components/play/LogPanel'
 import { PlayLayout, type InfoTab, type MobileTab } from '../components/play/PlayLayout'
@@ -26,6 +27,7 @@ import { ConfirmDialog, LiveRegion } from '../components/ui'
 import { useHelp } from '../components/help/helpContext'
 import { HelpProvider } from '../components/help'
 import { focusZone, useKeyboardShortcuts, type Zone } from '../lib/keyboard'
+import { useAnnouncer } from '../lib/useAnnouncer'
 import { useSimulationClock } from '../lib/useSimulationClock'
 import { useBreakpoint } from '../lib/useMediaQuery'
 import { loadScenario } from '../scenarios'
@@ -42,21 +44,29 @@ const ZONE_TO_TAB: Record<Zone, InfoTab | 'decide'> = {
   5: 'log',
 }
 
-function PlayView({
+/**
+ * Everything below the providers.
+ *
+ * This used to be one component that called `useHelp()` at the top and rendered its own
+ * `<HelpProvider>` two hundred lines later — so the hook read the shell's *default* context, not
+ * the one on screen. `?` and `H` were advertised in the status bar and did nothing, and the
+ * "help sheet open → hold the clock" rule could never fire because `help.isOpen` was always
+ * false. Splitting the component is the whole fix: a hook can only see a provider above it.
+ */
+function PlayScreen({
   scenario,
   state,
-  history,
   run,
+  view,
 }: {
   scenario: ScenarioDefinition
   state: GameState
-  history: GameState[]
   run: RunInfo
+  view: NonNullable<ReturnType<typeof safeTurnView>>
 }) {
   const navigate = useNavigate()
   const bp = useBreakpoint()
   const mobile = bp === 'mobile'
-  const mode = run.mode
   const help = useHelp()
   const rewindTo = useGameStore((s) => s.rewindTo)
   const abandon = useGameStore((s) => s.abandon)
@@ -70,12 +80,6 @@ function PlayView({
   const resume = useGameStore((s) => s.resume)
   const pauseClock = useGameStore((s) => s.pause)
 
-  const view = useMemo(() => safeTurnView(state, scenario, mode), [state, scenario, mode])
-  const ctx = useMemo<PlayContextValue | null>(
-    () => (view ? { scenario, state, history, run, mode, view } : null),
-    [scenario, state, history, run, mode, view],
-  )
-
   const [infoTab, setInfoTab] = useState<InfoTab>('situation')
   const [mobileTab, setMobileTab] = useState<MobileTab>('situation')
   const [preview, setPreview] = useState<PreviewState | null>(null)
@@ -84,7 +88,7 @@ function PlayView({
   const [rewindTarget, setRewindTarget] = useState<number | null>(null)
   const [abandonOpen, setAbandonOpen] = useState(false)
   const [skipSignal, setSkipSignal] = useState(0)
-  const [announce, setAnnounce] = useState('')
+  const [announce, setAnnounce] = useAnnouncer()
   const [undoLabel, setUndoLabel] = useState('')
   /** Turn index whose intro card the player has already dismissed with 시작 ▶. */
   const [startedTurn, setStartedTurn] = useState<number | null>(null)
@@ -96,9 +100,9 @@ function PlayView({
   // A reel the engine produced and the dock has not finished playing yet (turn reels never play).
   const reelPending = Boolean(
     state.lastReel &&
-      state.lastReel.cause.kind !== 'turn' &&
-      state.lastReel.steps.length > 0 &&
-      state.lastReel.id !== playedReelId,
+    state.lastReel.cause.kind !== 'turn' &&
+    state.lastReel.steps.length > 0 &&
+    state.lastReel.id !== playedReelId,
   )
   const clock = useSimulationClock({ helpOpen: help.isOpen, introPending })
   const interrupt = view?.interrupts[0]
@@ -115,7 +119,7 @@ function PlayView({
   useEffect(() => {
     if (clock.holdReason && clock.holdReason !== prevHold.current) setAnnounce(clock.holdReason)
     prevHold.current = clock.holdReason
-  }, [clock.holdReason])
+  }, [clock.holdReason, setAnnounce])
   const pendingCount = view
     ? view.decisions.filter((d) => !d.resolved && (d.decision.required ?? true)).length
     : 0
@@ -134,12 +138,22 @@ function PlayView({
     setPreview(null)
     setStartedTurn(null)
     setInfoTab('situation')
-    // The mobile tab only moves when something is actually being asked of the player.
-    if (mobile && pendingCount > 0) setMobileTab('decide')
+    // The mobile tab follows the new turn: to 결정 when something is being asked, back to 상황
+    // otherwise. Leaving it on 결정 after a turn with nothing to decide showed an empty dock and
+    // hid the one thing that changed.
+    if (mobile) setMobileTab(pendingCount > 0 ? 'decide' : 'situation')
     const t = window.setTimeout(() => {
+      // Focus has to land *somewhere*: the element that had it was just unmounted by the turn
+      // change, so without this it falls to <body> and the next Tab starts from the top of the
+      // document. The chain ends at <main>, which always exists.
       const header = document.getElementById('turn-header-current')
-      if (header) header.focus()
-      else focusZone(2)
+      if (header) {
+        header.focus()
+        return
+      }
+      if (focusZone(mobile && pendingCount > 0 ? 2 : 1)) return
+      if (focusZone(2)) return
+      document.getElementById('main')?.focus()
     }, 60)
     return () => window.clearTimeout(t)
   }, [state.turnIndex, mobile, pendingCount])
@@ -167,19 +181,19 @@ function PlayView({
     const ok = nextTurn()
     if (ok) setAnnounce(isLast ? '시나리오가 종료되었습니다' : '다음 턴으로 이동했습니다')
     return ok
-  }, [nextTurn, state.turnIndex, scenario.turns.length])
+  }, [nextTurn, state.turnIndex, scenario.turns.length, setAnnounce])
 
   const onUndo = useCallback(() => {
     if (!undoChoice()) return
     setPreview(null)
     setAnnounce('직전 결정을 실행 취소했습니다')
-  }, [undoChoice])
+  }, [undoChoice, setAnnounce])
 
   const onStartTurn = useCallback(() => {
     setStartedTurn(state.turnIndex)
     resume()
     setAnnounce('시계가 흐르기 시작했습니다')
-  }, [state.turnIndex, resume])
+  }, [state.turnIndex, resume, setAnnounce])
 
   useKeyboardShortcuts(
     {
@@ -197,8 +211,12 @@ function PlayView({
         : introPending
           ? onStartTurn
           : () => {
+              // Announce the *intent* being toggled, and read it before `toggle()` — `running`
+              // can be false while the player's intent is "run" (a hold), which made the message
+              // say the opposite of what just happened.
+              const wasRunning = clock.intent
               clock.toggle()
-              setAnnounce(clock.running ? '시계를 멈췄습니다' : '시계를 재개했습니다')
+              setAnnounce(wasRunning ? '시계를 멈췄습니다' : '시계를 재개했습니다')
             },
       onSpeedStep: !ticked
         ? undefined
@@ -213,11 +231,14 @@ function PlayView({
     !ended && !interrupt,
   )
 
-  const onCommitted = useCallback((message: string) => {
-    setSkipSignal(0)
-    setAnnounce(message)
-    setUndoLabel(message)
-  }, [])
+  const onCommitted = useCallback(
+    (message: string) => {
+      setSkipSignal(0)
+      setAnnounce(message)
+      setUndoLabel(message)
+    },
+    [setAnnounce],
+  )
 
   const onDebrief = () => {
     const attempts = useProgressStore.getState().getScenario(scenario.meta.id).attempts
@@ -229,6 +250,164 @@ function PlayView({
     abandon()
     navigate('/')
   }
+
+  return (
+    <>
+      <h1 className="sr-only">
+        {scenario.meta.title} — {view.turn.label} {view.turn.timeLabel}
+      </h1>
+      <div
+        className="flex h-full min-h-0 flex-col overflow-hidden"
+        // The situation room keeps the dense rhythm while the rest of the app breathes: spacing
+        // utilities compile to `calc(var(--spacing) * n)`, so re-scoping the property here
+        // re-scopes every gap, pad and margin below it. See `--spacing` in index.css.
+        style={{ '--spacing': '0.25rem' } as React.CSSProperties}
+      >
+        <LiveRegion message={announce.message} seq={announce.seq} />
+        <StatusBar
+          compact={bp !== 'desktop'}
+          onShortcuts={() => setShortcuts(true)}
+          onRewind={setRewindTarget}
+          onAbandon={() => setAbandonOpen(true)}
+          clock={
+            ticked && !ended
+              ? {
+                  running: clock.running,
+                  intent: clock.intent,
+                  speed: clock.speed,
+                  tick: clock.tick,
+                  ticks: clock.ticks,
+                  tickLabel: view.tickLabel ?? tickLabelOf(view.turn, clock.tick),
+                  progressStore: clock.progressStore,
+                  holdReason: clock.holdReason,
+                  onPause: pauseClock,
+                  onResume: introPending ? onStartTurn : resume,
+                  onSpeed: clock.setSpeed,
+                }
+              : undefined
+          }
+        />
+        {ended ? (
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <TerminalCard onDebrief={onDebrief} />
+          </div>
+        ) : (
+          <PlayLayout
+            bp={bp}
+            strip={
+              <>
+                <LiquidityStrip mobile={mobile} />
+                {/* Why the clock stopped, where the clock is — not in a 26px button's tooltip. */}
+                <HoldRibbon reason={clock.holdReason} intent={clock.intent} />
+              </>
+            }
+            panels={{
+              situation: (
+                <>
+                  {introPending && (
+                    <div className="p-3 pb-0">
+                      <TurnIntroCard onStart={onStartTurn} />
+                    </div>
+                  )}
+                  <SituationPanel
+                    onOpenFeed={(entryId) => {
+                      goZone(4)
+                      if (!entryId) return
+                      // After the tab has switched and React has committed the feed.
+                      window.setTimeout(() => {
+                        document
+                          .getElementById(`wire-${entryId}`)
+                          ?.scrollIntoView({ block: 'center' })
+                      }, 60)
+                    }}
+                  />
+                </>
+              ),
+              dashboard: <Dashboard preview={preview} />,
+              feed: <WireFeed onUnreadChange={setFeedUnread} />,
+              log: <LogPanel />,
+              balance: (
+                <div className="p-3">
+                  <BalanceSheetMini />
+                </div>
+              ),
+            }}
+            dock={
+              <DecisionDock
+                sticky={mobile}
+                onPreview={setPreview}
+                onCommitted={onCommitted}
+                skipSignal={skipSignal}
+              />
+            }
+            // The primary action is a sibling of the scroll box, not a child of it.
+            dockAction={<DockActionBar onNext={onNext} />}
+            infoTab={infoTab}
+            onInfoTab={setInfoTab}
+            mobileTab={mobileTab}
+            onMobileTab={setMobileTab}
+            unreadCount={unreadCount}
+            pendingCount={pendingCount}
+            scrollResetKey={state.turnIndex}
+          />
+        )}
+        {interrupt && !ended && (
+          <InterruptOverlay
+            key={interrupt.decision.id}
+            dv={interrupt}
+            onAnswered={() => setAnnounce('응답이 전달되었습니다')}
+          />
+        )}
+        <UndoToast
+          undoable={undoable}
+          label={undoLabel || '결정을 확정했습니다'}
+          onUndo={onUndo}
+          onExpire={clearUndo}
+        />
+        <ShortcutsSheet open={shortcuts} onClose={() => setShortcuts(false)} />
+        <ConfirmDialog
+          open={rewindTarget !== null}
+          title={`T+${rewindTarget ?? 0}으로 되감기`}
+          body="이 턴 이후의 결정이 모두 지워집니다. 되감기 횟수는 기록에 남으며, 되감기한 런은 최고 점수 집계에서 제외됩니다."
+          confirmLabel="되감기"
+          onConfirm={() => {
+            if (rewindTarget !== null) rewindTo(rewindTarget)
+            setRewindTarget(null)
+          }}
+          onCancel={() => setRewindTarget(null)}
+        />
+        <ConfirmDialog
+          open={abandonOpen}
+          title="시나리오를 포기하시겠습니까"
+          body="진행 중인 기록이 삭제되며 점수는 기록되지 않습니다."
+          confirmLabel="포기"
+          destructive
+          onConfirm={onAbandon}
+          onCancel={() => setAbandonOpen(false)}
+        />
+      </div>
+    </>
+  )
+}
+
+/** Mounts the contexts, then renders the screen that reads them. */
+function PlayView({
+  scenario,
+  state,
+  history,
+  run,
+}: {
+  scenario: ScenarioDefinition
+  state: GameState
+  history: GameState[]
+  run: RunInfo
+}) {
+  const mode = run.mode
+  const view = useMemo(() => safeTurnView(state, scenario, mode), [state, scenario, mode])
+  const ctx = useMemo<PlayContextValue | null>(
+    () => (view ? { scenario, state, history, run, mode, view } : null),
+    [scenario, state, history, run, mode, view],
+  )
 
   if (!ctx || !view) {
     return (
@@ -243,111 +422,7 @@ function PlayView({
   return (
     <PlayContext.Provider value={ctx}>
       <HelpProvider context={{ page: 'play', scenario, state, view }} shortcuts={false}>
-        <div className="flex h-full flex-col">
-          <LiveRegion message={announce} />
-          <StatusBar
-            compact={bp !== 'desktop'}
-            onShortcuts={() => setShortcuts(true)}
-            onRewind={setRewindTarget}
-            onAbandon={() => setAbandonOpen(true)}
-            clock={
-              ticked && !ended
-                ? {
-                    running: clock.intent,
-                    speed: clock.speed,
-                    tick: clock.tick,
-                    ticks: clock.ticks,
-                    tickLabel: view.tickLabel ?? tickLabelOf(view.turn, clock.tick),
-                    progress: clock.progress,
-                    holdReason: clock.holdReason,
-                    onPause: pauseClock,
-                    onResume: introPending ? onStartTurn : resume,
-                    onSpeed: clock.setSpeed,
-                  }
-                : undefined
-            }
-          />
-          {ended ? (
-            <div className="flex-1 overflow-y-auto p-4 md:p-8">
-              <TerminalCard onDebrief={onDebrief} />
-            </div>
-          ) : (
-            <PlayLayout
-              bp={bp}
-              strip={<LiquidityStrip mobile={mobile} />}
-              panels={{
-                situation: (
-                  <>
-                    {introPending && (
-                      <div className="p-3 pb-0">
-                        <TurnIntroCard onStart={onStartTurn} />
-                      </div>
-                    )}
-                    <SituationPanel onOpenFeed={() => goZone(4)} />
-                  </>
-                ),
-                dashboard: <Dashboard preview={preview} />,
-                feed: <WireFeed onUnreadChange={setFeedUnread} />,
-                log: <LogPanel />,
-                balance: (
-                  <div className="p-3">
-                    <BalanceSheetMini />
-                  </div>
-                ),
-              }}
-              dock={
-                <DecisionDock
-                  sticky={mobile}
-                  onPreview={setPreview}
-                  onCommitted={onCommitted}
-                  skipSignal={skipSignal}
-                  onNext={onNext}
-                />
-              }
-              infoTab={infoTab}
-              onInfoTab={setInfoTab}
-              mobileTab={mobileTab}
-              onMobileTab={setMobileTab}
-              unreadCount={unreadCount}
-              pendingCount={pendingCount}
-              scrollResetKey={state.turnIndex}
-            />
-          )}
-          {interrupt && !ended && (
-            <InterruptOverlay
-              key={interrupt.decision.id}
-              dv={interrupt}
-              onAnswered={() => setAnnounce('응답이 전달되었습니다')}
-            />
-          )}
-          <UndoToast
-            undoable={undoable}
-            label={undoLabel || '결정을 확정했습니다'}
-            onUndo={onUndo}
-            onExpire={clearUndo}
-          />
-          <ShortcutsSheet open={shortcuts} onClose={() => setShortcuts(false)} />
-          <ConfirmDialog
-            open={rewindTarget !== null}
-            title={`T+${rewindTarget ?? 0}으로 되감기`}
-            body="이 턴 이후의 결정이 모두 지워집니다. 되감기 횟수는 기록에 남으며, 되감기한 런은 최고 점수 집계에서 제외됩니다."
-            confirmLabel="되감기"
-            onConfirm={() => {
-              if (rewindTarget !== null) rewindTo(rewindTarget)
-              setRewindTarget(null)
-            }}
-            onCancel={() => setRewindTarget(null)}
-          />
-          <ConfirmDialog
-            open={abandonOpen}
-            title="시나리오를 포기하시겠습니까"
-            body="진행 중인 기록이 삭제되며 점수는 기록되지 않습니다."
-            confirmLabel="포기"
-            destructive
-            onConfirm={onAbandon}
-            onCancel={() => setAbandonOpen(false)}
-          />
-        </div>
+        <PlayScreen scenario={scenario} state={state} run={run} view={view} />
       </HelpProvider>
     </PlayContext.Provider>
   )

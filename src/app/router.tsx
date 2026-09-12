@@ -47,8 +47,8 @@ function RouteErrorBody() {
       ? error.message
       : String(error ?? '')
   return (
-    <div className="rounded-lg border border-critical/40 bg-critical-bg p-6">
-      <h1 className="text-lg font-semibold text-critical">화면을 표시하지 못했습니다</h1>
+    <div className="rounded-lg border border-critical-border bg-critical-bg p-6">
+      <h1 className="text-xl font-semibold text-critical">화면을 표시하지 못했습니다</h1>
       <p className="mt-2 text-base">
         저장된 진행 데이터는 그대로 있습니다. 아래 링크로 이동하거나 새로고침해 보세요.
       </p>
@@ -98,7 +98,13 @@ function Layout() {
   const helpContext = shellHelpContext(pathname)
   const body = (
     <AppShell>
-      <ScrollRestoration />
+      {/*
+        Keyed by pathname, not by the default location key. The debrief keeps its selected tab in
+        the hash, so every tab click was a new location — and the default behaviour scrolled the
+        page back to the top each time, halfway down a long debrief. Keying on the pathname makes
+        a hash change the same scroll position, while real navigations still restore per page.
+      */}
+      <ScrollRestoration getKey={(location) => location.pathname} />
       <Suspense fallback={<Loading />}>
         <Outlet />
       </Suspense>

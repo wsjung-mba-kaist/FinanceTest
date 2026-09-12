@@ -31,7 +31,13 @@ import { MARGIN, T4_PROFILE } from './turnsA'
  * 3/26 무제한 RP(첫 입찰 4/2, 증권사 11개사 대상 추가), 3/31 통화스와프 1차 입찰 87.2억달러 낙찰.
  */
 
-const TICK_LABELS = ['08:30 해외 종가', '10:30 오전', '12:30 점심', '15:30 장 마감', '19:00 해외 증거금 마감']
+const TICK_LABELS = [
+  '08:30 해외 종가',
+  '10:30 오전',
+  '12:30 점심',
+  '15:30 장 마감',
+  '19:00 해외 증거금 마감',
+]
 
 // =============================================================================================
 // T4 — 2020-03-23 (월) "차환의 벽" — 5틱
@@ -105,10 +111,7 @@ const t4Interrupt: Interrupt<SecuritiesState> = {
       id: 't4-i1-selfreliant',
       label: '자체 대응 가능하다고 답변',
       description: '유동성에 문제가 없으며 자체 대응이 가능하다고 답한다. 감독 부담이 줄어든다.',
-      effects: [
-        flag('claimed_selfreliant'),
-        { kind: 'counter', key: 'fssSelfReliant', add: 1 },
-      ],
+      effects: [flag('claimed_selfreliant'), { kind: 'counter', key: 'fssSelfReliant', add: 1 }],
       delayedEffects: [
         {
           afterTurns: 1,
@@ -203,7 +206,11 @@ export const t4: T = {
   ],
   ticker: {
     series: [
-      { path: 'market.equityIndex', mode: 'absolute', values: [1566.15, 1530, 1500, 1482.46, 1482.46] },
+      {
+        path: 'market.equityIndex',
+        mode: 'absolute',
+        values: [1566.15, 1530, 1500, 1482.46, 1482.46],
+      },
       { path: 'market.fxUsdLocal', mode: 'absolute', values: [1254.1, 1262, 1270, 1276, 1274.6] },
       { path: 'market.custom.cp91', mode: 'absolute', values: [156, 158, 160, 162, 162] },
     ],
@@ -309,7 +316,10 @@ export const t4: T = {
           },
           consequences: '발행금리를 올려 차환 물량 대부분을 소화했습니다. 조달비용이 올랐습니다.',
           historical: true,
-          feasibility: { basis: 'CP 발행시장 가동 — 금리 조정으로 수요 확보 가능', sourceRefs: [S.pCp] },
+          feasibility: {
+            basis: 'CP 발행시장 가동 — 금리 조정으로 수요 확보 가능',
+            sourceRefs: [S.pCp],
+          },
           calibrationNote: '+80bp → 차환률 +12%p, 비용 = CP 잔액 × 80bp × 0.25 [CAL]',
           preview: [{ metric: 'rollRate', direction: 'up', magnitude: 2 }],
         },
@@ -341,7 +351,10 @@ export const t4: T = {
             sourceRefs: [S.bcbs555, S.cgfs],
           },
           consequences: '채권이 체결되었습니다. 매각손이 자본에서 빠졌습니다.',
-          feasibility: { basis: '채권시장 유동성 저하 상태에서 할인 체결', sourceRefs: [S.bcbs555] },
+          feasibility: {
+            basis: '채권시장 유동성 저하 상태에서 할인 체결',
+            sourceRefs: [S.bcbs555],
+          },
           calibrationNote: '할인 2.0%(스프레드 확대 정점 구간) [CAL]',
         },
         {
@@ -349,9 +362,7 @@ export const t4: T = {
           label: '원화 크레딧라인 4,000억 인출',
           description:
             '미사용 원화 크레딧라인의 절반을 인출한다. 확정 라인이라 당일 실행되며, 절반만 쓰면 신호 효과가 작다.',
-          effects: [
-            securitiesFx.raiseFunding({ channel: 'bank', amount: 4000, rateBp: 180 }),
-          ],
+          effects: [securitiesFx.raiseFunding({ channel: 'bank', amount: 4000, rateBp: 180 })],
           expert: {
             rating: 80,
             rationale:
@@ -394,8 +405,7 @@ export const t4: T = {
     {
       id: 't4-d2',
       title: '헤지 북 구성',
-      prompt:
-        '증거금 소요가 2주째 이어집니다. 자체헤지 북을 어떻게 하시겠습니까? (최대 2개)',
+      prompt: '증거금 소요가 2주째 이어집니다. 자체헤지 북을 어떻게 하시겠습니까? (최대 2개)',
       context:
         '자체헤지는 델타를 직접 복제하므로 지수가 움직일 때마다 외화 증거금이 나갑니다. 백투백은 그 의무를 상대방에게 넘기지만 평상시에도 비용이 듭니다. 위기 중 전환은 비쌉니다.',
       select: { min: 1, max: 2 },
@@ -451,8 +461,7 @@ export const t4: T = {
               '증거금이 사라지는 대신 ELS 부채의 지수 위험이 40% 열린다. 지수가 더 내려가면 손실이 자본을 직접 때리고, 시장위험액 증가로 NCR도 함께 내려간다. 2020년 1분기 파생결합증권 손익 △9,067억은 2019년 연간 이익 7,501억을 한 분기에 넘어선 규모다.',
             sourceRefs: [S.fss, S.dlsPlan],
           },
-          consequences:
-            '증거금 소요가 크게 줄었습니다. 지수 위험이 40% 열린 채 남았습니다.',
+          consequences: '증거금 소요가 크게 줄었습니다. 지수 위험이 40% 열린 채 남았습니다.',
           trap: true,
           trapExplanation:
             '달러가 없는 상황에서 "달러가 필요 없게 만드는" 선택은 즉효처럼 보인다. 그러나 헤지를 푸는 것은 유동성 위기를 손익 위기로 바꾸는 것일 뿐이며, 지수가 반등해도 손실이 난다(반등분을 못 따라간다). 이 시나리오에서 NCR을 무너뜨릴 수 있는 유일한 경로다.',
@@ -555,6 +564,37 @@ export const t5: T = {
   ],
   events: [
     {
+      /**
+       * The correction to `t4-news-margin`, and the one that corrects to *nothing*.
+       *
+       * The "누적 수조원대" estimate was never confirmed and never denied. It was not published by
+       * the supervisor at the time and still has not been — this project's own fact ledger carries
+       * `industry.marginCallTotal` as unresolved, with the closing document named as a National
+       * Assembly document request that was never made public.
+       *
+       * Every other correction in this project resolves one way or the other. This one has to say
+       * "the number was never published", because that is what happened, and because a player who
+       * only ever sees rumours resolved learns to wait for resolution. In a funding squeeze the
+       * number you are trading on is often the one nobody will ever confirm.
+       */
+      id: 't5-news-margin-unconfirmed',
+      kind: 'newswire',
+      outlet: '경제지 종합',
+      time: '08:40',
+      headline: '[후속] 마진콜 누적 규모, 당국 집계 공표 없음 — 업계 추정만 남았다',
+      body:
+        '지난주 보도된 "누적 수조원대"는 확인도 부인도 되지 않았다. 금융감독원은 자체헤지 증거금 ' +
+        '납입 규모를 집계해 공표한 적이 없고, 사별 수치는 각사가 밝히지 않는다. 시장이 그 주에 ' +
+        '가격에 반영한 것은 확인된 수치가 아니라 추정치였다.',
+      severity: 'warning',
+      // `confirmed`, not `unconfirmed`: the *absence* of a published figure is itself an
+      // established fact. The estimate stays unverified — that is what the body says — but this
+      // item is not a second rumour, and marking it as one would leave the thread open forever.
+      reliability: 'confirmed',
+      correctionOf: 't4-news-margin',
+      sourceRefs: [S.fsr, S.kcmiLee],
+    },
+    {
       id: 't5-emergency2',
       kind: 'regulator',
       agency: '대한민국 정부·금융위원회',
@@ -648,9 +688,7 @@ export const t5: T = {
           label: '원화 크레딧라인 추가 인출',
           description:
             '정책 창구를 기다리지 않고 남은 원화 라인에서 3,000억을 인출한다. 확정 라인이라 오늘 들어온다.',
-          effects: [
-            securitiesFx.raiseFunding({ channel: 'bank', amount: 3000, rateBp: 190 }),
-          ],
+          effects: [securitiesFx.raiseFunding({ channel: 'bank', amount: 3000, rateBp: 190 })],
           expert: {
             rating: 70,
             rationale:
@@ -878,9 +916,7 @@ export const t6: T = {
           label: '대상기관 편입 신청 후 국채 담보로 6,000억 조달',
           description:
             '한국은행 공개시장운영 대상기관 편입을 신청하고 보유 국채를 담보로 91일물 RP를 최대한 조달한다. 금리는 0.85% 이하다.',
-          effects: [
-            policyFunding({ programme: 'bokrp', amount: 6000, scopeShare: 1, rateBp: 85 }),
-          ],
+          effects: [policyFunding({ programme: 'bokrp', amount: 6000, scopeShare: 1, rateBp: 85 })],
           expert: {
             rating: 88,
             rationale:
@@ -901,9 +937,7 @@ export const t6: T = {
           label: '최소한만 조달하고 담보를 남겨 둔다',
           description:
             '3,000억만 조달하고 나머지 국공채는 예비 담보로 남긴다. 추가 충격에 대비하지만 지금 비싼 CP를 계속 굴려야 한다.',
-          effects: [
-            policyFunding({ programme: 'bokrp', amount: 3000, scopeShare: 1, rateBp: 85 }),
-          ],
+          effects: [policyFunding({ programme: 'bokrp', amount: 3000, scopeShare: 1, rateBp: 85 })],
           expert: {
             rating: 66,
             rationale:
@@ -975,7 +1009,10 @@ export const t6: T = {
             sourceRefs: [S.dlsPlan, S.bcbs144],
           },
           consequences: '내부 규정이 확정되었습니다. 외화 버퍼 목표가 대시보드에 표시됩니다.',
-          feasibility: { basis: '내부 리스크관리 규정 — 이사회 결의로 즉시 가능', sourceRefs: [S.dlsPlan] },
+          feasibility: {
+            basis: '내부 리스크관리 규정 — 이사회 결의로 즉시 가능',
+            sourceRefs: [S.dlsPlan],
+          },
         },
         {
           id: 't6-d2-c',
@@ -1160,8 +1197,7 @@ export const t7: T = {
         {
           id: 't7-d1-b',
           label: '최소한만 응찰(1,000억 상당)',
-          description:
-            '당장의 소요만큼만 응찰한다. 조달비용이 줄지만 버퍼는 얇게 남는다.',
+          description: '당장의 소요만큼만 응찰한다. 조달비용이 줄지만 버퍼는 얇게 남는다.',
           effects: [bokSwapBid({ amount: 1000, allocationCap: 3000, rateBp: 90 })],
           expert: {
             rating: 60,

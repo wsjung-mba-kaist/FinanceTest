@@ -36,7 +36,7 @@ function StackedBar({
         <span className="num text-muted">{formatCurrency(total, units)}</span>
       </div>
       <div
-        className="mt-1 flex h-4 w-full gap-px overflow-hidden rounded bg-surface-2"
+        className="mt-1 flex h-4 w-full gap-px overflow-hidden rounded-sm bg-surface-2"
         role="img"
         aria-label={`${title}: ${summary}`}
       >

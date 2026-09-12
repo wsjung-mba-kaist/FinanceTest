@@ -5,6 +5,7 @@ import { buildConditionContext, evaluate } from '../../engine'
 import type { GameState, Lesson, ScenarioDefinition } from '../../engine/types'
 import { Citation } from '../knowledge/Citation'
 import { Markdown } from '../knowledge/Markdown'
+import { Card } from '../ui'
 
 export function LessonList({
   scenario,
@@ -24,7 +25,7 @@ export function LessonList({
   return (
     <ol className="m-0 list-none space-y-3 p-0">
       {visible.map((l, i) => (
-        <li key={l.id} className="rounded-lg border border-border bg-surface p-3">
+        <Card as="li" key={l.id} className="p-3">
           <h4 className="m-0 text-base font-semibold">
             <span className="num text-muted">{i + 1}.</span> {l.title}
             {l.sourceRefs.length > 0 && (
@@ -46,7 +47,7 @@ export function LessonList({
               })}
             </p>
           )}
-        </li>
+        </Card>
       ))}
     </ol>
   )

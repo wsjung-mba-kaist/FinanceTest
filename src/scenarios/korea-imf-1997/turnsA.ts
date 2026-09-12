@@ -1117,6 +1117,37 @@ export const t3: T = {
   ],
   events: [
     {
+      /**
+       * The correction to `t2-news-bloomberg`, and the one this scenario is *about*.
+       *
+       * The wire's $2bn figure was unsourced and the authorities refused to confirm it. It was
+       * wrong — but it was wrong in the direction of the truth, and by far less than the published
+       * $28bn was. The official number was not a lie either: it counted gross reserves, of which
+       * a large part was already lent to the overseas branches of Korean banks and could not be
+       * spent. Two numbers can both be honest and still not describe the same thing.
+       *
+       * A player who learned "unverified wire copy is noise" from turn 2 is being taught here that
+       * the question is never whether a claim is confirmed, but which quantity each side is
+       * counting.
+       */
+      id: 't3-news-reserve-gap',
+      kind: 'newswire',
+      outlet: '통신사·국내 일간지',
+      time: '11/10 07:30',
+      atTick: 0,
+      headline: '[확인] 공표 보유액과 쓸 수 있는 보유액이 다르다 — 해외지점 예치분이 빠진다',
+      body:
+        '지난주 보도된 "20억달러"는 근거가 제시되지 않았고 지금도 확인되지 않는다. 다만 공표치와 ' +
+        '가용액이 크게 다르다는 보도의 전제 자체는 맞다 — 총외환보유액에는 국내은행 해외지점에 ' +
+        '예치되어 사실상 회수가 어려운 금액이 포함되어 있다. 오늘 기준 가용액은 약 161억달러로, ' +
+        '같은 시점 공표치 281억달러와 120억달러가량 벌어져 있다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't2-news-bloomberg',
+      sourceRefs: [S.hearing, S.audit],
+      relatedMetrics: ['usableReserves', 'grossReserves', 'reserveGap'],
+    },
+    {
       id: 't3-data-crossover',
       kind: 'data',
       time: '11/10 09:00',

@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { KnowledgeSearch } from '../components/help/KnowledgeSearch'
+import { CardLinksFooter } from '../components/knowledge/CardLinksFooter'
 import { Markdown } from '../components/knowledge/Markdown'
-import { Badge, Button, EmptyState } from '../components/ui'
+import { Badge, Button, Chip, EmptyState } from '../components/ui'
+import { buttonClass } from '../components/ui/buttonStyles'
+import { gridClass } from '../lib/grid'
 import { CARDS, FRAMEWORKS, GLOSSARY, READING_LIST } from '../content'
 import type { KnowledgeCard } from '../content/types'
 import { useProgressStore } from '../store/progressStore'
@@ -44,11 +48,14 @@ function CardItem({
       </button>
       <div id={panelId} hidden={!open} className="border-t border-border px-3 py-3">
         <Markdown>{card.body}</Markdown>
-        {card.relatedMetrics.length > 0 && (
-          <p className="mt-2 text-xs text-muted">
-            관련 지표: <span className="font-mono">{card.relatedMetrics.join(', ')}</span>
-          </p>
-        )}
+        {/*
+          The raw `relatedMetrics` ids used to be printed here in a monospace face — `lcr, hqla,
+          survivalDays`. Monospace says "this is code you could type", and these are engine keys
+          the reader cannot enter anywhere. Worse, the same key is labelled differently per
+          scenario (예금자 신뢰지수 vs 채권단 신뢰지수), so there is no one correct name to show.
+          The scenarios below are where those numbers appear *with* their proper labels.
+        */}
+        <CardLinksFooter card={card} />
       </div>
     </li>
   )
@@ -92,6 +99,24 @@ export default function KnowledgeIndexPage() {
       return next
     })
 
+  // `?q=` keeps the search in the URL, so a result set can be linked to or reloaded.
+  const [params, setParams] = useSearchParams()
+  const queryParam = params.get('q') ?? ''
+  const setQueryParam = useCallback(
+    (next: string) => {
+      setParams(
+        (prev) => {
+          const out = new URLSearchParams(prev)
+          if (next.trim()) out.set('q', next)
+          else out.delete('q')
+          return out
+        },
+        { replace: true },
+      )
+    },
+    [setParams],
+  )
+
   // Deep link: #card-<id>
   useEffect(() => {
     const m = /^#card-(.+)$/.exec(loc.hash)
@@ -116,18 +141,35 @@ export default function KnowledgeIndexPage() {
         <nav aria-label="지식 베이스 하위 메뉴" className="mt-2 flex flex-wrap gap-2 text-sm">
           <Link
             to="/knowledge/glossary"
-            className="rounded-md border border-border bg-surface px-3 py-1 no-underline text-text hover:border-accent"
+            className={buttonClass({ variant: 'secondary', size: 'sm' })}
           >
             용어집 <span className="num text-muted">({GLOSSARY.length})</span>
           </Link>
           <Link
             to="/knowledge/reading"
-            className="rounded-md border border-border bg-surface px-3 py-1 no-underline text-text hover:border-accent"
+            className={buttonClass({ variant: 'secondary', size: 'sm' })}
           >
             읽을거리 <span className="num text-muted">({READING_LIST.length})</span>
           </Link>
         </nav>
       </header>
+
+      {/*
+        The unified search existed only inside the help sheet — reachable from the play screen and
+        from the shell's 도움 button, but not from the page whose whole subject is this content.
+        Someone who navigated to 지식 베이스 to look something up had a list of sections and no
+        search box. Same component, and `?q=` in the URL so a search can be linked to.
+      */}
+      <section aria-labelledby="kb-search-h">
+        <h2 id="kb-search-h" className="sr-only">
+          검색
+        </h2>
+        <KnowledgeSearch
+          initialQuery={queryParam}
+          autoFocus={false}
+          onQueryChange={setQueryParam}
+        />
+      </section>
 
       <section aria-labelledby="kb-frameworks">
         <h2 id="kb-frameworks" className="mb-2 text-lg font-semibold">
@@ -138,7 +180,7 @@ export default function KnowledgeIndexPage() {
             <Link to="/knowledge/reading">읽을거리 목록 보기</Link>
           </EmptyState>
         ) : (
-          <ul className="grid list-none gap-2 p-0 m-0 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className={`grid list-none gap-2 p-0 m-0 ${gridClass('link', FRAMEWORKS.length)}`}>
             {FRAMEWORKS.map((f) => (
               <li key={f.id}>
                 <Link
@@ -169,24 +211,18 @@ export default function KnowledgeIndexPage() {
         </h2>
         {tags.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="태그 필터">
-            <button
-              type="button"
-              aria-pressed={!tag}
-              onClick={() => setTag(undefined)}
-              className={`rounded-full border px-2.5 py-0.5 text-sm ${!tag ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
-            >
+            <Chip selected={!tag} aria-pressed={!tag} onClick={() => setTag(undefined)}>
               전체
-            </button>
+            </Chip>
             {tags.map(([t, n]) => (
-              <button
+              <Chip
                 key={t}
-                type="button"
+                selected={tag === t}
                 aria-pressed={tag === t}
                 onClick={() => setTag(tag === t ? undefined : t)}
-                className={`rounded-full border px-2.5 py-0.5 text-sm ${tag === t ? 'bg-accent text-accent-fg border-accent' : 'bg-surface text-muted border-border hover:text-text'}`}
               >
-                {t} <span className="num opacity-70">{n}</span>
-              </button>
+                {t} <span className="num text-muted">{n}</span>
+              </Chip>
             ))}
           </div>
         )}
@@ -204,8 +240,10 @@ export default function KnowledgeIndexPage() {
           <div className="space-y-4">
             {groups.map(([g, cards]) => (
               <div key={g}>
-                <h3 className="mb-1 text-base font-semibold text-muted">#{g}</h3>
-                <ul className="m-0 list-none space-y-1.5 p-0">
+                <h3 className="mb-1 text-md font-semibold text-muted">#{g}</h3>
+                <ul
+                  className={`m-0 grid list-none gap-1.5 p-0 ${gridClass('prose', cards.length)}`}
+                >
                   {cards.map((c) => (
                     <CardItem
                       key={c.id}

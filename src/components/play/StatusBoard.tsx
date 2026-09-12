@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Badge, Button } from '../ui'
+import { Badge, Button, Card } from '../ui'
 import { usePlay } from './playContext'
 import { REGULATOR_LABELS } from './playHelpers'
 import { buildStatusRows, confidenceBars, confidenceTone, type StatusRow } from './statusRows'
@@ -9,7 +9,7 @@ const BAR_CLASS: Record<string, string> = {
   info: 'bg-info',
   warning: 'bg-warning',
   critical: 'bg-critical',
-  neutral: 'bg-none',
+  neutral: 'bg-sev-none',
 }
 
 const VISIBLE = 8
@@ -39,7 +39,7 @@ export function StatusBoard() {
   const lastNote = [...state.regulator.notes].reverse()[0]
 
   return (
-    <section aria-labelledby="status-board-title" className="card-surface p-3">
+    <Card aria-labelledby="status-board-title" className="p-3">
       <h3 id="status-board-title" className="text-md font-semibold">
         창구·거래상대 현황판
       </h3>
@@ -97,6 +97,6 @@ export function StatusBoard() {
         </Badge>
         {lastNote && <span className="text-sm text-muted">{lastNote}</span>}
       </div>
-    </section>
+    </Card>
   )
 }

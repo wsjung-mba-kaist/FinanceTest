@@ -42,7 +42,8 @@ export const IMF_SOURCES: Source[] = [
   },
   {
     id: 'ecos-817Y002',
-    title: '시장금리 일별 계열 — 콜금리 1일 전체거래(010101000)·회사채 3년 AA-(010300000)·CD 91일(010502000)',
+    title:
+      '시장금리 일별 계열 — 콜금리 1일 전체거래(010101000)·회사채 3년 AA-(010300000)·CD 91일(010502000)',
     publisher: '한국은행 경제통계시스템(ECOS)',
     date: '2026-09-11',
     url: 'https://ecos.bok.or.kr/api/StatisticSearch/sample/json/kr/1/10/817Y002/D/19971020/19971024/010101000',

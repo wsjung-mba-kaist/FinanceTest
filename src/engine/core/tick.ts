@@ -191,7 +191,8 @@ export function sweepOpenInterrupts<S extends InstitutionState>(
     try {
       s = applyDecision(s, scenario, id, [it.defaultOptionId], { timedOut: true })
     } catch (e) {
-      const msg = e instanceof DecisionError ? e.message : e instanceof Error ? e.message : String(e)
+      const msg =
+        e instanceof DecisionError ? e.message : e instanceof Error ? e.message : String(e)
       s = produce(s, (d) => {
         d.log.push(`[T${d.turnIndex}] 턴 마감 자동 확정 실패 ${id}: ${msg}`)
       })

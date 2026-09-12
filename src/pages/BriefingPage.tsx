@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { ConceptPreview } from '../components/briefing/ConceptPreview'
 import { Dossier } from '../components/briefing/Dossier'
 import { ExecutiveSummary } from '../components/briefing/ExecutiveSummary'
-import { PreflightChecklist } from '../components/briefing/PreflightChecklist'
 import { Badge, Button, EmptyState } from '../components/ui'
 import { Icon } from '../components/ui/Icon'
 import { latestSnapshot } from '../engine'
@@ -85,14 +84,13 @@ function BriefingBodyInner({ scenario }: { scenario: ScenarioDefinition }) {
         scenario={scenario}
         summary={summary}
         baseline={baseline}
-        baselineState={baselineState}
         mode={mode}
         setMode={setMode}
       />
 
-      <ConceptPreview cardIds={summary.concepts} onView={markCardViewed} />
-
-      <PreflightChecklist items={summary.preflight} scenario={scenario} baseline={baseline} />
+      {/* Every card, not the first three: the dossier used to list the rest again in a
+          different card shape, which was the same content twice with two looks. */}
+      <ConceptPreview cardIds={scenario.briefing.cardRefs} onView={markCardViewed} />
 
       <section aria-labelledby="bf-dossier-h">
         <h2 id="bf-dossier-h" className="m-0">

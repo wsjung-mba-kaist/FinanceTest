@@ -25,6 +25,30 @@ export const t4: T = {
   ],
   events: [
     {
+      /**
+       * The correction to `t3-news-buyers`. The bidders' demand for a loss guarantee was real, and
+       * so was the Treasury's refusal — which is why the meeting in the next event opens with
+       * "공적 자금은 없습니다" and a consortium bad bank instead.
+       *
+       * The reader who read the Thursday report as a negotiating posture is finding out here that
+       * it was the actual constraint, and that the only remaining source of a guarantee is the
+       * room they are sitting in.
+       */
+      id: 't4-news-guarantee-confirmed',
+      kind: 'newswire',
+      outlet: '통신사',
+      time: '08:30',
+      headline: '[확인] 손실 보증 요구는 사실이었다 — 재무부는 거부, 남은 자금줄은 경쟁사들',
+      body:
+        '어제 전해진 "정부 손실 보증 없이는 어렵다"는 두 후보의 입장은 사실로 확인됐다. ' +
+        '재무부는 보증을 거부했고, 그래서 오늘 회의의 의제는 인수자 찾기가 아니라 ' +
+        '상업용 부동산을 떼어낼 자금을 누가 댈 것인가로 옮겨졌다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't3-news-buyers',
+      sourceRefs: [S.fcic, S.val],
+    },
+    {
       id: 't4-dialogue-frbny',
       kind: 'dialogue',
       time: '09:00',
@@ -438,6 +462,28 @@ export const t5: T = {
     },
   ],
   events: [
+    {
+      /**
+       * The correction to `t4-news-bofa-merrill`. The unconfirmed report was right, and the
+       * timing is what matters: BofA and Merrill agreed over the same weekend, which removed one
+       * of the two bidders from the table while the consortium was still being assembled.
+       *
+       * A reader who discounted it as unconfirmed was planning around a buyer that was already
+       * gone.
+       */
+      id: 't5-news-bofa-merrill-confirmed',
+      kind: 'newswire',
+      outlet: '통신사',
+      time: '09:40',
+      headline: '[확인] BofA는 메릴린치로 갔다 — 인수 후보가 하나로 줄었다',
+      body:
+        '어제 "확인되지 않았다"고 전해진 보도는 사실이었다. BofA는 주말 사이 메릴린치와 합의했고, ' +
+        '이로써 남은 인수 후보는 바클레이스 하나다. 바클레이스의 조건은 바뀌지 않았다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't4-news-bofa-merrill',
+      sourceRefs: [S.fcic],
+    },
     {
       id: 't5-call-fsa',
       kind: 'call',

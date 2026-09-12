@@ -845,6 +845,27 @@ export const t5: T = {
   interrupts: [t5SponsorCall],
   events: [
     {
+      /**
+       * The correction to `t4-news-plea`. "영란은행은 논평 거부" was true when it was written and
+       * stopped being the whole truth two days later. The lesson is not that the Bank was lying —
+       * it is that "no comment" from a central bank in a market seizure carries no information
+       * either way, and a fund that waited for a signal spent two days it did not have.
+       */
+      id: 't5-news-plea-answered',
+      kind: 'newswire',
+      outlet: 'Financial Times',
+      time: '11:05',
+      headline: '[후속] 이틀 전 "논평 거부"였던 영란은행이 오늘 장기물 매입에 나섰다',
+      body:
+        '지난 이틀간 운용사들이 전달한 시장 기능 저하는 오늘 11시 임시 매입 발표로 답을 받았다. ' +
+        '그 사이 영란은행의 공식 입장은 "논평하지 않는다"였다 — 개입 준비가 진행 중이던 기간과 ' +
+        '겹친다. 시한과 규모가 명시된 일시적 조치이며, 지원이 온다는 사전 신호는 없었다.',
+      severity: 'positive',
+      reliability: 'confirmed',
+      correctionOf: 't4-news-plea',
+      sourceRefs: [S.pr0928, S.qb],
+    },
+    {
       id: 't5-news-boe',
       kind: 'newswire',
       outlet: 'Bank of England',

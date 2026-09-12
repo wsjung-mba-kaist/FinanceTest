@@ -68,7 +68,7 @@ export function RationalePanel({
           <div key={o.id} className="text-sm">
             <span className="num mr-1 font-semibold">{letterOf(o.id)}</span>
             <span className="font-medium">{o.label}</span>
-            <Markdown className="mt-0.5 text-base leading-relaxed">{o.consequences}</Markdown>
+            <Markdown className="mt-0.5 text-base">{o.consequences}</Markdown>
           </div>
         ))}
         {feedItems.map((f) => (
@@ -76,7 +76,7 @@ export function RationalePanel({
             <Badge tone={f.severity === 'info' ? 'neutral' : f.severity}>[결과]</Badge>
             <div>
               <div className="font-medium">{f.title}</div>
-              <Markdown className="text-base leading-relaxed">{f.body}</Markdown>
+              <Markdown className="text-base">{f.body}</Markdown>
             </div>
           </div>
         ))}
@@ -119,7 +119,7 @@ export function RationalePanel({
         {chosen
           .filter((o) => o.expert.historicalNote)
           .map((o) => (
-            <Markdown key={o.id} className="text-base leading-relaxed">
+            <Markdown key={o.id} className="text-base">
               {o.expert.historicalNote ?? ''}
             </Markdown>
           ))}
@@ -146,7 +146,7 @@ export function RationalePanel({
                 <Citation ids={o.expert.sourceRefs} local={scenario.meta.sources} />
               )}
             </div>
-            <Markdown className="text-base leading-relaxed">{o.expert.rationale}</Markdown>
+            <Markdown className="text-base">{o.expert.rationale}</Markdown>
           </div>
         ))}
         {best && !chosen.includes(best) && (
@@ -165,12 +165,10 @@ export function RationalePanel({
         {chosen.map((o) => (
           <div key={o.id} className="space-y-1.5">
             {o.trap && (
-              <div className="rounded border border-warning/40 bg-warning-bg px-2 py-1 text-sm">
+              <div className="rounded-sm border border-warning-border bg-warning-bg px-2 py-1 text-sm">
                 <Badge tone="warning">함정 선택지</Badge>
                 {o.trapExplanation && (
-                  <Markdown className="mt-1 text-base leading-relaxed">
-                    {o.trapExplanation}
-                  </Markdown>
+                  <Markdown className="mt-1 text-base">{o.trapExplanation}</Markdown>
                 )}
               </div>
             )}

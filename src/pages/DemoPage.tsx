@@ -17,9 +17,12 @@ import {
 } from '../engine'
 import { loadScenario } from '../scenarios'
 import { Markdown } from '../components/knowledge/Markdown'
-import { Badge, Button, StatusBadge } from '../components/ui'
+import { Badge, Button, Card, Chip, StatusBadge } from '../components/ui'
+import { buttonClass } from '../components/ui/buttonStyles'
+import { chipClass } from '../components/ui/chipStyles'
 import { Icon } from '../components/ui/Icon'
 import { formatDelta, formatMetric } from '../lib/format'
+import { gridClass } from '../lib/grid'
 
 /** The scenario the tour is built from, and the historical choice that gets it to its second turn. */
 const DEMO = { scenarioId: 'svb-2023', firstDecision: 't0-d1', firstChoice: 't0-a' }
@@ -38,7 +41,9 @@ interface DemoState {
   state: GameState<InstitutionState>
 }
 
-function headlineOf(events: GameEvent[]): { title: string; body: string; time?: string } | undefined {
+function headlineOf(
+  events: GameEvent[],
+): { title: string; body: string; time?: string } | undefined {
   const e = events[0]
   if (!e) return undefined
   const time = e.time
@@ -116,7 +121,9 @@ export default function DemoPage() {
     }
   }, [demo])
 
-  const decision: DecisionView<InstitutionState> | undefined = view?.decisions.find((d) => !d.resolved)
+  const decision: DecisionView<InstitutionState> | undefined = view?.decisions.find(
+    (d) => !d.resolved,
+  )
   const metrics = useDemoMetrics(demo)
   const headline = view ? headlineOf(view.events as GameEvent[]) : undefined
 
@@ -169,7 +176,7 @@ export default function DemoPage() {
   const turn = view.turn
 
   return (
-    <div className="mx-auto max-w-4xl py-6">
+    <div>
       <header className="prose-col">
         <p className="text-sm text-muted">{demo.scenario.meta.title} · 실제 엔진으로 재현됩니다</p>
         <h1 className="mt-1 text-xl font-semibold">90초 둘러보기</h1>
@@ -178,31 +185,47 @@ export default function DemoPage() {
         </p>
       </header>
 
+      {/*
+        A completed step is a place you can go back to, so it is a button. The ones ahead are not
+        yet reachable and stay as text — a disabled button would only add a stop for the keyboard.
+      */}
       <ol className="mt-5 flex flex-wrap gap-2" aria-label="둘러보기 단계">
         {STEPS.map((s, i) => {
-          const state = i === index ? 'current' : i < index ? 'done' : 'todo'
+          const current = i === index
+          const done = i < index
+          const body = (
+            <>
+              <span className="num">{i + 1}</span>
+              {s.label}
+            </>
+          )
           return (
             <li key={s.id}>
-              <span
-                aria-current={state === 'current' ? 'step' : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${
-                  state === 'current'
-                    ? 'border-accent bg-accent text-accent-fg'
-                    : state === 'done'
-                      ? 'border-border-strong text-muted'
-                      : 'border-border text-muted'
-                }`}
-              >
-                <span className="num">{i + 1}</span>
-                {s.label}
-              </span>
+              {done ? (
+                <Chip
+                  size="sm"
+                  onClick={() => setStep(s.id)}
+                  aria-label={`${i + 1}단계 ${s.label} 다시 보기`}
+                >
+                  {body}
+                </Chip>
+              ) : (
+                <span
+                  // A step you have not reached is not a button you cannot press — it is text.
+                  // Same chip surface, correct element.
+                  aria-current={current ? 'step' : undefined}
+                  className={chipClass({ selected: current, size: 'sm', inert: true })}
+                >
+                  {body}
+                </span>
+              )}
             </li>
           )
         })}
       </ol>
       <p className="mt-2 text-sm text-muted">{STEPS[index]?.hint}</p>
 
-      <section className="mt-5 rounded-lg border border-border bg-surface p-4">
+      <Card className="mt-5 p-4">
         {step === 'situation' && (
           <div className="prose-col">
             <p className="text-sm text-muted">
@@ -224,7 +247,7 @@ export default function DemoPage() {
         {step === 'metrics' && (
           <div>
             <h2 className="text-lg font-semibold">핵심 지표</h2>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            <ul className={`mt-3 grid gap-3 ${gridClass('metric', metrics.length)}`}>
               {metrics.map(({ spec, m }) => (
                 <li key={spec.metric} className="rounded-lg border border-border p-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -261,11 +284,15 @@ export default function DemoPage() {
                       aria-pressed={on}
                       onClick={() => setPicked(o.option.id)}
                       className={`block w-full rounded-lg border p-3 text-left ${
-                        on ? 'border-accent bg-accent-soft' : 'border-border hover:border-border-strong'
+                        on
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-border hover:border-border-strong'
                       }`}
                     >
                       <span className="block font-medium">{o.option.label}</span>
-                      <span className="mt-0.5 block text-sm text-muted">{o.option.description}</span>
+                      <span className="mt-0.5 block text-sm text-muted">
+                        {o.option.description}
+                      </span>
                     </button>
                   </li>
                 )
@@ -316,7 +343,7 @@ export default function DemoPage() {
             </p>
           </div>
         )}
-      </section>
+      </Card>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {index > 0 && step !== 'result' ? (
@@ -332,7 +359,7 @@ export default function DemoPage() {
           <>
             <Link
               to={`/scenarios/${DEMO.scenarioId}`}
-              className="inline-flex items-center rounded-md bg-accent px-3 py-1.5 font-medium text-accent-fg"
+              className={buttonClass({ variant: 'primary' })}
             >
               이 시나리오 시작하기
             </Link>
@@ -341,7 +368,11 @@ export default function DemoPage() {
             </Link>
           </>
         ) : (
-          <Button variant="primary" onClick={() => setStep(STEPS[index + 1]!.id)} disabled={!canAdvance}>
+          <Button
+            variant="primary"
+            onClick={() => setStep(STEPS[index + 1]!.id)}
+            disabled={!canAdvance}
+          >
             다음 <Icon name="chevron-right" />
           </Button>
         )}

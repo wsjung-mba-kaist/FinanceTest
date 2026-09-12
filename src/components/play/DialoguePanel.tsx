@@ -134,7 +134,7 @@ export function DialoguePanel({
                 <InlineMarkdown>{l.text}</InlineMarkdown>
               </p>
             ))}
-            <p className="prose-col rounded bg-accent-soft px-2 py-1 text-base">
+            <p className="prose-col rounded-sm bg-accent-soft px-2 py-1 text-base">
               <span className="font-semibold text-muted">나</span> {reply.label}
             </p>
           </div>
@@ -176,11 +176,11 @@ export function DialoguePanel({
                 buttons.current[i] = el
               }}
               data-reply={reply.id}
-              className="flex min-h-[56px] w-full items-start gap-2 rounded-md border border-border bg-bg px-3 py-2 text-left hover:border-accent hover:bg-surface-2"
+              className="flex min-h-tap-min w-full items-start gap-2 rounded-md border border-border bg-bg px-3 py-2 text-left hover:border-accent hover:bg-surface-2"
               onClick={() => answer(reply.id)}
             >
               <span
-                className="num mt-0.5 shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-sm"
+                className="num mt-0.5 shrink-0 rounded-sm bg-surface-2 px-1.5 py-0.5 text-sm"
                 aria-hidden="true"
               >
                 {replyKeyFor(i)}

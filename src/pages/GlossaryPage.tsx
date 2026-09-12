@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Citation } from '../components/knowledge/Citation'
-import { Button, EmptyState } from '../components/ui'
+import { Button, Card, EmptyState } from '../components/ui'
 import { GLOSSARY, getCard } from '../content'
 import type { GlossaryEntry } from '../content/types'
 import { scenariosUsingCards } from '../lib/catalog'
+import { normalize } from '../lib/search'
 import { getScenarioSummary } from '../scenarios'
 import { useProgressStore } from '../store/progressStore'
 import { useSettingsStore } from '../store/settingsStore'
@@ -97,15 +98,19 @@ export default function GlossaryPage() {
   }, [termDisplay])
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    // The same normalisation the unified search uses: NFC, lowercase, and spaces / `·` /
+    // brackets / hyphens removed. Plain `.toLowerCase().includes()` meant «마진 콜» did not find
+    // 마진콜 and «margincall» did not find "margin call" — on the one screen whose entire job is
+    // looking a term up.
+    const q = normalize(query)
     if (!q) return sorted
     return sorted.filter(
       (g) =>
-        g.id.includes(q) ||
-        g.term.ko.toLowerCase().includes(q) ||
-        g.term.en.toLowerCase().includes(q) ||
-        (g.aliases ?? []).some((a) => a.toLowerCase().includes(q)) ||
-        g.definition.ko.toLowerCase().includes(q),
+        normalize(g.id).includes(q) ||
+        normalize(g.term.ko).includes(q) ||
+        normalize(g.term.en).includes(q) ||
+        (g.aliases ?? []).some((a) => normalize(a).includes(q)) ||
+        normalize(g.definition.ko).includes(q),
     )
   }, [sorted, query])
 
@@ -150,7 +155,7 @@ export default function GlossaryPage() {
         </h1>
       </header>
 
-      <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+      <Card as="div" className="p-3 space-y-2">
         <label htmlFor={searchId} className="block text-sm text-muted">
           검색 (한글·영문·약어)
         </label>
@@ -160,25 +165,31 @@ export default function GlossaryPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="예: LCR, 유동성, margin call"
-          className="w-full rounded border border-border bg-bg px-2 py-1.5"
+          className="w-full rounded-sm border border-border-control bg-bg px-2 py-1.5"
         />
-        <nav aria-label="색인" className="flex flex-wrap gap-0.5 text-sm">
-          {[...KO_INDEX, ...EN_INDEX].map((k) => (
-            <a
-              key={k}
-              href={`#idx-${k}`}
-              aria-disabled={!present.has(k)}
-              onClick={(e) => {
-                e.preventDefault()
-                document.getElementById(`idx-${k}`)?.scrollIntoView({ block: 'start' })
-              }}
-              className={`num rounded px-1.5 py-0.5 no-underline ${present.has(k) ? 'text-accent hover:bg-surface-2' : 'pointer-events-none text-muted opacity-40'}`}
-            >
-              {k}
-            </a>
-          ))}
+        {/*
+          Only the letters that actually have entries. Of the 40 rendered before, 21 were dead —
+          a row of greyed, unclickable characters that also sat at 17px next to each other, below
+          every touch-target minimum. What is left is clickable, 24px, and gapped.
+        */}
+        <nav aria-label="색인" className="flex flex-wrap gap-1 text-sm">
+          {[...KO_INDEX, ...EN_INDEX]
+            .filter((k) => present.has(k))
+            .map((k) => (
+              <a
+                key={k}
+                href={`#idx-${k}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  document.getElementById(`idx-${k}`)?.scrollIntoView({ block: 'start' })
+                }}
+                className="num inline-flex min-h-tap-dense min-w-tap-dense items-center justify-center rounded-sm px-1.5 text-accent no-underline hover:bg-surface-2"
+              >
+                {k}
+              </a>
+            ))}
         </nav>
-      </div>
+      </Card>
 
       {groups.length === 0 ? (
         <EmptyState
@@ -197,7 +208,7 @@ export default function GlossaryPage() {
           <section key={k} id={`idx-${k}`} aria-labelledby={`idx-${k}-h`} className="scroll-mt-4">
             <h2
               id={`idx-${k}-h`}
-              className="num sticky top-0 z-10 border-b border-border bg-bg py-1 text-base font-semibold"
+              className="num sticky top-0 z-10 border-b border-border bg-bg py-1 text-lg font-semibold"
             >
               {k}
             </h2>
@@ -214,7 +225,7 @@ export default function GlossaryPage() {
                     id={`term-${g.id}`}
                     tabIndex={-1}
                     className={`scroll-mt-12 break-inside-avoid border-b border-border py-2 ${
-                      hl ? 'bg-accent-soft -mx-2 px-2 rounded' : ''
+                      hl ? 'bg-accent-soft -mx-2 px-2 rounded-sm' : ''
                     }`}
                   >
                     <dt className="font-medium">

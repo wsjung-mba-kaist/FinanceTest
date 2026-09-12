@@ -28,9 +28,9 @@ function TurnSeparator({
     <h3
       id={current ? 'turn-header-current' : `turn-header-${turnIndex}`}
       tabIndex={-1}
-      className="flex items-center gap-2 pt-2 text-sm font-semibold text-muted outline-none"
+      className="flex items-center gap-2 pt-2 text-sm font-semibold text-muted"
     >
-      <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-text">{label}</span>
+      <span className="num rounded-sm bg-surface-2 px-1.5 py-0.5 text-text">{label}</span>
       <span>{timeLabel}</span>
       {title && <span className="text-text">· {title}</span>}
       <span className="ml-2 h-px flex-1 bg-border" aria-hidden="true" />
@@ -47,7 +47,7 @@ function TickSeparator({ label }: { label: string }) {
       aria-label={`${label} 시각`}
       data-tick-separator={label}
     >
-      <span className="num rounded bg-surface-2 px-1.5 py-0.5">{label}</span>
+      <span className="num rounded-sm bg-surface-2 px-1.5 py-0.5">{label}</span>
       <span className="h-px flex-1 bg-border" aria-hidden="true" />
     </div>
   )

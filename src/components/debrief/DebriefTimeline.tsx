@@ -16,6 +16,7 @@ import {
 import type { GameState, KpiSpec, ScenarioDefinition } from '../../engine/types'
 import { formatMetric } from '../../lib/format'
 import { Button } from '../ui'
+import { useChartType } from '../dashboard/useChartType'
 
 interface Point {
   turn: number
@@ -53,6 +54,8 @@ export function DebriefTimeline({
   /** Printing: render the table so the chart is never measured at zero width. */
   forceTable?: boolean
 }) {
+  // Chart labels follow the reader's type scale; Recharts takes numbers, not CSS.
+  const chart = useChartType()
   const kpis = scenario.kpis
   const [metric, setMetric] = useState(
     () => kpis.find((k) => k.primary)?.metric ?? kpis[0]?.metric ?? 'confidence',
@@ -107,7 +110,7 @@ export function DebriefTimeline({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">경로 비교</h3>
+        <h3 className="text-md font-semibold">경로 비교</h3>
         <div className="flex items-center gap-2">
           <label htmlFor={selectId} className="text-sm text-muted">
             지표
@@ -116,7 +119,7 @@ export function DebriefTimeline({
             id={selectId}
             value={metric}
             onChange={(e) => setMetric(e.target.value)}
-            className="rounded border border-border bg-bg px-2 py-1 text-sm"
+            className="rounded-sm border border-border-control bg-bg px-2 py-1 text-sm"
           >
             {kpis.map((k) => (
               <option key={k.metric} value={k.metric}>
@@ -159,13 +162,9 @@ export function DebriefTimeline({
                   <td className="py-1 pr-2 num">{fmt(d.expert)}</td>
                   <td className="py-1">
                     {d.decided && (
-                      <button
-                        type="button"
-                        className="text-accent underline-offset-2 hover:underline bg-transparent border-0 p-0"
-                        onClick={() => onMarkerClick?.(d.turn)}
-                      >
+                      <Button variant="link" onClick={() => onMarkerClick?.(d.turn)}>
                         결정 보기
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -185,12 +184,12 @@ export function DebriefTimeline({
                 <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: chart.tick }}
                   axisLine={{ stroke: 'var(--border)' }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: chart.tick }}
                   axisLine={false}
                   tickLine={false}
                   width={56}
@@ -198,7 +197,7 @@ export function DebriefTimeline({
                   domain={['auto', 'auto']}
                 />
                 <Tooltip content={<TimelineTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: chart.label }} />
                 {threshold && (
                   <ReferenceLine
                     y={threshold.breach}
@@ -207,7 +206,7 @@ export function DebriefTimeline({
                     label={{
                       value: '위험',
                       fill: 'var(--text-muted)',
-                      fontSize: 10,
+                      fontSize: chart.tick,
                       position: 'insideTopRight',
                     }}
                   />
@@ -220,7 +219,7 @@ export function DebriefTimeline({
                     label={{
                       value: '경고',
                       fill: 'var(--text-muted)',
-                      fontSize: 10,
+                      fontSize: chart.tick,
                       position: 'insideTopRight',
                     }}
                   />
@@ -231,7 +230,7 @@ export function DebriefTimeline({
                     x2={scenario.turns[lastTurn]?.label}
                     fill="var(--surface-2)"
                     fillOpacity={0.6}
-                    label={{ value: '종료 이후', fill: 'var(--text-muted)', fontSize: 10 }}
+                    label={{ value: '종료 이후', fill: 'var(--text-muted)', fontSize: chart.tick }}
                   />
                 )}
                 <Line

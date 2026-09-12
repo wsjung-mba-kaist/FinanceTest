@@ -6,7 +6,14 @@ import { useSettingsStore } from '../../store/settingsStore'
 
 /**
  * Inline glossary term with an accessible tooltip. Renders `한글(English)` on demand.
- * Trigger is a button (hover + focus + click), Esc closes.
+ *
+ * The trigger is a **link to the glossary entry**, not a button, and the tooltip holds only text.
+ * It used to be a button with a 자세히 → link *inside* the tooltip — which no keyboard user could
+ * ever reach, because the tooltip closes on blur and blur is what pressing Tab does. The
+ * `onMouseDown` preventDefault that kept it alive for the mouse is gone with it.
+ *
+ * So: hover or focus reads the definition, and activating goes to the full entry. One control,
+ * one meaning.
  */
 export function GlossaryTerm({
   id,
@@ -32,24 +39,21 @@ export function GlossaryTerm({
         : `${term.term.en}(${term.term.ko})`)
   return (
     <span className="relative inline-block">
-      <button
-        type="button"
-        className="underline decoration-dotted underline-offset-2 decoration-muted hover:decoration-accent cursor-help bg-transparent border-0 p-0 text-inherit"
+      <Link
+        to={`/knowledge/glossary#term-${term.id}`}
+        className="cursor-help text-inherit underline decoration-muted decoration-dotted underline-offset-2 hover:decoration-accent"
         aria-describedby={open ? tipId : undefined}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={() => {
-          setOpen((o) => !o)
-          markTermViewed(term.id)
-        }}
+        onClick={() => markTermViewed(term.id)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') setOpen(false)
         }}
       >
         {label}
-      </button>
+      </Link>
       {open && (
         <span
           role="tooltip"
@@ -60,13 +64,6 @@ export function GlossaryTerm({
             {term.term.ko} <span className="text-muted font-normal">({term.term.en})</span>
           </span>
           <span className="block mt-1">{term.definition.ko}</span>
-          <Link
-            to={`/knowledge/glossary#${term.id}`}
-            className="block mt-1 text-accent"
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            자세히 →
-          </Link>
         </span>
       )}
     </span>

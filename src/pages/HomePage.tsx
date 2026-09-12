@@ -5,6 +5,8 @@ import { ScenarioCard } from '../components/catalog/ScenarioCard'
 import { RoleChooser } from '../components/onboarding/RoleChooser'
 import { Welcome } from '../components/onboarding/Welcome'
 import { Button, ConfirmDialog, EmptyState } from '../components/ui'
+import { buttonClass } from '../components/ui/buttonStyles'
+import { gridPlan } from '../lib/grid'
 import { roleFamilyOf, type RoleFamily } from '../content/roleFrames'
 import type { Competency, Difficulty, Region, ScenarioSummary } from '../engine/types'
 import type { InProgressSave } from '../persistence/schema'
@@ -55,8 +57,7 @@ export default function HomePage() {
   const [discardId, setDiscardId] = useState<string | undefined>()
   const [introReopened, setIntroReopened] = useState(false)
 
-  const engaged = Object.keys(scenarios).length > 0
-  const showIntro = introReopened || !onboardingSeenAt || !engaged
+  const showIntro = introReopened || !onboardingSeenAt
 
   const toggle = (key: FilterKey, id: string) =>
     setFilters((f) => {
@@ -72,7 +73,13 @@ export default function HomePage() {
   const plannedCount = useMemo(() => all.filter((s) => s.status === 'planned').length, [all])
 
   const familyCounts = useMemo(() => {
-    const out: Record<RoleFamily, number> = { bank: 0, securities: 0, pension: 0, fund: 0, policy: 0 }
+    const out: Record<RoleFamily, number> = {
+      bank: 0,
+      securities: 0,
+      pension: 0,
+      fund: 0,
+      policy: 0,
+    }
     for (const s of all) {
       if (s.status !== 'available') continue
       out[roleFamilyOf(s.role)] += 1
@@ -127,6 +134,7 @@ export default function HomePage() {
     return out.sort((a, b) => b.run.updatedAt.localeCompare(a.run.updatedAt))
   }, [all, scenarios])
   const discardTarget = inProgress.find((x) => x.summary.id === discardId)
+  const cardGrid = gridPlan('scenario', visible.length)
 
   return (
     <div className="space-y-6">
@@ -143,7 +151,7 @@ export default function HomePage() {
       {inProgress.length > 0 && (
         <section
           aria-label="이어하기"
-          className="space-y-2 rounded-lg border border-info/40 bg-info-bg p-3"
+          className="space-y-2 rounded-lg border border-info-border bg-info-bg p-3"
         >
           {inProgress.map(({ summary, run, stale }) => (
             <div key={summary.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -162,14 +170,14 @@ export default function HomePage() {
                 {stale ? (
                   <Link
                     to={`/scenarios/${summary.id}`}
-                    className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1 text-sm font-medium text-text no-underline hover:bg-surface-2"
+                    className={buttonClass({ variant: 'secondary', size: 'sm' })}
                   >
                     브리핑 열기
                   </Link>
                 ) : (
                   <Link
                     to={`/play/${summary.id}`}
-                    className="inline-flex items-center rounded-md border border-accent bg-accent px-3 py-1 text-sm font-medium text-accent-fg no-underline hover:opacity-90"
+                    className={buttonClass({ variant: 'primary', size: 'sm' })}
                   >
                     이어하기
                   </Link>
@@ -190,7 +198,7 @@ export default function HomePage() {
       />
 
       <section aria-labelledby="catalog-h" className="space-y-3">
-        <h2 id="catalog-h" className="text-md font-semibold">
+        <h2 id="catalog-h" className="text-lg font-semibold">
           시나리오
           {roleFamily && (
             <span className="ml-1 font-normal text-muted">— {ROLE_FAMILY_LABELS[roleFamily]}</span>
@@ -231,9 +239,12 @@ export default function HomePage() {
             </div>
           </EmptyState>
         ) : (
-          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
-            {visible.map((s) => (
-              <li key={s.id}>
+          <ul className={`m-0 grid list-none gap-3 p-0 ${cardGrid.className}`}>
+            {visible.map((s, i) => (
+              // The first card takes two columns when the last row would otherwise strand one.
+              // Sorting already puts the 입문 편 first, so the card that gets the extra width is
+              // the one a newcomer should start from.
+              <li key={s.id} className={i === 0 ? cardGrid.firstItemClassName : undefined}>
                 <ScenarioCard summary={s} progress={scenarios[s.id]} />
               </li>
             ))}

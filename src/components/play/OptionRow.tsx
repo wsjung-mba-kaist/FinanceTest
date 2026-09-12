@@ -22,6 +22,7 @@ export function OptionRow({
   onSelect,
   onToggleExpand,
   onFocusChange,
+  risk,
   children,
 }: {
   ov: OptionView
@@ -35,6 +36,8 @@ export function OptionRow({
   onSelect: () => void
   onToggleExpand: () => void
   onFocusChange: (focused: boolean) => void
+  /** Shown on the row itself, never behind the disclosure: this option can end the scenario. */
+  risk?: string
   /** Expanded detail block (description, ImpactPreview, feasibility). */
   children?: ReactNode
 }) {
@@ -44,7 +47,7 @@ export function OptionRow({
   const effect = optionEffectLine(option, kpis)
   return (
     <div
-      className={`rounded-md border ${checked ? 'border-accent bg-accent-soft' : 'border-border bg-surface'} ${available ? '' : 'opacity-80'}`}
+      className={`rounded-md border ${checked ? 'border-accent bg-accent-soft' : 'border-border-control bg-surface'} ${available ? '' : 'opacity-80'}`}
     >
       <button
         ref={buttonRef}
@@ -54,7 +57,7 @@ export function OptionRow({
         aria-disabled={available ? undefined : true}
         aria-describedby={descId}
         tabIndex={tabIndex}
-        className="flex min-h-[44px] w-full items-start gap-2 rounded-md px-3 py-2 text-left"
+        className="flex min-h-tap-min w-full items-start gap-2 rounded-md px-3 py-2 text-left"
         onClick={() => {
           if (available) onSelect()
         }}
@@ -62,7 +65,7 @@ export function OptionRow({
         onBlur={() => onFocusChange(false)}
       >
         <span
-          className={`num mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border text-sm font-semibold ${checked ? 'border-accent bg-accent text-accent-fg' : 'border-border bg-surface-2 text-muted'}`}
+          className={`num mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold ${checked ? 'border-accent bg-accent text-accent-fg' : 'border-border-control bg-surface-2 text-muted'}`}
           aria-hidden="true"
         >
           {letter}
@@ -78,6 +81,17 @@ export function OptionRow({
             {effect}
             {!available && reason ? ` — ${reason}` : ''}
           </span>
+          {/*
+            The most dangerous thing the product can tell you — "this choice can end the run" —
+            used to live inside the 자세히 disclosure, one click away, next to the impact preview.
+            It belongs on the row, where the choice is made.
+          */}
+          {risk && (
+            <span className="mt-1 flex items-start gap-1 text-sm font-medium text-critical">
+              <Icon name="alert" size={14} />
+              {risk}
+            </span>
+          )}
         </span>
         <span className="mt-1 shrink-0 text-muted" aria-hidden="true">
           {role === 'checkbox' ? (checked ? '☑' : '☐') : checked ? '●' : '○'}
@@ -88,7 +102,7 @@ export function OptionRow({
           type="button"
           aria-expanded={expanded}
           aria-controls={`opt-${option.id}-detail`}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
+          className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
           onClick={onToggleExpand}
         >
           {expanded ? '접기' : '자세히'}

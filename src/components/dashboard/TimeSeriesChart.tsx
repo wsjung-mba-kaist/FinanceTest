@@ -15,6 +15,7 @@ import { useReducedMotion } from '../../lib/useMediaQuery'
 import { PlayContext } from '../play/playContext'
 import { Button, Card, StatusBadge } from '../ui'
 import { NoThresholdChip } from './KpiTile'
+import { useChartType } from './useChartType'
 
 /**
  * One selectable KPI across the run, with warn/breach reference lines and a table alternative.
@@ -34,6 +35,8 @@ export function TimeSeriesChart({
   units: Units
   thresholds: ThresholdMap
 }) {
+  // Chart labels follow the reader's type scale; Recharts takes numbers, not CSS.
+  const chart = useChartType()
   const play = useContext(PlayContext)
   const [metric, setMetric] = useState(kpis[0]?.metric ?? '')
   const [table, setTable] = useState(false)
@@ -75,7 +78,7 @@ export function TimeSeriesChart({
         </h3>
         <select
           aria-label="지표 선택"
-          className="rounded border border-border bg-bg px-1.5 py-0.5 text-sm"
+          className="rounded-sm border border-border-control bg-bg px-1.5 py-0.5 text-sm"
           value={spec.metric}
           onChange={(e) => setMetric(e.target.value)}
         >
@@ -153,14 +156,14 @@ export function TimeSeriesChart({
               <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
               <XAxis
                 dataKey="turn"
-                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                tick={{ fontSize: chart.tick, fill: 'var(--text-muted)' }}
                 stroke="var(--border)"
                 tickLine={false}
               />
               <YAxis
                 domain={domain}
                 width={56}
-                tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                tick={{ fontSize: chart.tick, fill: 'var(--text-muted)' }}
                 stroke="var(--border)"
                 tickLine={false}
                 tickFormatter={(v) => fmt(Number(v))}
@@ -171,7 +174,7 @@ export function TimeSeriesChart({
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 6,
-                  fontSize: 12,
+                  fontSize: chart.label,
                   color: 'var(--text)',
                 }}
                 labelStyle={{ color: 'var(--text-muted)' }}
@@ -185,7 +188,7 @@ export function TimeSeriesChart({
                   label={{
                     value: '경고',
                     position: 'insideTopRight',
-                    fontSize: 10,
+                    fontSize: chart.tick,
                     fill: 'var(--sev-warning)',
                   }}
                 />
@@ -198,7 +201,7 @@ export function TimeSeriesChart({
                   label={{
                     value: '위험',
                     position: 'insideBottomRight',
-                    fontSize: 10,
+                    fontSize: chart.tick,
                     fill: 'var(--sev-critical)',
                   }}
                 />

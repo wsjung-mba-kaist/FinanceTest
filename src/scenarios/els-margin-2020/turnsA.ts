@@ -52,7 +52,13 @@ export const T1_PROFILE = [0.15, 0.25, 0.2, 0.15, 0.25]
 export const T3_PROFILE = [0.2, 0.3, 0.2, 0.15, 0.15]
 export const T4_PROFILE = [0.1, 0.2, 0.25, 0.25, 0.2]
 
-const TICK_LABELS = ['08:30 해외 종가', '10:30 오전', '12:30 점심', '15:30 장 마감', '19:00 해외 증거금 마감']
+const TICK_LABELS = [
+  '08:30 해외 종가',
+  '10:30 오전',
+  '12:30 점심',
+  '15:30 장 마감',
+  '19:00 해외 증거금 마감',
+]
 
 // =============================================================================================
 // T0 — 2020-03-12 (목) 17:00 KST "유럽이 무너지는 저녁"
@@ -67,7 +73,10 @@ export const t0: T = {
     {
       id: 't0-roll',
       description: 'CP·전단채 차환은 아직 정상(98%)',
-      effects: [setRollRate(0.98, '단기자금 시장 정상'), cpRolloverStep({ label: '3/12 만기 차환' })],
+      effects: [
+        setRollRate(0.98, '단기자금 시장 정상'),
+        cpRolloverStep({ label: '3/12 만기 차환' }),
+      ],
     },
     {
       id: 't0-cp-rate',
@@ -221,16 +230,21 @@ export const t0: T = {
           consequences:
             '세 청산회원 모두 납입 통화는 달러, 컷오프는 한국시간 19시로 확인되었습니다. 대체담보(국채)는 사전 등록분만 허용됩니다.',
           feasibility: { basis: '내부 결재 사항 — 당일 실행 가능', sourceRefs: [S.cgfs] },
-          preview: [{ metric: 'confidence', direction: 'flat', magnitude: 1, note: '즉각적 지표 변화 없음' }],
+          preview: [
+            {
+              metric: 'confidence',
+              direction: 'flat',
+              magnitude: 1,
+              note: '즉각적 지표 변화 없음',
+            },
+          ],
         },
         {
           id: 't0-c',
           label: '자체헤지 잔액 15%를 백투백으로 전환',
           description:
             '자체헤지 잔액 10조 중 1조 5,000억원을 해외 투자은행에 백투백으로 넘긴다. 증거금 의무가 상대방으로 이전되고 시장위험액이 줄지만, 오늘 기준 전환 수수료 35bp를 한 번에 지불한다.',
-          effects: [
-            convertToBackToBack({ share: 0.15, costBp: 35, label: '백투백 전환 15%' }),
-          ],
+          effects: [convertToBackToBack({ share: 0.15, costBp: 35, label: '백투백 전환 15%' })],
           expert: {
             rating: 76,
             rationale:
@@ -331,7 +345,8 @@ const t1DialogueSteps: DialogueStep<SecuritiesState>[] = [
         next: 'clr-terms',
         expert: {
           rating: 72,
-          rationale: '금액·통화·컷오프·대체담보 가능 여부를 확인한 뒤에야 조달 계획을 세울 수 있다.',
+          rationale:
+            '금액·통화·컷오프·대체담보 가능 여부를 확인한 뒤에야 조달 계획을 세울 수 있다.',
         },
       },
       {
@@ -498,7 +513,8 @@ const t1Interrupt: Interrupt<SecuritiesState> = {
     {
       id: 't1-i1-check',
       label: '금액 확인 후 회신하겠다고 답변',
-      description: '내부 집계 후 회신하겠다고 답하고 통화를 끝낸다. 위법도 허위도 아니지만 상대는 답을 얻지 못한다.',
+      description:
+        '내부 집계 후 회신하겠다고 답하고 통화를 끝낸다. 위법도 허위도 아니지만 상대는 답을 얻지 못한다.',
       effects: [{ kind: 'counter', key: 'marginDeferred', add: 1 }],
       expert: {
         rating: 42,
@@ -506,7 +522,8 @@ const t1Interrupt: Interrupt<SecuritiesState> = {
           '2020년 3월의 기본 상태였다. 정보 공백은 상대가 최악을 가정하게 만들지만, 이 통화만으로 한도가 끊기지는 않는다.',
         sourceRefs: [S.kcmiLee],
       },
-      consequences: '회신을 보류했습니다. 증거금 통지 금액은 대시보드의 "마진콜 대기"에 반영됩니다.',
+      consequences:
+        '회신을 보류했습니다. 증거금 통지 금액은 대시보드의 "마진콜 대기"에 반영됩니다.',
       historical: true,
     },
   ],
@@ -541,7 +558,10 @@ export const t1: T = {
     {
       id: 't1-roll',
       description: '차환률 95% — CP 시장은 아직 열려 있다',
-      effects: [setRollRate(0.95, '단기자금 시장 경계'), cpRolloverStep({ label: '3/13 만기 차환' })],
+      effects: [
+        setRollRate(0.95, '단기자금 시장 경계'),
+        cpRolloverStep({ label: '3/13 만기 차환' }),
+      ],
     },
     {
       id: 't1-unhedged',
@@ -571,7 +591,11 @@ export const t1: T = {
   ],
   ticker: {
     series: [
-      { path: 'market.equityIndex', mode: 'absolute', values: [1834.33, 1760, 1745, 1771.44, 1771.44] },
+      {
+        path: 'market.equityIndex',
+        mode: 'absolute',
+        values: [1834.33, 1760, 1745, 1771.44, 1771.44],
+      },
       { path: 'market.fxUsdLocal', mode: 'absolute', values: [1202, 1211, 1218, 1222.2, 1222.2] },
       { path: 'market.custom.swapBasisBp', mode: 'absolute', values: [-25, -38, -52, -60, -60] },
     ],
@@ -696,7 +720,8 @@ export const t1: T = {
               '확실하지만 비싸고, 규모가 커지면 원/달러 자체를 밀어올린다. 3월 하순 증권사들의 달러 매입이 환율 불안의 한 축으로 지목된 이유다.',
             sourceRefs: [S.kcmiLee, S.fsr],
           },
-          consequences: '담보 여력이 줄고 달러가 들어왔습니다. 체결 환율은 고시 환율보다 불리했습니다.',
+          consequences:
+            '담보 여력이 줄고 달러가 들어왔습니다. 체결 환율은 고시 환율보다 불리했습니다.',
           feasibility: { basis: '현물 외환시장·RP 시장 정상 가동', sourceRefs: [S.ecosFx] },
           calibrationNote: '슬리피지 = 10bp × (1 + 금액/10,000) [CAL, 가이드 6.6 자기 체결가]',
         },
@@ -730,8 +755,7 @@ export const t1: T = {
               '3월 셋째 주 초반까지 업계의 일반적 대응이었다. 금융위가 사후에 외화 유동자산 상시 보유를 의무화한 배경이다.',
             sourceRefs: [S.dlsPlan],
           },
-          consequences:
-            '보유 외화로 납입했습니다. 외화 유동자산이 거의 남지 않았습니다.',
+          consequences: '보유 외화로 납입했습니다. 외화 유동자산이 거의 남지 않았습니다.',
           historical: true,
           trap: true,
           trapExplanation:
@@ -751,10 +775,10 @@ export const t1: T = {
               '증거금 문제를 시장위험 문제로 바꾸는 선택이다. 지수가 더 내려가면 열린 위험이 그대로 손실이 되고, 시장위험액이 늘어 NCR도 깎인다. 2020년 1분기 증권사 파생결합증권 손익 △9,067억의 상당 부분이 이 계열의 손실이다.',
             sourceRefs: [S.fss, S.dlsPlan],
           },
-          consequences:
-            '헤지 델타가 줄었습니다. 증거금 소요는 감소하지만 지수 위험이 열렸습니다.',
+          consequences: '헤지 델타가 줄었습니다. 증거금 소요는 감소하지만 지수 위험이 열렸습니다.',
           feasibility: { basis: '선물 포지션 청산 — 당일 체결 가능', sourceRefs: [S.fss] },
-          calibrationNote: '축소분 × 13% 만큼 시장위험액 증가, 이후 지수 변동의 40%가 자본 손익 [CAL]',
+          calibrationNote:
+            '축소분 × 13% 만큼 시장위험액 증가, 이후 지수 변동의 40%가 자본 손익 [CAL]',
         },
       ],
     },
@@ -810,7 +834,10 @@ export const t2: T = {
     {
       id: 't2-roll',
       description: '차환률 92%',
-      effects: [setRollRate(0.92, '기준금리 인하 직후'), cpRolloverStep({ label: '3/16 만기 차환' })],
+      effects: [
+        setRollRate(0.92, '기준금리 인하 직후'),
+        cpRolloverStep({ label: '3/16 만기 차환' }),
+      ],
     },
     {
       id: 't2-delta',
@@ -953,7 +980,10 @@ export const t2: T = {
             sourceRefs: [S.bcbs555, S.cgfs],
           },
           consequences: '채권이 체결되었습니다. 현금이 늘고 자본은 매각손만큼 줄었습니다.',
-          feasibility: { basis: '채권시장 유동성 저하 상태에서 체결 가능', sourceRefs: [S.bcbs555] },
+          feasibility: {
+            basis: '채권시장 유동성 저하 상태에서 체결 가능',
+            sourceRefs: [S.bcbs555],
+          },
           calibrationNote: '할인 1.2%(스프레드 확대 구간) [CAL]',
         },
         {
@@ -962,7 +992,12 @@ export const t2: T = {
           description:
             '익일물 콜차입을 한도(자기자본 15%)까지 늘린다. 가장 싸고 빠르지만 매일 갱신해야 하며 신뢰가 흔들리면 하루 만에 회수된다.',
           effects: [
-            securitiesFx.raiseFunding({ channel: 'call', amount: 2750, callLimit: 6750, rateBp: 80 }),
+            securitiesFx.raiseFunding({
+              channel: 'call',
+              amount: 2750,
+              callLimit: 6750,
+              rateBp: 80,
+            }),
           ],
           expert: {
             rating: 32,
@@ -1002,7 +1037,10 @@ export const t2: T = {
             sourceRefs: [S.fsb, S.kcmiLee],
           },
           consequences: '신청액의 70%가 체결되었습니다. 한도가 좁아지고 있습니다.',
-          feasibility: { basis: '은행 FX 스왑 데스크 한도 축소 중, 부분 체결 가능', sourceRefs: [S.fsb] },
+          feasibility: {
+            basis: '은행 FX 스왑 데스크 한도 축소 중, 부분 체결 가능',
+            sourceRefs: [S.fsb],
+          },
           calibrationNote: '체결률 70%, 비용 = 금액 × 95bp × 0.25 [CAL]',
         },
         {
@@ -1173,8 +1211,7 @@ const t3DialogueSteps: DialogueStep<SecuritiesState>[] = [
         resolvesTo: 't3-i1-full',
         expert: {
           rating: 78,
-          rationale:
-            '오늘 19시 컷오프를 기준으로 보면 가산 몇십 bp보다 체결 수량이 훨씬 중요하다.',
+          rationale: '오늘 19시 컷오프를 기준으로 보면 가산 몇십 bp보다 체결 수량이 훨씬 중요하다.',
         },
       },
       {
@@ -1193,7 +1230,8 @@ const t3DialogueSteps: DialogueStep<SecuritiesState>[] = [
         resolvesTo: 't3-i1-decline',
         expert: {
           rating: 20,
-          rationale: '절반이라도 오늘 저녁 결제에 쓰인다. 전부 아니면 아무것도라는 판단이 최악이다.',
+          rationale:
+            '절반이라도 오늘 저녁 결제에 쓰인다. 전부 아니면 아무것도라는 판단이 최악이다.',
         },
         trap: true,
         trapExplanation:
@@ -1247,7 +1285,12 @@ const t3Interrupt: Interrupt<SecuritiesState> = {
   prompt: '스왑 데스크가 지금 제시 수준에 체결할지 묻습니다. 답은 몇 분 안에 주어야 합니다.',
   context:
     '1개월 베이시스가 −150bp까지 벌어졌고 본점 한도가 거의 소진됐습니다. 지금 거절하면 오늘 다시 제시받기 어렵습니다.',
-  source: { kind: 'desk', caller: '주간사 은행 FX 스왑 데스크', agency: '외국환은행', tone: 'urgent' },
+  source: {
+    kind: 'desk',
+    caller: '주간사 은행 FX 스왑 데스크',
+    agency: '외국환은행',
+    tone: 'urgent',
+  },
   lines: [
     {
       speaker: '스왑 데스크',
@@ -1292,7 +1335,8 @@ const t3Interrupt: Interrupt<SecuritiesState> = {
     {
       id: 't3-i1-half',
       label: '절반만 체결하고 나머지는 현물에서',
-      description: '스왑으로 절반을 받고 나머지는 현물시장에서 산다. 비용을 나누지만 두 시장 모두에서 불리한 가격에 체결된다.',
+      description:
+        '스왑으로 절반을 받고 나머지는 현물시장에서 산다. 비용을 나누지만 두 시장 모두에서 불리한 가격에 체결된다.',
       effects: [
         fxSwapDraw({ amount: 1500, capacityShare: 1, label: '스왑 절반 체결' }),
         spotBuyUsd({ amount: 1500, slippageBp: 18, label: '잔여 현물 매입' }),
@@ -1318,7 +1362,8 @@ const t3Interrupt: Interrupt<SecuritiesState> = {
     {
       id: 't3-i1-decline',
       label: '거절하고 정책 창구를 기다린다',
-      description: '−150bp는 받아들이지 않고 당국의 외화 공급을 기다린다. 오늘 컷오프는 보유분으로 감당해야 한다.',
+      description:
+        '−150bp는 받아들이지 않고 당국의 외화 공급을 기다린다. 오늘 컷오프는 보유분으로 감당해야 한다.',
       effects: [{ kind: 'counter', key: 'swapDeclined', add: 1 }],
       expert: {
         rating: 22,
@@ -1366,7 +1411,10 @@ export const t3: T = {
     {
       id: 't3-roll',
       description: '차환률 80% — MMF 환매로 CP 수요처가 빠지기 시작',
-      effects: [setRollRate(0.8, 'MMF 환매·CP 수요 위축'), cpRolloverStep({ label: '3/19 만기 차환' })],
+      effects: [
+        setRollRate(0.8, 'MMF 환매·CP 수요 위축'),
+        cpRolloverStep({ label: '3/19 만기 차환' }),
+      ],
     },
     {
       id: 't3-delta',
@@ -1407,7 +1455,11 @@ export const t3: T = {
   ],
   ticker: {
     series: [
-      { path: 'market.equityIndex', mode: 'absolute', values: [1591.2, 1520, 1490, 1457.64, 1457.64] },
+      {
+        path: 'market.equityIndex',
+        mode: 'absolute',
+        values: [1591.2, 1520, 1490, 1457.64, 1457.64],
+      },
       { path: 'market.fxUsdLocal', mode: 'absolute', values: [1237.8, 1258, 1272, 1285.7, 1280.1] },
       { path: 'market.volIndex', mode: 'absolute', values: [72, 74, 75, 76, 76] },
     ],
@@ -1515,8 +1567,7 @@ export const t3: T = {
             '한국은행이 공급하는 외화자금 입찰에 응찰한다. 현재 증권회사를 대상으로 한 외화 공급 입찰은 실시되지 않고 있다.',
           effects: [{ kind: 'counter', key: 'policyRequests', add: 1 }],
           requires: { flag: 'bok_swap_open' },
-          unavailableReason:
-            '증권회사가 응찰할 수 있는 한국은행 외화자금 입찰이 아직 없습니다.',
+          unavailableReason: '증권회사가 응찰할 수 있는 한국은행 외화자금 입찰이 아직 없습니다.',
           expert: {
             rating: 70,
             rationale:
@@ -1678,15 +1729,15 @@ export const t3: T = {
           label: '"마진콜은 없다"고 부인',
           description:
             '증거금 납입 사실 자체를 부인한다. 오늘 기사는 잦아들지만 청산회원·은행·감독당국은 실제 자금 흐름을 보고 있다.',
-          effects: [
-            flag('false_statement'),
-            confidence(-2, '사실과 다른 설명'),
-          ],
+          effects: [flag('false_statement'), confidence(-2, '사실과 다른 설명')],
           delayedEffects: [
             {
               afterTurns: 1,
               description: '자금 흐름과 설명의 불일치가 드러난다',
-              effects: [confidence(-14, '허위 설명 노출'), regulator({ add: 1 }, '설명 불일치 검사')],
+              effects: [
+                confidence(-14, '허위 설명 노출'),
+                regulator({ add: 1 }, '설명 불일치 검사'),
+              ],
             },
           ],
           expert: {

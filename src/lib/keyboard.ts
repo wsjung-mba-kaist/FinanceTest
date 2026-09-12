@@ -38,6 +38,31 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 }
 
+/**
+ * Space is the browser's own "activate the focused control" key. A global Space handler that
+ * always `preventDefault()`s therefore takes the keyboard away from every button on the screen:
+ * the option rows, 확정, 다음 턴 — tab to one, press Space, and nothing happens because the
+ * simulation clock consumed the key instead.
+ *
+ * So the global handler yields whenever focus is *on* something Space would activate. The zones
+ * themselves are `tabIndex={-1}` scroll containers, not controls, so Alt+n → Space still pauses.
+ */
+function isActivatableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY') return true
+  const role = target.getAttribute('role')
+  return (
+    role === 'button' ||
+    role === 'tab' ||
+    role === 'link' ||
+    role === 'checkbox' ||
+    role === 'radio' ||
+    role === 'switch' ||
+    role === 'menuitem'
+  )
+}
+
 export function focusZone(zone: Zone): boolean {
   const el = document.getElementById(ZONE_IDS[zone])
   if (!el) return false
@@ -78,6 +103,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       }
       if (isEditableTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === ' ' || e.key === 'Spacebar') {
+        if (isActivatableTarget(e.target)) return
         const handler = h.onSkipReel ?? h.onToggleClock
         if (!handler) return
         e.preventDefault()

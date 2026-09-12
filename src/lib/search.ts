@@ -1,6 +1,7 @@
 import { CARDS, FRAMEWORKS, GLOSSARY, READING_LIST } from '../content'
 import { parseFrontmatter } from '../content/frontmatter'
 import { REGULATION_REFS, SECTOR_LABELS } from '../content/regulationQuickRef'
+import { sectionSlug } from './slug'
 
 /**
  * 지식 베이스 통합 검색 — 용어집 · 개념 카드 · 프레임워크 절 · 규정 참조 · 읽을거리.
@@ -43,6 +44,10 @@ export const KIND_LABELS: Record<SearchKind, string> = {
   reading: '읽을거리',
 }
 
+// `sectionSlug` lives in ./slug: the framework anchors it builds and the heading ids
+// `<Markdown>` renders must come from one definition, or deep links land at the top of the page.
+export { sectionSlug } from './slug'
+
 const STRIP = /[\s·()[\]{}<>,.;:!?'"`_/\\|·・ー–—-]/
 
 /** NFC → 소문자 → 공백·구두점·`·`·괄호·하이픈 제거. */
@@ -63,15 +68,6 @@ function normalizeWithMap(s: string): { text: string; map: number[] } {
     for (let k = 0; k < lower.length; k++) map.push(i)
   }
   return { text, map }
-}
-
-/** `## 핵심 규칙과 수치` → `핵심-규칙과-수치` (프레임워크 절 앵커). */
-export function sectionSlug(heading: string): string {
-  return heading
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '')
-    .replace(/\s+/g, '-')
 }
 
 // ─────────────────────────────── index ───────────────────────────────

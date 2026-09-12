@@ -10,7 +10,7 @@ import {
   type RegulationSector,
 } from '../../content/regulationQuickRef'
 import { sectionSlug } from '../../lib/search'
-import { Badge } from '../ui'
+import { Badge, Chip } from '../ui'
 import { Citation } from '../knowledge/Citation'
 import { GlossaryTerm } from '../knowledge/GlossaryTerm'
 
@@ -47,33 +47,70 @@ export function RegulationQuickRef({
     <section aria-label="규정 빠른 참조" className="space-y-2">
       <div className="space-y-1.5">
         <FilterRow label="분류">
-          <Chip active={group === 'all'} onClick={() => setGroup('all')}>
+          <Chip
+            size="sm"
+            selected={group === 'all'}
+            aria-pressed={group === 'all'}
+            onClick={() => setGroup('all')}
+          >
             전체
           </Chip>
           {REGULATION_GROUPS.map((g) => (
-            <Chip key={g} active={group === g} onClick={() => setGroup(g)}>
+            <Chip
+              key={g}
+              size="sm"
+              selected={group === g}
+              aria-pressed={group === g}
+              onClick={() => setGroup(g)}
+            >
               {g}
             </Chip>
           ))}
         </FilterRow>
         <FilterRow label="업권">
-          <Chip active={sector === 'all'} onClick={() => setSector('all')}>
+          <Chip
+            size="sm"
+            selected={sector === 'all'}
+            aria-pressed={sector === 'all'}
+            onClick={() => setSector('all')}
+          >
             전체
           </Chip>
           {(Object.keys(SECTOR_LABELS) as RegulationSector[]).map((s) => (
-            <Chip key={s} active={sector === s} onClick={() => setSector(s)}>
+            <Chip
+              key={s}
+              size="sm"
+              selected={sector === s}
+              aria-pressed={sector === s}
+              onClick={() => setSector(s)}
+            >
               {SECTOR_LABELS[s]}
             </Chip>
           ))}
         </FilterRow>
         <FilterRow label="지역">
-          <Chip active={region === 'all'} onClick={() => setRegion('all')}>
+          <Chip
+            size="sm"
+            selected={region === 'all'}
+            aria-pressed={region === 'all'}
+            onClick={() => setRegion('all')}
+          >
             전체
           </Chip>
-          <Chip active={region === 'korea'} onClick={() => setRegion('korea')}>
+          <Chip
+            size="sm"
+            selected={region === 'korea'}
+            aria-pressed={region === 'korea'}
+            onClick={() => setRegion('korea')}
+          >
             한국
           </Chip>
-          <Chip active={region === 'global'} onClick={() => setRegion('global')}>
+          <Chip
+            size="sm"
+            selected={region === 'global'}
+            aria-pressed={region === 'global'}
+            onClick={() => setRegion('global')}
+          >
             국제
           </Chip>
         </FilterRow>
@@ -99,29 +136,6 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
       <span className="text-xs text-muted">{label}</span>
       {children}
     </div>
-  )
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`rounded-full border px-2 py-0.5 text-xs ${
-        active ? 'border-accent bg-accent-soft text-text' : 'border-border bg-surface text-muted'
-      }`}
-    >
-      {children}
-    </button>
   )
 }
 

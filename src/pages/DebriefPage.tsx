@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { DebriefTimeline } from '../components/debrief/DebriefTimeline'
+import { KpiComparisonTable } from '../components/debrief/KpiComparisonTable'
 import { LessonList } from '../components/debrief/LessonList'
 import { MistakeList } from '../components/debrief/MistakeList'
 import { OnePageSummary } from '../components/debrief/OnePageSummary'
@@ -56,7 +57,39 @@ interface DebriefData {
   attempt?: AttemptSave
 }
 
+/**
+ * A replay of a finished run is a pure function of `(scenario version, seed, decisions)` — the
+ * engine is deterministic, which is the whole premise of this project. Re-running it on every
+ * visit to the debrief cost the first paint tens of milliseconds for an answer that cannot have
+ * changed. The cache is module-level and small: one entry per attempt looked at this session.
+ */
+const replayCache = new Map<string, DebriefData | undefined>()
+const REPLAY_CACHE_MAX = 12
+
+function attemptKey(scenario: ScenarioDefinition, attempt: AttemptSave): string {
+  return [
+    scenario.meta.id,
+    scenario.meta.version,
+    attempt.runId,
+    attempt.seed,
+    attempt.decisions.length,
+  ].join('|')
+}
+
 function rebuildFromAttempt(
+  scenario: ScenarioDefinition,
+  attempt: AttemptSave,
+): DebriefData | undefined {
+  const key = attemptKey(scenario, attempt)
+  if (replayCache.has(key)) return replayCache.get(key)
+  const out = computeFromAttempt(scenario, attempt)
+  if (replayCache.size >= REPLAY_CACHE_MAX)
+    replayCache.delete(replayCache.keys().next().value as string)
+  replayCache.set(key, out)
+  return out
+}
+
+function computeFromAttempt(
   scenario: ScenarioDefinition,
   attempt: AttemptSave,
 ): DebriefData | undefined {
@@ -110,6 +143,8 @@ function Panel({
     <div
       role="tabpanel"
       id={`dbf-panel-${id}`}
+      // Named by `aria-label`, not `aria-labelledby={tab}`: a tab may carry a count badge, and
+      // pointing the panel at the tab would fold that number into the panel's accessible name.
       aria-label={label}
       hidden={!shown}
       className="pt-4"
@@ -188,13 +223,16 @@ export default function DebriefPage() {
     if (!recorded) useGameStore.getState().finish()
   }, [live])
 
-  // Nothing to debrief → back to the briefing.
-  useEffect(() => {
-    if (loading || !summary || summary.status !== 'available') return
-    if (!scenario) return
-    if (!live && (!attempts || attempts.length === 0))
-      navigate(`/scenarios/${scenarioId}`, { replace: true })
-  }, [loading, summary, scenario, live, attempts, navigate, scenarioId])
+  // Nothing to debrief. This used to redirect on its own, which reads as the app losing the
+  // page: the user typed or bookmarked a URL and landed somewhere else with no explanation.
+  // Saying so and offering the way forward is the same one click, and it is honest about why.
+  const nothingToShow =
+    !loading &&
+    !!summary &&
+    summary.status === 'available' &&
+    !!scenario &&
+    !live &&
+    (!attempts || attempts.length === 0)
 
   const report = useMemo(
     () => (data && scenario ? computeScore(data.state, scenario) : undefined),
@@ -300,9 +338,16 @@ export default function DebriefPage() {
   }
   if (error || !scenario)
     return <p className="text-critical">시나리오를 불러오지 못했습니다: {error}</p>
+  if (nothingToShow)
+    return (
+      <EmptyState headingLevel={1} title="아직 이 시나리오를 끝내지 않으셨습니다">
+        디브리핑은 한 편을 끝까지 마친 뒤에 볼 수 있습니다.{' '}
+        <Link to={`/scenarios/${scenarioId}`}>브리핑에서 시작하기</Link>
+      </EmptyState>
+    )
   if (!data || !report) {
     return (
-      <EmptyState title="디브리핑할 기록이 없습니다">
+      <EmptyState headingLevel={1} title="디브리핑할 기록이 없습니다">
         {attempts && attempts.length > 0
           ? '저장된 기록을 현재 시나리오 버전으로 재구성할 수 없습니다. '
           : ''}
@@ -406,11 +451,25 @@ export default function DebriefPage() {
             상세
           </h2>
           <div data-noprint>
-            <Tabs tabs={TABS} value={tab} onChange={setTab} ariaLabel="디브리핑 상세" />
+            <Tabs
+              tabs={TABS}
+              value={tab}
+              onChange={setTab}
+              ariaLabel="디브리핑 상세"
+              idFor={(id) => ({ tab: `dbf-tab-${id}`, panel: `dbf-panel-${id}` })}
+            />
           </div>
 
           <Panel id="paths" active={tab} printAll={printing}>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <KpiComparisonTable
+              scenario={scenario}
+              state={state}
+              historical={paths.historical}
+              expert={paths.expert}
+              computing={!paths.done}
+            />
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-3">
                 <DebriefTimeline
                   scenario={scenario}

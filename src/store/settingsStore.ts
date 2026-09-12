@@ -24,9 +24,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 }))
 
-/** Root font size in px at scale 1. Must match the pre-paint script in index.html. */
-export const BASE_FONT_PX = 14
-
 function prefersDark(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -46,7 +43,10 @@ export function applySettingsToDocument(s: SettingsState): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   root.setAttribute('data-theme', resolveTheme(s.theme))
-  root.style.fontSize = `${Math.round(BASE_FONT_PX * s.fontScale)}px`
+  // A *scale*, never a size. `html { font-size: calc(var(--fs-root) * var(--fs-scale)) }` keeps
+  // the base in CSS, so the wide-screen bump and the print size still apply and the user's scale
+  // multiplies with them. Writing `style.fontSize` here made an inline rule that beat both.
+  root.style.setProperty('--fs-scale', String(s.fontScale))
   root.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false')
   root.setAttribute('data-system-font', s.useSystemFont ? 'true' : 'false')
 }

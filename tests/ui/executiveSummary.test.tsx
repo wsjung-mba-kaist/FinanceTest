@@ -24,7 +24,6 @@ function Harness({ def }: { def: ScenarioDefinition }) {
       scenario={def}
       summary={deriveBriefingSummary(def, snapshot)}
       baseline={snapshot}
-      baselineState={state}
       mode={mode}
       setMode={setMode}
     />
@@ -48,14 +47,26 @@ describe.skipIf(!scenario)('ExecutiveSummary', () => {
     useGameStore.setState({ scenario: undefined, state: undefined, history: [], run: undefined })
   })
 
-  it('shows the four summary blocks and the KPI baselines', () => {
+  /**
+   * The summary answers four questions, each exactly once: 이게 뭔가 / 내 일은 뭔가 /
+   * 무엇을 결정하나 / 무엇을 지켜보나. It used to answer two of them twice and the third not at
+   * all — 중요한 판단 listed learning objectives ("…을 이해한다"), which say nothing about what
+   * the player will be asked to decide.
+   */
+  it('answers each of the four briefing questions once', () => {
     renderSummary(scenario!)
-    for (const title of ['상황', '역할·권한', '목표', '시작하기', '핵심 지표 기준선']) {
+    for (const title of ['상황', '역할·권한', '목표', '시작하기']) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument()
     }
-    expect(screen.getByRole('heading', { level: 2, name: /중요한 판단 3가지/ })).toBeInTheDocument()
-    // 생존 일수 appears in the KPI baseline list and again in the role frame's metric chips.
-    expect(screen.getAllByText(/생존 일수/).length).toBeGreaterThan(0)
+    expect(
+      screen.getByRole('heading', { level: 2, name: /내려야 할 결정 \d가지/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: /매 턴 확인할 \d가지/ }),
+    ).toBeInTheDocument()
+    // The summary no longer carries a separate baseline strip or a second copy of the role frame.
+    expect(screen.queryByRole('heading', { level: 2, name: '핵심 지표 기준선' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /중요한 판단/ })).toBeNull()
     // The start card carries the mode radios with their one-line summaries.
     const group = screen.getByRole('radiogroup', { name: '플레이 모드' })
     expect(within(group).getAllByRole('radio')).toHaveLength(3)
@@ -127,6 +138,26 @@ describe.skipIf(!scenario)('ExecutiveSummary', () => {
     expect(screen.getByText('시나리오가 갱신되어 이어할 수 없습니다.')).toBeInTheDocument()
     for (const b of screen.getAllByRole('button', { name: '이어하기' })) {
       expect(b).toBeDisabled()
+    }
+  })
+
+  /**
+   * The decisive assertion for this page: a T0 figure appeared up to four times on one screen
+   * (baseline strip, role-frame chips, pre-flight checklist, dossier table). 매 턴 확인할 N가지
+   * is now the only place the summary prints one.
+   */
+  it('prints each baseline figure exactly once', () => {
+    renderSummary(scenario!)
+    const watch = screen.getByRole('heading', { level: 2, name: /매 턴 확인할/ }).closest('section')
+    expect(watch).not.toBeNull()
+    const shown = [...watch!.querySelectorAll('dt')].map((el) => el.textContent?.trim() ?? '')
+    expect(shown.length).toBeGreaterThan(0)
+    for (const label of new Set(shown)) {
+      // Each KPI label appears once inside the section…
+      expect(
+        shown.filter((x) => x === label),
+        label,
+      ).toHaveLength(1)
     }
   })
 })

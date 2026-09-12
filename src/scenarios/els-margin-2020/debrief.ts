@@ -27,7 +27,12 @@ export const elsDebrief: DebriefSpec = {
       {
         turnId: 't3',
         note: '3/19 원/달러 장중 1,291원·종가 1,285.7원(연중 최고, 당일 거래 가중평균 1,280.1원), KOSPI 1,457.64(−8.39%) 서킷브레이커. 오전 제1차 비상경제회의 50조원 발표. 밤에 한미 통화스왑 600억달러 체결 — 그러나 자금 입찰은 3월 31일이었다.',
-        sourceRefs: ['ecos-731Y001', 'ecos-802Y001', 'govt-emergency-1-2020-03-19', 'bok-swap-2020-03-19'],
+        sourceRefs: [
+          'ecos-731Y001',
+          'ecos-802Y001',
+          'govt-emergency-1-2020-03-19',
+          'bok-swap-2020-03-19',
+        ],
       },
       {
         turnId: 't4',
@@ -108,7 +113,11 @@ export const elsDebrief: DebriefSpec = {
       id: 'l6',
       title: '정책은 범위와 집행일로 읽는다',
       body: '3월 19일 밤 체결된 600억달러 통화스왑의 자금이 입찰로 시장에 나온 것은 3월 31일이다 — 그 12일 동안 해외 증거금 컷오프는 여덟 번 돌아왔다. 3월 24일 발표된 100조원 패키지의 채권시장안정펀드는 금융회사 출자 캐피탈콜 방식이라 실제 매입이 4월 초에야 시작됐고, 매입 대상도 회사채와 우량 CP였다. 반면 3월 26일 한국은행이 증권사 11개사를 공개시장운영 대상기관에 추가한 조치는 범위가 정확히 일치했고 담보만 있으면 0.85% 이하로 91일 자금이 나왔다. 발표 규모가 아니라 "내 물량이 적격인가"와 "언제 돈이 나오는가"가 조달 계획의 입력이다.',
-      sourceRefs: ['bok-swap-auction-2020-03-31', 'govt-emergency-2-2020-03-24', 'bok-rp-2020-03-26'],
+      sourceRefs: [
+        'bok-swap-auction-2020-03-31',
+        'govt-emergency-2-2020-03-24',
+        'bok-rp-2020-03-26',
+      ],
       cardRefs: ['korea-crisis-toolkit'],
     },
     {
@@ -147,8 +156,7 @@ export const elsDebrief: DebriefSpec = {
     {
       id: 'q2',
       type: 'numeric',
-      prompt:
-        '2020년 3월 27일 CP(91일)와 CD(91일)의 금리 격차는 몇 bp였는가? (±10bp)',
+      prompt: '2020년 3월 27일 CP(91일)와 CD(91일)의 금리 격차는 몇 bp였는가? (±10bp)',
       answer: 100,
       tolerance: 10,
       unit: 'bp',
@@ -183,7 +191,11 @@ export const elsDebrief: DebriefSpec = {
       answer: ['a', 'b', 'c'],
       explanation:
         '한미 통화스왑은 3월 19일 밤에 체결됐지만 자금 입찰은 3월 31일에야 실시됐다(공급 예정 120억달러, 낙찰 87.2억달러). 채권시장안정펀드는 원화 회사채·CP 매입 프로그램이며 외화 조달과 무관하고, 실제 매입도 4월 초부터였다. 3월 23일에 실제로 쓸 수 있었던 경로는 시장 스왑, 현물 매입, 사전 약정된 외화 크레딧라인뿐이었다 — 발표일과 집행일의 거리가 이 문제의 핵심이다.',
-      sourceRefs: ['bok-swap-auction-2020-03-31', 'govt-emergency-2-2020-03-24', 'bok-swap-2020-03-19'],
+      sourceRefs: [
+        'bok-swap-auction-2020-03-31',
+        'govt-emergency-2-2020-03-24',
+        'bok-swap-2020-03-19',
+      ],
       cardRefs: ['korea-crisis-toolkit'],
     },
     {

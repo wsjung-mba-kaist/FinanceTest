@@ -43,4 +43,30 @@ describe('app wiring', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toBeVisible()
   })
+
+  /**
+   * The unified search lived only in the help sheet, so the page whose subject *is* this content
+   * had no search box on it. `?q=` makes a result set linkable.
+   */
+  it('knowledge index has its own search, synced to ?q=', async () => {
+    const user = userEvent.setup()
+    await renderAt('#/knowledge')
+    const box = await screen.findByRole(
+      'searchbox',
+      { name: '지식 베이스 검색' },
+      { timeout: 5000 },
+    )
+    await user.type(box, 'LCR')
+    await waitFor(() => expect(window.location.hash).toContain('q=LCR'))
+  })
+
+  it('opens the knowledge index with the query the URL carries', async () => {
+    await renderAt('#/knowledge?q=LCR')
+    const box = await screen.findByRole(
+      'searchbox',
+      { name: '지식 베이스 검색' },
+      { timeout: 5000 },
+    )
+    expect(box).toHaveValue('LCR')
+  })
 })

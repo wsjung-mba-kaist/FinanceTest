@@ -4,7 +4,7 @@ import { GLOSSARY } from '../../content'
 import { normalize } from '../../lib/search'
 import { useProgressStore } from '../../store/progressStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { EmptyState } from '../ui'
+import { EmptyState, SearchField } from '../ui'
 import { Icon } from '../ui/Icon'
 
 const PAGE = 60
@@ -35,18 +35,13 @@ export function GlossaryHelp({
 
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5">
-        <Icon name="search" size={16} />
-        <span className="sr-only">용어 검색</span>
-        <input
-          type="search"
-          className="w-full bg-transparent text-base outline-none"
-          placeholder="용어 검색 (한글·영문·약어)"
-          aria-label="용어 검색"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </label>
+      <SearchField
+        label="용어 검색"
+        icon={<Icon name="search" size={16} />}
+        placeholder="용어 검색 (한글·영문·약어)"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
 
       {list.length === 0 && <EmptyState title="일치하는 용어가 없습니다" />}
 

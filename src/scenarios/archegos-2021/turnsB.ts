@@ -880,6 +880,27 @@ export const t5: T = {
   interrupts: [t5DeskCall],
   events: [
     {
+      /**
+       * The correction to `t4-news-rumour`. The unsourced talk of "수십억 달러 블록" was accurate,
+       * and by the time it is confirmed the blocks are already being shown to buyers — which is
+       * the point. A rumour about your own client's liquidation is not information you get to
+       * verify first and act on second.
+       */
+      id: 't5-news-rumour-confirmed',
+      kind: 'newswire',
+      outlet: 'Bloomberg',
+      atTick: 0,
+      time: '07:05',
+      headline: '[확인] 어제 돌던 블록 이야기는 사실 — 매도는 이미 시작됐다',
+      body:
+        '어제 출처 없이 돌던 "비아콤CBS·디스커버리 수십억 달러 블록"은 사실로 확인됐다. ' +
+        '확인 시점에 이미 물량은 기관 매수자에게 제시되고 있으며, 매도 주체는 여전히 공개되지 않았다.',
+      severity: 'critical',
+      reliability: 'confirmed',
+      correctionOf: 't4-news-rumour',
+      sourceRefs: [S.pw, S.sec],
+    },
+    {
       id: 't5-news-premarket',
       kind: 'newswire',
       outlet: 'Bloomberg',

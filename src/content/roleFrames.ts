@@ -153,7 +153,8 @@ export const ROLE_FRAMES: Record<RoleFamily, { title: string; items: RoleFrameIt
       {
         id: 'fund-ladder',
         label: '유동성 사다리',
-        question: '당일·1주·1개월 각 칸을 위기 가정으로 다시 세었는가 — 평시 수치를 쓰고 있지 않은가?',
+        question:
+          '당일·1주·1개월 각 칸을 위기 가정으로 다시 세었는가 — 평시 수치를 쓰고 있지 않은가?',
         cardRef: 'fund-liquidity-ladder',
         frameworkRef: 'basel3-liquidity',
         metrics: ['cashBufferPct', 'weeklyLiquidityPct', 'illiquidSharePct'],
@@ -161,7 +162,8 @@ export const ROLE_FRAMES: Record<RoleFamily, { title: string; items: RoleFrameIt
       {
         id: 'fund-slicing',
         label: '매도 순서',
-        question: '유동성 높은 칸부터 파는가, 비례로 파는가 — 남는 포트폴리오의 비유동 비중이 어떻게 변하는가?',
+        question:
+          '유동성 높은 칸부터 파는가, 비례로 파는가 — 남는 포트폴리오의 비유동 비중이 어떻게 변하는가?',
         cardRef: 'fund-liquidity-ladder',
         frameworkRef: 'margin-and-collateral-mechanics',
         metrics: ['illiquidSharePct', 'dilutionBp', 'navIndex'],
@@ -169,7 +171,8 @@ export const ROLE_FRAMES: Record<RoleFamily, { title: string; items: RoleFrameIt
       {
         id: 'fund-pricing',
         label: '가격 장치',
-        question: '스윙 임계와 계수가 위기 전에 결의되어 있었는가 — 지금 도입하면 그 자체가 신호가 되는가?',
+        question:
+          '스윙 임계와 계수가 위기 전에 결의되어 있었는가 — 지금 도입하면 그 자체가 신호가 되는가?',
         cardRef: 'fund-liquidity-ladder',
         frameworkRef: 'crisis-communication',
         metrics: ['dilutionBp', 'redemptionsPendingPct'],

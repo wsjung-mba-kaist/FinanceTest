@@ -22,8 +22,9 @@ import {
 } from '../../lib/labels'
 import type { CompetencyMastery } from '../../lib/mastery'
 import { getScenarioSummary } from '../../scenarios'
-import { Badge, Button, type Tone } from '../ui'
+import { Badge, Button, Card, type Tone } from '../ui'
 import { InfoTip } from '../ui/InfoTip'
+import { useChartType } from '../dashboard/useChartType'
 
 const LEVEL_TONE: Record<CompetencyMastery['level'], Tone> = {
   none: 'neutral',
@@ -88,6 +89,8 @@ function EvidenceList({ m }: { m: CompetencyMastery }) {
 }
 
 export function ProgressMap({ mastery }: { mastery: Record<Competency, CompetencyMastery> }) {
+  // Chart labels follow the reader's type scale; Recharts takes numbers, not CSS.
+  const chart = useChartType()
   const [table, setTable] = useState(false)
   const rows: Row[] = COMPETENCIES.map((c) => ({
     competency: c,
@@ -104,10 +107,10 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
     )
     .join(', ')
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="rounded-lg border border-border bg-surface p-3">
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+      <Card as="div" className="p-3 lg:sticky lg:top-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">역량 맵</h3>
+          <h3 className="text-md font-semibold">역량 맵</h3>
           <Button
             size="sm"
             variant="ghost"
@@ -146,12 +149,12 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis
                   dataKey="short"
-                  tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: chart.label }}
                 />
                 <PolarRadiusAxis
                   domain={[0, 100]}
                   tickCount={5}
-                  tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: chart.tick }}
                   axisLine={false}
                 />
                 <Radar
@@ -170,13 +173,13 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
             <figcaption className="sr-only">{summary}</figcaption>
           </figure>
         )}
-      </div>
+      </Card>
       <ul className="m-0 list-none space-y-2 p-0">
         {COMPETENCIES.map((c) => {
           const m = mastery[c]
           const v = m.mastery ?? 0
           return (
-            <li key={c} className="rounded-lg border border-border bg-surface p-3">
+            <Card as="li" key={c} className="p-3">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{DIMENSION_LABELS[c]}</span>
                 <InfoTip label={`${DIMENSION_LABELS[c]} 설명`}>{DIMENSION_HELP[c]}</InfoTip>
@@ -186,7 +189,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
                 </span>
               </div>
               <div
-                className="mt-1.5 h-1.5 w-full overflow-hidden rounded bg-surface-2"
+                className="mt-1.5 h-1.5 w-full overflow-hidden rounded-sm bg-surface-2"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={100}
@@ -194,7 +197,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
                 aria-label={`${DIMENSION_LABELS[c]} 숙련도`}
               >
                 <div
-                  className="h-full rounded bg-accent"
+                  className="h-full rounded-sm bg-accent"
                   style={{ width: `${Math.max(0, Math.min(100, v))}%` }}
                 />
               </div>
@@ -204,7 +207,7 @@ export function ProgressMap({ mastery }: { mastery: Record<Competency, Competenc
               <div className="mt-1">
                 <EvidenceList m={m} />
               </div>
-            </li>
+            </Card>
           )
         })}
       </ul>

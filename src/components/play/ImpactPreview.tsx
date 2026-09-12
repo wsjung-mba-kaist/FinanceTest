@@ -148,14 +148,8 @@ export function ImpactPreview({
           ))}
         </ul>
       )}
-      {result?.wouldEnd && (
-        <p
-          className="rounded border border-critical/40 bg-critical-bg px-2 py-1 text-critical"
-          role="alert"
-        >
-          이 선택으로 시나리오가 종료될 수 있습니다: {result.wouldEnd.title}
-        </p>
-      )}
+      {/* `wouldEnd` is shown by `OptionRow` itself — see the comment there. Repeating it inside
+          the disclosure would say the same thing twice to whoever opened it. */}
     </div>
   )
 }

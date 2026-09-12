@@ -38,6 +38,7 @@ export const S = {
   fsb: 'fsb-depositor-behaviour-2024',
   frc: 'fdic-frc-supervision-2023',
   bondSale: 'press-kfcc-bond-sale-2023-07-06',
+  reserve: 'mois-reserve-2023-07-05',
   bankRp: 'press-bank-rp-2023-07-11',
   outflow: 'press-mg-outflow-2023-07-17',
 }
@@ -510,6 +511,37 @@ export const t1: T = {
       severity: 'critical',
       sourceRefs: [S.merger],
       cardRefs: ['bank-run-dynamics'],
+    },
+    {
+      /**
+       * The correction to `t0-rumor-sns`.
+       *
+       * The rumour is not vague, it is **backwards**: 새마을금고 is outside 예금자보호법, which
+       * spread as "보호가 안 된다" — when in fact 새마을금고법 제71조's own 준비금 protects the
+       * same 5천만원. Leaving it uncorrected teaches the player that unverified claims simply
+       * fade; in this scenario the whole lesson is that a false claim with a true-sounding premise
+       * has to be answered with the specific provision, quickly, or the queue keeps growing.
+       *
+       * Inert by construction: no `effects`, so the engine's path is unchanged. What it changes is
+       * what the player *knows* when they pick the T1 communication option.
+       */
+      id: 't1-news-protect-correction',
+      kind: 'newswire',
+      outlet: '행정안전부 설명자료',
+      time: '09:20',
+      atTick: 1,
+      headline:
+        '[정정] "5천만원 넘으면 못 받는다"는 사실과 다르다 — 새마을금고법 자체 준비금이 같은 한도까지 보호',
+      body:
+        '예금자보호법의 적용 대상이 아닌 것은 맞다. 다만 그것이 "보호가 없다"는 뜻은 아니다 — ' +
+        '새마을금고법 제71조에 따른 예금자보호준비금이 같은 5천만원 한도까지 대위변제한다' +
+        '(한도는 같은 법 시행령 제46조제3항). 합병이 이뤄지는 경우에도 피합병금고의 예적금은 ' +
+        '금리·만기 조건 그대로 이관되므로 5천만원을 넘는 금액도 그대로 지급된다.',
+      severity: 'info',
+      reliability: 'confirmed',
+      correctionOf: 't0-rumor-sns',
+      sourceRefs: [S.kfccAct, S.reserve],
+      cardRefs: ['mutual-credit-deposit-protection'],
     },
     {
       id: 't1-news-queue',

@@ -4,6 +4,7 @@ import { getCard } from '../../content'
 import { Markdown } from '../knowledge/Markdown'
 import { Badge, Card } from '../ui'
 import { Icon } from '../ui/Icon'
+import { gridClass } from '../../lib/grid'
 
 const LEVEL_LABELS: Record<string, string> = { intro: '입문', core: '핵심', advanced: '심화' }
 
@@ -30,7 +31,7 @@ function ConceptItem({ cardId, onView }: { cardId: string; onView: (id: string) 
   const lead = firstParagraph(card.body)
   return (
     <Card as="article" className="flex h-full flex-col p-3">
-      <h3 className="text-base font-semibold">
+      <h3 className="text-md font-semibold">
         {card.title}
         {card.titleEn && <span className="font-normal text-muted"> ({card.titleEn})</span>}
       </h3>
@@ -62,7 +63,12 @@ function ConceptItem({ cardId, onView }: { cardId: string; onView: (id: string) 
   )
 }
 
-/** Three concept cards from `briefing.cardRefs`: title + first paragraph, expandable in place. */
+/**
+ * The scenario's concept cards: title + first paragraph, expandable in place.
+ *
+ * The dossier used to list the same cards again in a different card shape. One shape, one place,
+ * all of them — the summary is where a reader looks before starting, so that is where they live.
+ */
 export function ConceptPreview({
   cardIds,
   onView,
@@ -73,10 +79,10 @@ export function ConceptPreview({
   if (cardIds.length === 0) return null
   return (
     <section aria-labelledby="bf-concepts-h">
-      <h2 id="bf-concepts-h" className="text-md font-semibold">
+      <h2 id="bf-concepts-h" className="text-lg font-semibold">
         미리 알아 둘 개념
       </h2>
-      <ul className="mt-2 grid list-none gap-2 p-0 m-0 md:grid-cols-3">
+      <ul className={`mt-2 grid list-none gap-2 p-0 m-0 ${gridClass('prose', cardIds.length)}`}>
         {cardIds.map((id) => (
           <li key={id}>
             <ConceptItem cardId={id} onView={onView} />

@@ -297,8 +297,7 @@ export const FUND_SOURCES: Source[] = [
     date: '2020',
     kind: 'press',
     url: 'https://www.blackrock.com/corporate/literature/whitepaper/ishares-by-the-numbers-new-data-behind-the-bond-etf-primary-process.pdf',
-    note:
-      '현물 바스켓(in-kind) 설정·환매 경로의 실제 사용 기록. **2026-09 확인: 이 URL은 더 이상 PDF를 반환하지 않는다(HTML 오류 페이지).** 종전에 이 문서에서 인용하던 "2020년 3월 IG 회사채 ETF 최대 할인 −5.35%"는 발행사 자신의 Rule 6c-11 공시와 맞지 않는다 — LQD의 자기 NAV 기준 최대 할인은 **3/19 −5.08%**이고 −5.35%는 같은 날을 ICE 평가가격 기준으로 잰 값이다. 괴리 수치의 근거는 `ishares-lqd-premium-discount`로 옮겼고, 이 출처는 in-kind 서사에만 쓴다',
+    note: '현물 바스켓(in-kind) 설정·환매 경로의 실제 사용 기록. **2026-09 확인: 이 URL은 더 이상 PDF를 반환하지 않는다(HTML 오류 페이지).** 종전에 이 문서에서 인용하던 "2020년 3월 IG 회사채 ETF 최대 할인 −5.35%"는 발행사 자신의 Rule 6c-11 공시와 맞지 않는다 — LQD의 자기 NAV 기준 최대 할인은 **3/19 −5.08%**이고 −5.35%는 같은 날을 ICE 평가가격 기준으로 잰 값이다. 괴리 수치의 근거는 `ishares-lqd-premium-discount`로 옮겼고, 이 출처는 in-kind 서사에만 쓴다',
   },
   {
     id: 'sifma-fixed-income-2020',

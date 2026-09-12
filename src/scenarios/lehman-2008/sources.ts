@@ -55,7 +55,8 @@ export const LEHMAN_SOURCES: Source[] = [
     date: '2010-03-11',
     kind: 'primary',
     url: 'https://www.jenner.com/a/web/irKPixTgz8Ppv7n6waHtmE/4k1Wwu/VOLUME%204.pdf',
-    pages: 'Vol. 4 §III.A.5(Secured Lenders) — 목차 (5)(b) p.1455(10-Q 비공시), 청산은행 담보 요구 요약절, 유동성 "ability to monetize" 절',
+    pages:
+      'Vol. 4 §III.A.5(Secured Lenders) — 목차 (5)(b) p.1455(10-Q 비공시), 청산은행 담보 요구 요약절, 유동성 "ability to monetize" 절',
     note:
       '유동성 풀에 JPM 담보 ≈$5.5B·씨티 comfort deposit $2B 포함(비공시, p.1455 표제에 명시); ' +
       'JPM 담보 요구 9/9 $5B(9/9~10에 $3B 선이행) → 9/11 추가 현금 $5B(9/12 오후 이행); ' +

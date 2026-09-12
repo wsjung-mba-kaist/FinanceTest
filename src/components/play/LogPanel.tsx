@@ -9,7 +9,7 @@ import {
   type LogEntry,
   type LogKind,
 } from '../../lib/logExport'
-import { Badge, Button, LiveRegion } from '../ui'
+import { Badge, Button, Chip, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
 import { usePlay } from './playContext'
 
@@ -97,18 +97,10 @@ export function LogPanel() {
         {KINDS.map((k) => {
           const on = active.has(k)
           return (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={on}
-              className={`min-h-[32px] rounded-full border px-2.5 py-1 text-sm ${
-                on ? 'border-accent bg-accent-soft text-text' : 'border-border text-muted'
-              }`}
-              onClick={() => toggle(k)}
-            >
+            <Chip key={k} selected={on} aria-pressed={on} onClick={() => toggle(k)}>
               {LOG_KIND_LABELS[k]}
               <span className="num ml-1">{counts.get(k) ?? 0}</span>
-            </button>
+            </Chip>
           )
         })}
       </div>

@@ -4,6 +4,7 @@ import { getCard, getFramework } from '../../content'
 import { ROLE_FRAMES, roleFamilyOf, type RoleFrameItem } from '../../content/roleFrames'
 import { formatMetric } from '../../lib/format'
 import { Badge } from '../ui'
+import { gridClass } from '../../lib/grid'
 
 /**
  * 역할별 핵심 판단 프레임.
@@ -39,7 +40,11 @@ export function RoleFramePanel({
           같은 질문을 같은 순서로. 상황이 바뀌어도 이 네 가지는 매 턴 확인합니다.
         </p>
       </header>
-      <ol className={layout === 'grid' ? 'grid gap-2 sm:grid-cols-2 xl:grid-cols-4' : 'space-y-2'}>
+      <ol
+        className={
+          layout === 'grid' ? `grid gap-2 ${gridClass('question', items.length)}` : 'space-y-2'
+        }
+      >
         {items.map((item, i) => (
           <li key={item.id} className="rounded-md border border-border bg-surface p-2">
             <div className="flex items-center gap-1.5">
@@ -77,7 +82,7 @@ function MetricChips({
         return (
           <span
             key={m}
-            className="inline-flex items-center gap-1 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-xs"
+            className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface-2 px-1.5 py-0.5 text-xs"
           >
             <span className="text-muted">{spec?.label ?? value?.label ?? m}</span>
             {value && (

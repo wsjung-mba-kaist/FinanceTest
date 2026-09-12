@@ -22,17 +22,9 @@ const STATUS_TEXT: Record<MetricStatus, string> = {
  */
 export function NoThresholdChip() {
   return (
-    <span
-      className="inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium leading-none"
-      style={{
-        color: 'var(--sev-none)',
-        background: 'var(--sev-none-bg)',
-        borderColor: 'var(--border)',
-      }}
-      title="이 지표에는 경고·위험 구간이 정의되어 있지 않습니다"
-    >
+    <Badge tone="none" title="이 지표에는 경고·위험 구간이 정의되어 있지 않습니다">
       기준 없음
-    </span>
+    </Badge>
   )
 }
 
@@ -128,7 +120,7 @@ export function KpiTile({
   }
 
   return (
-    <Card as="div" className={`p-2 ${spec.primary ? 'card-key border-accent/40' : ''}`}>
+    <Card as="div" tier={spec.primary ? 'key' : 'base'} className="p-2">
       <div className="flex items-start gap-1">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium leading-snug">{spec.label}</span>
@@ -185,7 +177,7 @@ export function KpiTile({
 
       {projectedText && (
         <div
-          className={`num mt-1 inline-block rounded border border-dashed border-accent px-1.5 py-0.5 text-xs ${DIR_CLASS[projectedDir]}`}
+          className={`num mt-1 inline-block rounded-sm border border-dashed border-accent px-1.5 py-0.5 text-xs ${DIR_CLASS[projectedDir]}`}
         >
           {projectedText}
         </div>
@@ -200,7 +192,7 @@ function HelpButton({ onClick, label }: { onClick: () => void; label: string }) 
     <button
       type="button"
       onClick={onClick}
-      className="shrink-0 rounded-full p-0.5 text-muted hover:bg-surface-2 hover:text-text"
+      className="inline-flex min-h-tap-dense min-w-tap-dense shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-text"
     >
       <Icon name="help" size={14} label={`${label} 설명 보기`} />
     </button>
@@ -233,7 +225,7 @@ export function KpiChip({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[36px] items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-sm"
+      className="flex min-h-tap-min items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-sm"
       aria-label={`${spec.label} ${value}, ${STATUS_TEXT[status]}`}
     >
       <span className={tone} aria-hidden="true">

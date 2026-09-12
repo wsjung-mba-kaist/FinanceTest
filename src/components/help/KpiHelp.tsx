@@ -82,7 +82,7 @@ export function KpiHelp({
             )}
 
             {explain?.formula && (
-              <p className="num mt-1 rounded bg-surface-2 px-1.5 py-1 text-sm">
+              <p className="num mt-1 rounded-sm bg-surface-2 px-1.5 py-1 text-sm">
                 산식 · {explain.formula}
               </p>
             )}

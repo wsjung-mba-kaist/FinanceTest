@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 function printMatches(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
@@ -21,7 +22,11 @@ export function usePrintMode(): boolean {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const on = () => setPrinting(true)
+    // `beforeprint` is the browser's last synchronous moment before it snapshots the page. A
+    // plain `setState` here is batched and lands *after* the snapshot, so whether the hidden tab
+    // panels made it onto the paper was a race that usually lost. `flushSync` is safe in a native
+    // event listener (it is not inside React's own render or lifecycle).
+    const on = () => flushSync(() => setPrinting(true))
     const off = () => setPrinting(false)
     window.addEventListener('beforeprint', on)
     window.addEventListener('afterprint', off)

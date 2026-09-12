@@ -6,10 +6,11 @@ import { usePlay } from '../play/playContext'
 import type { PreviewState } from '../play/playHelpers'
 import { Icon } from '../ui/Icon'
 import { BalanceSheetMini } from './BalanceSheetMini'
-import { KpiChip, KpiTile } from './KpiTile'
+import { KpiTile } from './KpiTile'
 import { buildKpiRows, sortedKpis } from './kpiRows'
 import { MarketStrip } from './MarketStrip'
 import { TimeSeriesChart } from './TimeSeriesChart'
+import { StatusBoard } from '../play/StatusBoard'
 
 /**
  * 우측 지표 존: 시장 스트립 → **핵심 지표(큰 타일)** → `전체 지표` 토글 뒤의 나머지 → 추이 → 대차대조표.
@@ -99,21 +100,9 @@ export function Dashboard({ preview }: { preview: PreviewState | null }) {
         thresholds={thresholds}
       />
       <BalanceSheetMini />
-    </div>
-  )
-}
-
-/** Sticky strip of the 3 primary KPIs (tablet/mobile). */
-export function KpiStrip({ onSelect }: { onSelect?: () => void }) {
-  const { scenario, state, mode } = usePlay()
-  const rows = useMemo(() => buildKpiRows(scenario, state, mode), [scenario, state, mode])
-  const top = rows.filter((r) => r.spec.primary).slice(0, 3)
-  const shown = top.length > 0 ? top : rows.slice(0, 3)
-  return (
-    <div className="flex gap-1.5 overflow-x-auto" role="group" aria-label="핵심 지표">
-      {shown.map((r) => (
-        <KpiChip key={r.spec.metric} row={r} units={scenario.units} onClick={onSelect} />
-      ))}
+      {/* Moved off the situation column: ~460px of slow-changing reference was pushing
+          최근 결과 — the outcome of the decision just made — below the fold every turn. */}
+      <StatusBoard />
     </div>
   )
 }

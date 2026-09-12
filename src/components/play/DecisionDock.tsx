@@ -14,7 +14,7 @@ import { useGameStore } from '../../store/gameStore'
 import { useProgressStore } from '../../store/progressStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useHelp } from '../help/helpContext'
-import { Badge, Button, LiveRegion } from '../ui'
+import { Badge, Button, Card, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Markdown } from '../knowledge/Markdown'
 import { ConsequenceReel } from './ConsequenceReel'
@@ -314,7 +314,7 @@ function DecisionBlock({
 
   return (
     <article
-      className="card-key overflow-hidden"
+      className="rounded-lg border border-border-strong bg-surface shadow-card"
       aria-labelledby={titleId}
       onKeyDown={onBlockKeyDown}
     >
@@ -337,7 +337,7 @@ function DecisionBlock({
               </span>
             )}
           </div>
-          <h3 id={titleId} className="prose-col text-md font-semibold leading-tight">
+          <h3 id={titleId} className="prose-col text-lg font-semibold leading-tight">
             {decision.title}
           </h3>
         </div>
@@ -362,7 +362,7 @@ function DecisionBlock({
             <button
               type="button"
               aria-expanded={contextOpen}
-              className="inline-flex min-h-[32px] items-center gap-1 rounded px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
+              className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
               onClick={() => setContextOpen((o) => !o)}
             >
               배경
@@ -377,7 +377,7 @@ function DecisionBlock({
         )}
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-sm text-accent"
+          className="inline-flex min-h-tap-dense items-center gap-1 text-sm text-accent"
           onClick={() => help.open({ tab: 'decision', anchor: decision.id })}
         >
           <Icon name="help" size={14} />이 결정에서 전문가는 무엇을 보나
@@ -419,6 +419,11 @@ function DecisionBlock({
               checked={selected.includes(ov.option.id)}
               tabIndex={i === focusIdx ? 0 : -1}
               expanded={expandedId === ov.option.id}
+              risk={
+                preview?.id === ov.option.id && preview.result.wouldEnd
+                  ? `이 선택으로 시나리오가 종료될 수 있습니다: ${preview.result.wouldEnd.title}`
+                  : undefined
+              }
               buttonRef={(el) => {
                 buttons.current[i] = el
               }}
@@ -464,7 +469,7 @@ function DecisionBlock({
         <button
           type="button"
           aria-expanded={memoOpen}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
+          className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
           onClick={() => setMemoOpen((o) => !o)}
         >
           근거 메모{memo.trim() ? ' (작성됨)' : ' (선택)'}
@@ -474,7 +479,7 @@ function DecisionBlock({
           <label className="mt-1 block text-sm">
             <span className="sr-only">근거 메모</span>
             <textarea
-              className="w-full rounded-md border border-border bg-bg px-2 py-1.5 text-base"
+              className="w-full rounded-md border border-border-control bg-bg px-2 py-1.5 text-base"
               rows={2}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
@@ -485,14 +490,14 @@ function DecisionBlock({
       </div>
 
       <div
-        className={`mt-2 border-t border-border bg-surface px-3 py-2 ${
+        className={`mt-2 rounded-b-lg border-t border-border bg-surface px-3 py-2 ${
           sticky || due ? 'sticky bottom-0 z-10' : ''
         }`}
       >
         {attempted && lastError && (
           <p
             role="alert"
-            className="mb-2 rounded border border-critical/40 bg-critical-bg px-2 py-1 text-sm text-critical"
+            className="mb-2 rounded-sm border border-critical-border bg-critical-bg px-2 py-1 text-sm text-critical"
           >
             {lastError}
           </p>
@@ -514,7 +519,7 @@ function DecisionBlock({
             <Button
               ref={confirmBtn}
               variant="primary"
-              className="ml-auto min-h-[44px] sm:min-h-0"
+              className="ml-auto"
               disabled={!canConfirm}
               aria-keyshortcuts="Control+Enter"
               onClick={doConfirm}
@@ -562,8 +567,9 @@ function ResolvedRow({
     title: splitOptionLabel(dv.decision.options.find((o) => o.id === id)?.label ?? id).title,
   }))
   return (
-    <article
-      className="card-surface p-3"
+    <Card
+      as="article"
+      className="p-3"
       aria-labelledby={`resolved-${dv.decision.id}`}
       data-resolved={dv.decision.id}
     >
@@ -592,7 +598,7 @@ function ResolvedRow({
         </details>
       )}
       {record?.memo && (
-        <p className="mt-1 rounded border border-border bg-surface-2 px-2 py-1 text-sm">
+        <p className="mt-1 rounded-sm border border-border bg-surface-2 px-2 py-1 text-sm">
           <span className="text-muted">메모 · </span>
           {record.memo}
         </p>
@@ -613,7 +619,7 @@ function ResolvedRow({
         <button
           type="button"
           aria-expanded={open}
-          className="inline-flex min-h-[32px] items-center gap-1 rounded px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
+          className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
           onClick={() => setOpen((o) => !o)}
         >
           근거 보기
@@ -630,7 +636,7 @@ function ResolvedRow({
             </p>
           ))}
       </div>
-    </article>
+    </Card>
   )
 }
 
@@ -639,7 +645,11 @@ function UpcomingRow({ decision, tick }: { decision: Decision; tick: number }) {
   const { view } = usePlay()
   const from = decision.availableFrom ?? 0
   return (
-    <article className="card-quiet p-3 opacity-60" aria-disabled="true" data-upcoming={decision.id}>
+    <article
+      className="rounded-lg bg-disabled-bg p-3 text-disabled-fg"
+      aria-disabled="true"
+      data-upcoming={decision.id}
+    >
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h3 className="text-base font-semibold">{decision.title}</h3>
         <span className="num text-sm text-muted">
@@ -671,21 +681,16 @@ export function DecisionDock({
   onPreview,
   onCommitted,
   skipSignal,
-  onNext,
 }: {
   sticky: boolean
   onPreview: (p: PreviewState | null) => void
   onCommitted: (message: string) => void
   skipSignal: number
-  /** Returns false when the engine refuses (required decisions left). */
-  onNext: () => boolean
 }) {
   const { scenario, state, history, mode, view } = usePlay()
-  const lastError = useGameStore((s) => s.lastError)
   const playedReelId = useGameStore((s) => s.playedReelId)
   const markReelPlayed = useGameStore((s) => s.markReelPlayed)
   const rationaleSetting = useSettingsStore((s) => s.rationaleReveal)
-  const [nextFailed, setNextFailed] = useState(false)
 
   const timing = rationaleTiming(rationaleSetting, mode)
   const showRationale = timing === 'immediate' || (timing === 'endOfTurn' && view.allResolved)
@@ -696,10 +701,22 @@ export function DecisionDock({
     () => (turnStart ? diffSnapshots(latestSnapshot(turnStart), latestSnapshot(state)) : []),
     [turnStart, state],
   )
-  const isLast = state.turnIndex >= scenario.turns.length - 1
   const firstUnresolved = view.decisions.find((d) => !d.resolved)?.decision.id
-  // Only one sticky footer at a time: the due decision's 확정 bar, or this one.
-  const stickyNext = firstUnresolved === undefined
+
+  /**
+   * One unresolved decision is expanded at a time.
+   *
+   * Every pending decision used to be open at once: the dock opened at 740px of content on a turn
+   * with three decisions, the 확정 bar of the first was already below the fold, and the reader had
+   * to decide which of three half-read questions to answer first. Opening one — whichever the
+   * player picks, defaulting to the first that is due — halves the first paint and makes "there is
+   * exactly one primary action on screen" true by construction.
+   */
+  const [openId, setOpenId] = useState<string | undefined>()
+  const openDecisionId =
+    openId && view.decisions.some((d) => !d.resolved && d.decision.id === openId)
+      ? openId
+      : firstUnresolved
 
   // Decisions the turn authors but has not opened yet (`availableFrom` beyond the current tick).
   const upcoming = useMemo(() => {
@@ -730,8 +747,6 @@ export function DecisionDock({
   const standaloneReel =
     reel && (reel.decisionId === undefined || !resolvedIds.has(reel.decisionId)) ? reel : undefined
 
-  const handleNext = () => setNextFailed(!onNext())
-
   return (
     <div className="space-y-3 p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -758,7 +773,7 @@ export function DecisionDock({
         />
       )}
       {total === 0 && upcoming.length === 0 && (
-        <p className="card-quiet p-3 text-base text-muted">
+        <p className="rounded-lg bg-surface-2 p-3 text-base text-muted">
           이번 턴에는 내려야 할 결정이 없습니다. 상황을 읽고 다음 턴으로 넘어가 주세요.
         </p>
       )}
@@ -776,7 +791,7 @@ export function DecisionDock({
             skipSignal={skipSignal}
             onReelDone={onReelDone}
           />
-        ) : (
+        ) : dv.decision.id === openDecisionId ? (
           <DecisionBlock
             key={`${state.turnIndex}:${dv.decision.id}`}
             dv={dv}
@@ -790,39 +805,98 @@ export function DecisionDock({
             onPreview={onPreview}
             onCommitted={onCommitted}
           />
+        ) : (
+          <PendingRow
+            key={`${state.turnIndex}:${dv.decision.id}`}
+            dv={dv}
+            index={i}
+            onOpen={() => setOpenId(dv.decision.id)}
+          />
         ),
       )}
       {upcoming.map((d) => (
         <UpcomingRow key={`${state.turnIndex}:${d.id}`} decision={d} tick={state.tick} />
       ))}
-      <div
-        className={`flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 ${
-          stickyNext ? 'sticky bottom-0 z-10' : ''
-        }`}
+    </div>
+  )
+}
+
+/**
+ * An unresolved decision that is not the open one: title, deadline and a way in.
+ *
+ * The player chooses the order — this is not a wizard. What it is not is three fully expanded
+ * question blocks competing for the same screen.
+ */
+function PendingRow({
+  dv,
+  index,
+  onOpen,
+}: {
+  dv: DecisionView
+  index: number
+  onOpen: () => void
+}) {
+  const { view } = usePlay()
+  const deadline =
+    dv.decision.deadlineTick !== undefined
+      ? tickLabelOf(view.turn, dv.decision.deadlineTick)
+      : undefined
+  return (
+    <article className="rounded-lg border border-border-control bg-surface">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-h-tap-min w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-2"
+        aria-label={`결정 ${index + 1} ${dv.decision.title} 열기`}
       >
-        {nextFailed && lastError && (
-          <p role="alert" className="w-full text-sm text-critical">
-            {lastError}
-          </p>
-        )}
-        <span className="text-sm text-muted">
-          {view.allResolved
-            ? isLast
-              ? '마지막 턴입니다'
-              : '다음 턴으로 넘어갈 수 있습니다'
-            : '필수 결정을 모두 확정하면 넘어갈 수 있습니다'}
-        </span>
-        <Button
-          variant={view.allResolved ? 'primary' : 'secondary'}
-          className="ml-auto min-h-[44px] sm:min-h-0"
-          disabled={!view.allResolved}
-          aria-keyshortcuts="N"
-          onClick={handleNext}
-        >
-          {isLast ? '시나리오 마무리' : '다음 턴으로'}
-          <Icon name="arrow-right" size={14} />
-        </Button>
-      </div>
+        <span className="label-caps shrink-0">결정 {index + 1}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{dv.decision.title}</span>
+        {deadline && <span className="num shrink-0 text-sm text-warning">{deadline}까지</span>}
+        <Icon name="chevron-right" size={16} />
+      </button>
+    </article>
+  )
+}
+
+/**
+ * The dock's action bar, rendered into the zone's non-scrolling footer.
+ *
+ * It used to be the last child of the scrolled list, held down by `sticky bottom-0` — which an
+ * ancestor's `overflow-hidden` silently disabled, so on a 1280×800 screen the 다음 턴 button
+ * started every turn below the fold. Living outside the scroll box is the fix: there is nothing
+ * left for a stray `overflow` to break.
+ */
+export function DockActionBar({ onNext }: { onNext: () => boolean }) {
+  const { scenario, state, view } = usePlay()
+  const lastError = useGameStore((s) => s.lastError)
+  const [nextFailed, setNextFailed] = useState(false)
+  const isLast = state.turnIndex >= scenario.turns.length - 1
+  const handleNext = () => setNextFailed(!onNext())
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+      {nextFailed && lastError && (
+        <p role="alert" className="w-full text-sm text-critical">
+          {lastError}
+        </p>
+      )}
+      <span className="text-sm text-muted">
+        {view.allResolved
+          ? isLast
+            ? '마지막 턴입니다'
+            : '다음 턴으로 넘어갈 수 있습니다'
+          : '필수 결정을 모두 확정하면 넘어갈 수 있습니다'}
+      </span>
+      <Button
+        variant={view.allResolved ? 'primary' : 'secondary'}
+        className="ml-auto"
+        disabled={!view.allResolved}
+        aria-keyshortcuts="N"
+        onClick={handleNext}
+      >
+        {isLast ? '시나리오 마무리' : '다음 턴으로'}
+        <Icon name="arrow-right" size={14} />
+      </Button>
     </div>
   )
 }

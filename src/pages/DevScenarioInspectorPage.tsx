@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Badge, EmptyState } from '../components/ui'
+import { Badge, Card, EmptyState } from '../components/ui'
 import { CARDS, SOURCES } from '../content'
 import { autoplay, computeScore, describeCondition } from '../engine'
 import type { Decision, Effect, GameEvent, Option, ScenarioDefinition } from '../engine/types'
@@ -106,9 +106,7 @@ function OptionRow({
       <td className="px-2 py-1">
         <EffectList effects={o.effects} />
         {o.setFlags && (
-          <div className="font-mono text-xs text-muted">
-            setFlags {JSON.stringify(o.setFlags)}
-          </div>
+          <div className="font-mono text-xs text-muted">setFlags {JSON.stringify(o.setFlags)}</div>
         )}
         {o.delayedEffects?.map((de, i) => (
           <div key={i} className="mt-1 border-l border-border pl-2">
@@ -189,7 +187,7 @@ export default function DevScenarioInspectorPage() {
       </header>
 
       <section aria-labelledby="dev-issues">
-        <h2 id="dev-issues" className="mb-1 text-base font-semibold">
+        <h2 id="dev-issues" className="mb-1 text-lg font-semibold">
           무결성 검사{' '}
           <Badge tone={errors.length ? 'critical' : 'positive'}>오류 {errors.length}</Badge>{' '}
           <Badge tone={warnings.length ? 'warning' : 'neutral'}>경고 {warnings.length}</Badge>
@@ -209,7 +207,7 @@ export default function DevScenarioInspectorPage() {
 
       {runs && (
         <section aria-labelledby="dev-runs">
-          <h2 id="dev-runs" className="mb-1 text-base font-semibold">
+          <h2 id="dev-runs" className="mb-1 text-lg font-semibold">
             자동 플레이 (seed 1)
           </h2>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -254,7 +252,7 @@ export default function DevScenarioInspectorPage() {
       )}
 
       <section aria-labelledby="dev-paths">
-        <h2 id="dev-paths" className="mb-1 text-base font-semibold">
+        <h2 id="dev-paths" className="mb-1 text-lg font-semibold">
           경로 표
         </h2>
         <div className="overflow-x-auto rounded-md border border-border bg-surface">
@@ -312,7 +310,7 @@ export default function DevScenarioInspectorPage() {
       </section>
 
       <section aria-labelledby="dev-gameover">
-        <h2 id="dev-gameover" className="mb-1 text-base font-semibold">
+        <h2 id="dev-gameover" className="mb-1 text-lg font-semibold">
           게임오버 규칙 · 엔딩
         </h2>
         <ul className="m-0 list-none space-y-1 p-0">
@@ -337,12 +335,12 @@ export default function DevScenarioInspectorPage() {
       </section>
 
       <section aria-labelledby="dev-turns" className="space-y-4">
-        <h2 id="dev-turns" className="text-base font-semibold">
+        <h2 id="dev-turns" className="text-lg font-semibold">
           턴 · 결정 · 옵션
         </h2>
         {def.turns.map((t, ti) => (
-          <article key={t.id} className="rounded-lg border border-border bg-surface p-3">
-            <h3 className="m-0 text-base font-semibold">
+          <Card as="article" key={t.id} className="p-3">
+            <h3 className="m-0 text-md font-semibold">
               <span className="font-mono text-muted">[{ti}]</span> {t.label} {t.title ?? ''}{' '}
               <span className="font-normal text-muted">{t.timeLabel}</span>
             </h3>
@@ -462,13 +460,13 @@ export default function DevScenarioInspectorPage() {
                 </ul>
               </div>
             )}
-          </article>
+          </Card>
         ))}
       </section>
 
       {def.checkpoints && def.checkpoints.length > 0 && (
         <section aria-labelledby="dev-checkpoints">
-          <h2 id="dev-checkpoints" className="mb-1 text-base font-semibold">
+          <h2 id="dev-checkpoints" className="mb-1 text-lg font-semibold">
             체크포인트
           </h2>
           <ul className="m-0 list-disc pl-4 font-mono text-xs">

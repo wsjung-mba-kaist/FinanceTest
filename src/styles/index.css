@@ -5,71 +5,175 @@
    The resolved theme is stamped onto <html data-theme="light|dark"> by
    index.html (pre-paint) and kept in sync by settingsStore, so the dark palette
    is declared exactly once.
+
+   Token blocks are the one kind of rule that is *correct* to leave unlayered:
+   custom properties never fight a utility for a property, they are read through
+   var() by whichever rule already won. Everything else in this file lives in a
+   layer — see docs/ui-conventions.md §1.
    ============================================================================= */
 :root {
   --bg: #f6f7f9;
   --surface: #ffffff;
   --surface-2: #eef0f3;
-  --border: #d5d9e0;
-  --border-strong: #b3bac6;
+
+  /*
+   * Three borders, not one. WCAG 1.4.11 asks 3:1 of a boundary that *identifies a control*, not of
+   * every decorative corner — and pushing one token to 3:1 would turn 166 card edges into a
+   * spreadsheet. So the job splits: a hairline that only has to be visible, a control edge that
+   * has to be found by eye, and a strong edge for the panel the eye should land on first.
+   * See docs/ui-conventions.md §5.
+   */
+  --border: #c3c9d4; /* 1.66:1 on surface — decorative hairline */
+  --border-control: #7b8491; /* 3.78:1 — inputs, toggles, selectable rows */
+  --border-strong: #6e7683; /* 4.58:1 — emphasis panels, quote bars */
+
   --text: #14181f;
   --text-muted: #59616f;
-  --accent: #1f5eff;
+  --accent: #1a52e0; /* 5.39:1 on --accent-soft (was 4.37 and failed AA there) */
   --accent-soft: #e6edff;
   /* Foreground on an accent-filled surface (button, selected chip). */
   --accent-fg: #ffffff;
+  --accent-border: #5f86e9; /* 3.46:1 */
+
+  /*
+   * Disabled is a *colour*, not an opacity. `opacity-50` composites against whatever is behind, so
+   * the same disabled button measured 1.50:1 on one surface and passed on another; the confirm
+   * button in the decision dock was the invisible one.
+   */
+  --disabled-bg: #eef0f3;
+  --disabled-fg: #59616f; /* 5.47:1 on --disabled-bg */
+
   --sev-info: #2b6cb0;
   --sev-warning: #96450b;
   --sev-critical: #b91c1c;
-  --sev-positive: #15803d;
+  --sev-positive: #0f6330; /* 6.59:1 on its own bg (was 4.48) */
+  --sev-none: #545b68; /* 5.99:1 on its own bg (was 4.23) */
   --sev-info-bg: #e8f1fb;
   --sev-warning-bg: #fdf1e3;
   --sev-critical-bg: #fde8e8;
   --sev-positive-bg: #e6f6ec;
-  --sev-none: #6b7280;
-  --sev-none-bg: #eef0f3;
+  --sev-none-bg: #e6e8ed; /* distinct from --surface-2, so a neutral badge has an edge on one */
+  /* Solid tone borders. The `border-info/30` alphas they replace measured 1.52–2.08 and, being
+     alpha, changed value with whatever was behind them — including the dark surface. */
+  --sev-info-border: #5589c0;
+  --sev-warning-border: #b67d54;
+  --sev-critical-border: #d26b6b;
+  --sev-positive-border: #449964;
+  --sev-none-border: #878c95;
 
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
     'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, 'D2Coding', ui-monospace, monospace;
 
-  /* Root type size. settingsStore multiplies this by the 글자 크기 setting. */
+  /*
+   * Root type size. JS never writes `font-size` — it only sets `--fs-scale` (settingsStore.ts).
+   * An inline `style.fontSize` is what killed both the wide-screen bump and the print size: an
+   * inline style outranks every media query. See docs/ui-conventions.md §3.
+   */
   --fs-root: 14px;
+  --fs-scale: 1;
   --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06);
   color-scheme: light;
+}
+
+/*
+ * The spacing step, in a plain `@theme` block rather than `@theme inline` on purpose: non-inline
+ * keeps utilities compiling to `calc(var(--spacing) * n)`, which is what lets a subtree re-scope
+ * the whole rhythm with one inline custom property (the play screen does exactly that).
+ *
+ * Tailwind's default 0.25rem was written for a 16px root and gives 4px. At this project's 14px
+ * root it silently became 3.5px, i.e. every gap, pad and margin in the app was 12.5% tighter than
+ * the scale it was designed against. 0.2857rem restores 4px exactly — one line, and the whole
+ * non-play app breathes.
+ */
+@theme {
+  --spacing: 0.2857rem;
 }
 
 :root[data-theme='dark'] {
   --bg: #0e1116;
   --surface: #151a21;
   --surface-2: #1c232c;
-  --border: #2a323d;
-  --border-strong: #3d4857;
+  --border: #343d4a;
+  --border-control: #656f7e; /* 3.44:1 on surface */
+  --border-strong: #78838f; /* 4.53:1 on surface */
   --text: #e6e9ee;
   --text-muted: #9aa4b2;
   --accent: #7aa2ff;
   --accent-soft: #1b2743;
   /* Dark text on the light-blue accent: white would be ~2.5:1 (fails AA). */
   --accent-fg: #0b1020;
-  --sev-info: #7aa2ff;
+  --accent-border: #526ca6;
+  --disabled-bg: #1c232c;
+  --disabled-fg: #9aa4b2;
+  /* Not `--accent`. An info badge and a link were the same colour, so "this is a fact" and
+     "this is a thing you can click" looked identical. */
+  --sev-info: #6fb6f2;
   --sev-warning: #f2b84b;
   --sev-critical: #ff6b6b;
   --sev-positive: #4ade80;
+  --sev-none: #8b95a3;
   --sev-info-bg: #16233a;
   --sev-warning-bg: #3a2a10;
   --sev-critical-bg: #3a1616;
   --sev-positive-bg: #12301d;
-  --sev-none: #8b95a3;
-  --sev-none-bg: #1c232c;
+  --sev-none-bg: #232b35;
+  --sev-info-border: #477094;
+  --sev-warning-border: #846936;
+  --sev-critical-border: #a14b4d;
+  --sev-positive-border: #2d724c;
+  --sev-none-border: #5f6772;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35);
   color-scheme: dark;
 }
 
-/* Larger comfortable reading size on wide screens. */
-@media (min-width: 1200px) {
+/*
+ * Larger comfortable reading size on wide screens. The bump is a question about the *screen*;
+ * eyesight is what `--fs-scale` is for, and the two multiply. 1280 is not a bump point because the
+ * play grid is already tight there; at 1800 a 16px root fills a 1920 monitor for real.
+ */
+@media (min-width: 1440px) {
   :root {
     --fs-root: 15px;
+  }
+}
+@media (min-width: 1800px) {
+  :root {
+    --fs-root: 16px;
+  }
+}
+
+/* =============================================================================
+   Layout widths
+   Frames are px and measures are em, on purpose: a reader at 1.3× type scale must
+   not lose a third of their monitor, but 44 글자 has to stay 44 글자 at any scale.
+   See docs/ui-conventions.md §4.
+   ============================================================================= */
+:root {
+  --w-shell: 1180px;
+  --w-doc: 900px;
+  --w-prose: 44em;
+  --w-prose-wide: 64em;
+  /*
+   * Play columns are percentages of the viewport, so on a 1920 screen the reading column reaches
+   * 1114px while the text inside it stops at `--w-prose`. Capping the *reading* panels here turns
+   * that ragged right edge into a deliberate, centred column. It only bites past ~1600px — below
+   * that the column is already narrower than the cap — and the dashboard is exempt: charts want
+   * every pixel. See docs/ui-conventions.md §4.
+   */
+  --w-play-col: 52em;
+}
+@media (min-width: 1400px) {
+  :root {
+    --w-shell: 1320px;
+    --w-doc: 960px;
+  }
+}
+@media (min-width: 1800px) {
+  :root {
+    --w-shell: 1560px;
+    --w-doc: 1040px;
   }
 }
 
@@ -84,26 +188,73 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-control: var(--border-control);
   --color-border-strong: var(--border-strong);
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-border: var(--accent-border);
+  --color-disabled-bg: var(--disabled-bg);
+  --color-disabled-fg: var(--disabled-fg);
   --color-info: var(--sev-info);
   --color-warning: var(--sev-warning);
   --color-critical: var(--sev-critical);
   --color-positive: var(--sev-positive);
-  --color-none: var(--sev-none);
+  /*
+   * `sev-none`, not `none`. `--color-none` generated `bg-none` and `border-none`, which are both
+   * *built-in* Tailwind utilities meaning `background-image: none` and `border-style: none` — a
+   * name collision that reads as the opposite of what it paints.
+   */
+  --color-sev-none: var(--sev-none);
   --color-info-bg: var(--sev-info-bg);
   --color-warning-bg: var(--sev-warning-bg);
   --color-critical-bg: var(--sev-critical-bg);
   --color-positive-bg: var(--sev-positive-bg);
-  --color-none-bg: var(--sev-none-bg);
+  --color-sev-none-bg: var(--sev-none-bg);
+  --color-info-border: var(--sev-info-border);
+  --color-warning-border: var(--sev-warning-border);
+  --color-critical-border: var(--sev-critical-border);
+  --color-positive-border: var(--sev-positive-border);
+  --color-sev-none-border: var(--sev-none-border);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
-  /* Type scale (rem of --fs-root = 14px base, 15px ≥1200px).
+  /* Radius: four steps that all read a token, so a redesign is one edit here. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /*
+   * Minimum hit areas. 44px is the pointer target from WCAG 2.5.5; 32px is the compact control
+   * used in dense toolbars; 24px is the floor 2.5.8 sets and applies only where items must sit
+   * side by side (the glossary's 40-letter index).
+   */
+  --spacing-tap-min: 44px;
+  --spacing-tap-compact: 32px;
+  --spacing-tap-dense: 24px;
+
+  /* Containers → `max-w-shell` / `max-w-doc` / `max-w-prose` / `max-w-prose-wide`. */
+  --container-shell: var(--w-shell);
+  --container-doc: var(--w-doc);
+  --container-prose: var(--w-prose);
+  --container-prose-wide: var(--w-prose-wide);
+  --container-play-col: var(--w-play-col);
+
+  /* Breakpoints, spelled in px.
+     Tailwind's defaults are the same widths in rem — media-query rem resolves against the
+     browser's initial 16px, never against `--fs-root`, so sm…2xl are unchanged. Writing them
+     out is how `3xl` gets added without `xl` silently remaining the ceiling. */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  --breakpoint-3xl: 1800px;
+
+  /* Type scale (rem of --fs-root = 14px base, 15px ≥1440px, 16px ≥1800px).
      11 / 12 / 14 / 15 / 18 / 22 / 28 px at the 14px base. */
   --text-xs: 0.786rem;
   --text-xs--line-height: 1.4;
@@ -123,44 +274,36 @@
   --shadow-card: var(--shadow-card);
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-html {
-  font-size: var(--fs-root);
-}
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.55;
-  /* keep-all avoids breaking Hangul words; anywhere is the fallback so long
-     latin/number tokens ($2.25B, CRO/Treasurer) cannot overflow a narrow column. */
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  -webkit-font-smoothing: antialiased;
-}
-
-.num {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
-}
-.font-mono,
-.num {
-  font-family: var(--font-mono);
-}
+/* ---- Element defaults ---------------------------------------------------- */
 /*
- * These are element defaults, so they must sit in `@layer base`. Unlayered CSS outranks *every*
- * layered rule in the cascade, which in Tailwind v4 means an unlayered `a { color }` beats
- * `text-accent-fg` on the very links that fill themselves with the accent colour — accent text on
- * an accent background, i.e. an invisible label. `button { font: inherit }` has the same problem
- * against `text-sm` / `text-lg`, because the `font` shorthand resets `font-size`.
+ * These must sit in `@layer base`. Unlayered CSS outranks *every* layered rule in the cascade,
+ * which in Tailwind v4 means an unlayered `a { color }` beats `text-accent-fg` on the very links
+ * that fill themselves with the accent colour — accent text on an accent background, i.e. an
+ * invisible label. `button { font: inherit }` has the same problem against `text-sm` / `text-lg`,
+ * because the `font` shorthand resets `font-size`.
  */
 @layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    font-size: calc(var(--fs-root) * var(--fs-scale));
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+    /* keep-all avoids breaking Hangul words; anywhere is the fallback so long
+       latin/number tokens ($2.25B, CRO/Treasurer) cannot overflow a narrow column. */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
+  }
   a {
     color: var(--accent);
   }
@@ -173,11 +316,25 @@ body {
   }
 }
 
-/* ---- Utilities ---------------------------------------------------------- */
+/* ---- Utilities ----------------------------------------------------------- */
+/*
+ * A custom `@utility` is emitted at the *top* of `@layer utilities`, before Tailwind's built-ins.
+ * Same layer, same specificity ⇒ source order decides ⇒ the built-in always wins. So a utility
+ * here may only carry small, single-purpose defaults that are *meant* to be overridable. Multi-
+ * property component looks (a card, a chip) can never win and belong in a React primitive.
+ * See docs/ui-conventions.md §2.
+ */
 
-/* Comfortable Korean measure: ~44 글자 per line. */
+/* Comfortable Korean measure: ~44 글자 per line. Identical to `max-w-prose`; kept because it
+   reads as an intent ("this is a prose column") at ~30 call sites. */
 @utility prose-col {
-  max-width: 44em;
+  max-width: var(--w-prose);
+}
+/* Tabular figures for anything the eye compares down a column. */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 /* Large tabular figure used by KPI tiles and the liquidity strip. */
 @utility num-lg {
@@ -195,175 +352,180 @@ body {
   line-height: 1.15;
   font-weight: 600;
 }
-@utility card-surface {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 0.5rem;
-}
-/* One level louder: the panel the eye should land on first. */
-@utility card-key {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  border-radius: 0.5rem;
-  box-shadow: var(--shadow-card);
-}
-@utility card-quiet {
-  background: var(--surface-2);
-  border-radius: 0.5rem;
-}
 @utility label-caps {
   font-size: 0.786rem;
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
 
-/* ---- Markdown typography -------------------------------------------------
-   Tailwind's preflight zeroes heading sizes, list markers, paragraph margins
-   and table borders. Every long-form surface in the app (briefing sections,
-   knowledge cards, framework documents, debrief narratives, wire bodies) is
-   rendered through <Markdown> into `.md`, so these rules restore them.
-   -------------------------------------------------------------------------- */
-.md {
-  line-height: 1.65;
-}
-.md > * + * {
-  margin-top: 0.75em;
-}
-.md p {
-  margin: 0;
-}
-.md h1,
-.md h2,
-.md h3,
-.md h4 {
-  font-weight: 600;
-  line-height: 1.3;
-  margin: 0;
-}
-.md > h1 + *,
-.md > h2 + *,
-.md > h3 + *,
-.md > h4 + * {
-  margin-top: 0.4em;
-}
-.md > * + h1,
-.md > * + h2,
-.md > * + h3,
-.md > * + h4 {
-  margin-top: 1.4em;
-}
-.md h1 {
-  font-size: 1.286em;
-}
-.md h2 {
-  font-size: 1.15em;
-}
-.md h3 {
-  font-size: 1.05em;
-}
-.md h4 {
-  font-size: 1em;
-  color: var(--text-muted);
-}
-.md ul,
-.md ol {
-  margin: 0;
-  padding-left: 1.35em;
-}
-.md ul {
-  list-style: disc;
-}
-.md ol {
-  list-style: decimal;
-}
-.md li::marker {
-  color: var(--text-muted);
-}
-.md li + li {
-  margin-top: 0.3em;
-}
-.md li > ul,
-.md li > ol {
-  margin-top: 0.3em;
-}
-.md strong {
-  font-weight: 600;
-}
-.md em {
-  font-style: italic;
-}
-.md a {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.md code {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  background: var(--surface-2);
-  border-radius: 0.25rem;
-  padding: 0.1em 0.35em;
-}
-.md pre {
-  margin: 0;
-  padding: 0.75em;
-  overflow-x: auto;
-  background: var(--surface-2);
-  border-radius: 0.375rem;
-}
-.md pre code {
-  background: none;
-  padding: 0;
-}
-.md blockquote {
-  margin: 0;
-  padding-left: 0.9em;
-  border-left: 3px solid var(--border-strong);
-  color: var(--text-muted);
-}
-.md hr {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 1.2em 0;
-}
-.md table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.95em;
-  display: block;
-  overflow-x: auto;
-}
-.md thead th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  white-space: nowrap;
-}
-.md th,
-.md td {
-  border: 1px solid var(--border);
-  padding: 0.4em 0.6em;
-  vertical-align: top;
-}
-.md td:not(:first-child) {
-  font-variant-numeric: tabular-nums;
-}
-.md img {
-  max-width: 100%;
-}
-/* Compact variant for dense surfaces (wire items, option details). */
-.md-compact {
-  line-height: 1.6;
-}
-.md-compact > * + * {
-  margin-top: 0.5em;
-}
-.md-compact ul,
-.md-compact ol {
-  padding-left: 1.2em;
+@layer components {
+  /* ---- Markdown typography ------------------------------------------------
+     Tailwind's preflight zeroes heading sizes, list markers, paragraph margins
+     and table borders. Every long-form surface in the app (briefing sections,
+     knowledge cards, framework documents, debrief narratives, wire bodies) is
+     rendered through <Markdown> into `.md`, so these rules restore them.
+
+     In `@layer components`, so a `text-sm` or `leading-*` utility on the same
+     element wins — which is what a caller writing one expects.
+     ------------------------------------------------------------------------ */
+  .md {
+    line-height: 1.65;
+  }
+  .md > * + * {
+    margin-top: 0.75em;
+  }
+  .md p {
+    margin: 0;
+  }
+  .md h1,
+  .md h2,
+  .md h3,
+  .md h4 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0;
+  }
+  .md > h1 + *,
+  .md > h2 + *,
+  .md > h3 + *,
+  .md > h4 + * {
+    margin-top: 0.4em;
+  }
+  .md > * + h1,
+  .md > * + h2,
+  .md > * + h3,
+  .md > * + h4 {
+    margin-top: 1.4em;
+  }
+  .md h1 {
+    font-size: 1.286em;
+  }
+  .md h2 {
+    font-size: 1.15em;
+  }
+  .md h3 {
+    font-size: 1.05em;
+  }
+  .md h4 {
+    font-size: 1em;
+    color: var(--text-muted);
+  }
+  .md ul,
+  .md ol {
+    margin: 0;
+    padding-left: 1.35em;
+  }
+  .md ul {
+    list-style: disc;
+  }
+  .md ol {
+    list-style: decimal;
+  }
+  .md li::marker {
+    color: var(--text-muted);
+  }
+  .md li + li {
+    margin-top: 0.3em;
+  }
+  .md li > ul,
+  .md li > ol {
+    margin-top: 0.3em;
+  }
+  .md strong {
+    font-weight: 600;
+  }
+  .md em {
+    font-style: italic;
+  }
+  .md a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .md code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    border-radius: 0.25rem;
+    padding: 0.1em 0.35em;
+  }
+  .md pre {
+    margin: 0;
+    padding: 0.75em;
+    overflow-x: auto;
+    background: var(--surface-2);
+    border-radius: 0.375rem;
+  }
+  .md pre code {
+    background: none;
+    padding: 0;
+  }
+  .md blockquote {
+    margin: 0;
+    padding-left: 0.9em;
+    border-left: 3px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .md hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 1.2em 0;
+  }
+  /*
+   * No `display: block` here. It makes the <table> scrollable, and it also removes the element
+   * from the accessibility tree *as a table* — in a product whose regulatory tables are the point.
+   * <Markdown> wraps tables in a scrollable `role="group"` div instead.
+   */
+  .md table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+  }
+  .md thead th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  .md th,
+  .md td {
+    border: 1px solid var(--border);
+    padding: 0.4em 0.6em;
+    vertical-align: top;
+  }
+  .md td:not(:first-child) {
+    font-variant-numeric: tabular-nums;
+  }
+  .md img {
+    max-width: 100%;
+  }
+  .md-table-scroll {
+    overflow-x: auto;
+  }
+  /* Compact variant for dense surfaces (wire items, option details). */
+  .md-compact {
+    line-height: 1.6;
+  }
+  .md-compact > * + * {
+    margin-top: 0.5em;
+  }
+  .md-compact ul,
+  .md-compact ol {
+    padding-left: 1.2em;
+  }
+
+  /* ---- Feedback animation (consequence reel) ---------------------------- */
+  .pulse-better {
+    animation: fcs-pulse-better 700ms ease-out;
+  }
+  .pulse-worse {
+    animation: fcs-pulse-worse 700ms ease-out;
+  }
+  .reel-step-in {
+    animation: fcs-fade-in 260ms ease-out;
+  }
 }
 
-/* ---- Feedback animation (consequence reel) ------------------------------ */
 @keyframes fcs-pulse-better {
   0% {
     background-color: var(--sev-positive-bg);
@@ -390,17 +552,9 @@ body {
     transform: none;
   }
 }
-.pulse-better {
-  animation: fcs-pulse-better 700ms ease-out;
-}
-.pulse-worse {
-  animation: fcs-pulse-worse 700ms ease-out;
-}
-.reel-step-in {
-  animation: fcs-fade-in 260ms ease-out;
-}
 
-/* ---- Reduced motion (media query AND the 설정 toggle) -------------------- */
+/* ---- Reduced motion (media query AND the 설정 toggle) --------------------- */
+/* Deliberately unlayered: an `!important` sledgehammer that must beat everything. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -418,19 +572,64 @@ body {
   scroll-behavior: auto !important;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+/* ---- High contrast and forced colours ------------------------------------ */
+/*
+ * Windows 고대비 모드 replaces the whole palette with the user's own, and `background-color` /
+ * `border-color` stop being honoured. The two places that breaks this app are (a) status carried
+ * by a coloured dot or a tinted badge fill, and (b) borders drawn in a token colour, which vanish.
+ * `currentColor` is the one value forced-colors keeps, so boundaries are redrawn with it and the
+ * status glyphs already in the markup (● ⚠ ■) carry the meaning instead of the fill.
+ *
+ * Unlayered with the other overrides: like print, its job is to beat utilities.
+ */
+@media (forced-colors: active) {
+  *,
+  *::before,
+  *::after {
+    border-color: currentColor;
+  }
+  [data-card],
+  input,
+  select,
+  textarea,
+  button {
+    border: 1px solid currentColor;
+  }
+  *:focus-visible {
+    outline: 3px solid CanvasText;
+    outline-offset: 2px;
+  }
+  /* A tinted badge fill means nothing here; its own border has to say "this is a thing". */
+  [class*='bg-info-bg'],
+  [class*='bg-warning-bg'],
+  [class*='bg-critical-bg'],
+  [class*='bg-positive-bg'],
+  [class*='bg-sev-none-bg'] {
+    border: 1px solid currentColor;
+    forced-color-adjust: none;
+    background: Canvas;
+    color: CanvasText;
+  }
 }
 
-/* ---- Print (debrief / log hand-off) ------------------------------------- */
+/* A user asking for more contrast gets the control edge everywhere, not just on controls. */
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme='dark'] {
+    --border: var(--border-control);
+    --text-muted: var(--text);
+  }
+}
+
+/* ---- Print (debrief / log hand-off) -------------------------------------- */
+/*
+ * Unlayered on purpose: print rules exist to override utilities, and a layer would lose to them.
+ *
+ * The selector must name the dark theme too. `@media print :root` is specificity (0,1,0) and
+ * `:root[data-theme='dark']` is (0,2,0), so without the second selector a dark-mode user printing
+ * a debrief got the dark palette on white paper — 1.22:1 text and solid black blocks. Every token
+ * the dark block redefines has to be redeclared here, or that one token leaks through alone.
+ */
 @media print {
   [data-noprint],
   nav,
@@ -438,7 +637,8 @@ body {
   .recharts-tooltip-wrapper {
     display: none !important;
   }
-  :root {
+  :root,
+  :root[data-theme='dark'] {
     --bg: #fff;
     --surface: #fff;
     --surface-2: #f3f4f6;
@@ -446,10 +646,32 @@ body {
     --border-strong: #888;
     --text: #000;
     --text-muted: #444;
+    --border-control: #666;
+    /* Ink, not screen light: every tone below is chosen to survive greyscale. */
+    --accent: #0b3d91;
+    --accent-soft: #eef2fa;
+    --accent-fg: #fff;
+    --accent-border: #4a6ba8;
+    --disabled-bg: #f3f4f6;
+    --disabled-fg: #444;
+    --sev-info: #0b3d91;
+    --sev-warning: #7a3a00;
+    --sev-critical: #8c1111;
+    --sev-positive: #0b5a2a;
+    --sev-none: #3f3f46;
+    --sev-info-bg: #f0f4fb;
+    --sev-warning-bg: #f9f2e8;
+    --sev-critical-bg: #fbeeee;
+    --sev-positive-bg: #eef6f0;
+    --sev-none-bg: #ebecef;
+    --sev-info-border: #7a93bc;
+    --sev-warning-border: #a9855f;
+    --sev-critical-border: #b57272;
+    --sev-positive-border: #5f9478;
+    --sev-none-border: #8b8b90;
     --shadow-card: none;
-  }
-  html {
-    font-size: 11pt;
+    --fs-root: 11pt;
+    color-scheme: light;
   }
   body {
     background: #fff;
@@ -457,8 +679,7 @@ body {
   [data-print-all] [role='tabpanel'] {
     display: block !important;
   }
-  .card-surface,
-  .card-key,
+  [data-card],
   section,
   table {
     break-inside: avoid;

@@ -206,15 +206,19 @@ describe('buildConditionContext', () => {
       })
     })
     expect(buildConditionContext(naButFinite).metric('confidence')).toBe(10)
-    expect(buildConditionContext(naButFinite).metricHistory('confidence')).toEqual([
-      10, 30, 40, 52,
-    ])
+    expect(buildConditionContext(naButFinite).metricHistory('confidence')).toEqual([10, 30, 40, 52])
 
     const nonFinite = produce(faked, (d) => {
       d.metricsHistory.push({
         turnIndex: 4,
         metrics: {
-          confidence: { key: 'confidence', value: Infinity, unit: 'index', status: 'ok', label: 'CI' },
+          confidence: {
+            key: 'confidence',
+            value: Infinity,
+            unit: 'index',
+            status: 'ok',
+            label: 'CI',
+          },
         },
       })
     })

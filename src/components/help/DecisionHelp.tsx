@@ -189,7 +189,7 @@ function HintLevels({
             {shown &&
               items.map((h, i) => (
                 <div key={i} className="mt-1.5 space-y-1">
-                  <Markdown className="text-base leading-relaxed" autoGlossary>
+                  <Markdown className="text-base" autoGlossary>
                     {h.text}
                   </Markdown>
                   {h.cardRefs?.map((id) => (

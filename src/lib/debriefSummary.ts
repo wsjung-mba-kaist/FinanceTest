@@ -182,3 +182,33 @@ export function worstDecision(
   const top = [...list].sort((a, b) => b.regret - a.regret || a.turnIndex - b.turnIndex)[0]!
   return buildHighlight(scenario, top, true)
 }
+
+export interface ExpertGap {
+  row: KpiComparisonRow
+  player: number
+  expert: number
+  /** |player − expert| ÷ max(|expert|, |player|, ε) — relative so KPIs of different scale compare. */
+  relative: number
+}
+
+/**
+ * The KPI where the run diverged most from the expert path.
+ *
+ * A three-column table asks the reader to do this comparison themselves, on a page they are
+ * reading once. One sentence naming the metric that actually differed is the answer the table was
+ * being scanned for. Deliberately *not* labelled better or worse: `KpiSpec` carries no direction,
+ * and inventing one per metric would be a guess dressed as a verdict.
+ */
+export function largestExpertGap(rows: KpiComparisonRow[]): ExpertGap | undefined {
+  let best: ExpertGap | undefined
+  for (const row of rows) {
+    const { player, expert } = row
+    if (player === undefined || expert === undefined) continue
+    const scale = Math.max(Math.abs(expert), Math.abs(player), 1e-9)
+    const relative = Math.abs(player - expert) / scale
+    if (!best || relative > best.relative) best = { row, player, expert, relative }
+  }
+  // A gap under 2% is the two paths agreeing; saying so is more useful than naming a rounding
+  // difference as the headline divergence.
+  return best && best.relative >= 0.02 ? best : undefined
+}
