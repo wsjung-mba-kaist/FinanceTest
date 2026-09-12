@@ -120,3 +120,21 @@ describe('stripInlineMarkdown / bulletsOf', () => {
     expect(bulletsOf(NEWS_10K_BODY)).toHaveLength(0)
   })
 })
+
+describe('firstSentence skips a leading heading', () => {
+  it('summarises the prose, not the section title', () => {
+    const body = ['## 정의', '', '미국 은행의 담보차입 창구는 세 층이다. 그 다음 문장.'].join('\n')
+    expect(firstSentence(body).head).toBe('미국 은행의 담보차입 창구는 세 층이다.')
+  })
+
+  it('skips a run of headings', () => {
+    const body = ['# 카드', '## 정의', '', '핵심은 이것이다. 나머지.'].join('\n')
+    expect(firstSentence(body).head).toBe('핵심은 이것이다.')
+  })
+
+  it('leaves a body with no heading alone', () => {
+    expect(firstSentence('무디스 현재 등급을 검토 중입니다. 뒷문장.').head).toBe(
+      '무디스 현재 등급을 검토 중입니다.',
+    )
+  })
+})

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Units } from '../engine/types/common'
-import { formatAt, scaleFor, splitMetric } from './format'
+import { formatAt, formatDelta, scaleFor, splitMetric } from './format'
 
 /**
  * A column is only a comparable axis if every cell in it shares a unit. `formatCurrency` picks the
@@ -117,5 +117,28 @@ describe('formatAt', () => {
     expect(formatAt(0.09, 'ccy', USD, { scale })).toBe('$90M')
     expect(formatAt(0, 'ccy', USD, { scale })).toBe('$0M')
     expect(formatAt(-0.09, 'ccy', USD, { scale })).toBe('−$90M')
+  })
+})
+
+describe('formatDelta', () => {
+  /**
+   * A row that reads `$20B → $18B ▼$2.0B` puts three numbers and two conventions in one sentence.
+   * The change belongs on the same axis as the figures it sits between.
+   */
+  it('shares the row scale when given one', () => {
+    const scale = scaleFor([20, 18], USD)
+    expect(formatDelta(-2, 'ccy', USD, { scale, decimals: 0 })).toBe('▼$2B')
+  })
+
+  it('keeps its per-value behaviour without one', () => {
+    expect(formatDelta(-2, 'ccy', USD)).toBe('▼$2.0B')
+  })
+
+  it('still marks a flat change', () => {
+    expect(formatDelta(0, 'ccy', USD)).toBe('±0')
+  })
+
+  it('honours authored decimals for non-currency units', () => {
+    expect(formatDelta(2.567, '%', USD, { decimals: 2 })).toBe('▲2.57%p')
   })
 })

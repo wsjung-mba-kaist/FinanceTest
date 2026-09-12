@@ -1,6 +1,6 @@
 import type { MetricDelta, MetricStatus, Units } from '../../engine'
 import { KPI_EXPLAIN } from '../../content/kpiExplain'
-import { formatAt, formatDelta, formatMetric } from '../../lib/format'
+import { formatAt, formatDelta } from '../../lib/format'
 import { useHelp } from '../help/helpContext'
 import type { PreviewFidelity } from '../play/playHelpers'
 import { Badge, Card, StatusBadge } from '../ui'
@@ -199,44 +199,6 @@ function HelpButton({ onClick, label }: { onClick: () => void; label: string }) 
       className="inline-flex min-h-tap-dense min-w-tap-dense shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-text"
     >
       <Icon name="help" size={14} label={`${label} 설명 보기`} />
-    </button>
-  )
-}
-
-/** Compact chip for the sticky KPI strip (tablet/mobile). */
-export function KpiChip({
-  row,
-  units,
-  onClick,
-}: {
-  row: KpiRow
-  units: Units
-  onClick?: () => void
-}) {
-  const { spec, current } = row
-  const status: MetricStatus = current?.status ?? 'na'
-  const value = current ? formatMetric(current.value, spec.unit, units, spec.decimals) : '—'
-  const dot = status === 'breach' ? '■' : status === 'warn' ? '⚠' : status === 'ok' ? '●' : '–'
-  const tone =
-    status === 'breach'
-      ? 'text-critical'
-      : status === 'warn'
-        ? 'text-warning'
-        : status === 'ok'
-          ? 'text-positive'
-          : 'text-muted'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-tap-min items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-sm"
-      aria-label={`${spec.label} ${value}, ${STATUS_TEXT[status]}`}
-    >
-      <span className={tone} aria-hidden="true">
-        {dot}
-      </span>
-      <span className="text-muted">{spec.label}</span>
-      <span className="num font-semibold">{value}</span>
     </button>
   )
 }

@@ -147,7 +147,7 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
             aria-expanded={showPrevious}
             onClick={() => setShowPrevious((s) => !s)}
           >
-            {showPrevious ? '이전 턴 접기' : `이전 턴 ${previousCount}건 펼치기`}
+            {showPrevious ? '접기' : `이전 턴 ${previousCount}건 더 보기`}
           </Button>
         </div>
       )}

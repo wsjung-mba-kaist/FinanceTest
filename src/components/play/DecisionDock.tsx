@@ -388,6 +388,8 @@ function DecisionBlock({
               key={id}
               cardId={id}
               prefix="이 결정에 앞서:"
+              // Guided mode gets the lead sentence, not the whole card: see InlineCard.
+              lead
               defaultOpen={mode === 'guided'}
               onOpen={markCardViewed}
             />

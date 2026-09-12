@@ -59,9 +59,14 @@ export interface SplitText {
 /**
  * First sentence of a body, capped at `max` characters.
  * Cuts at `다.`, `。`, `. ` or a line break. A bullet-list body yields its first bullet.
+ *
+ * Leading markdown headings are skipped. A heading is a title, not a sentence: a knowledge card
+ * that opens with `## 정의` summarised itself as the single word 「정의」, which told the reader
+ * nothing at all. No caller wants the heading — they want the prose under it.
  */
 export function firstSentence(s: string, max = 90): SplitText {
-  const text = stripInlineMarkdown(s)
+  const withoutHeadings = s.replace(/^(?:\s*#{1,6}[^\n]*\n+)+/, '')
+  const text = stripInlineMarkdown(withoutHeadings)
   if (!text) return { head: '', rest: '' }
 
   const lines = text.split('\n')

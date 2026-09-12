@@ -101,7 +101,7 @@ function BriefingBodyInner({ scenario }: { scenario: ScenarioDefinition }) {
             onClick={() => setDossierOpen((v) => !v)}
           >
             <Icon name={dossierOpen ? 'chevron-down' : 'chevron-right'} size={16} />
-            전체 도시에 {dossierOpen ? '접기' : '펼치기'}
+            전체 도시에 {dossierOpen ? '접기' : '자세히'}
           </Button>
         </h2>
         <p className="mt-1 text-sm text-muted">

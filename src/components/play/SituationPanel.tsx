@@ -7,6 +7,7 @@ import { Badge, Button, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Citation } from '../knowledge/Citation'
 import { Markdown } from '../knowledge/Markdown'
+import { TurnChanges } from './TurnChanges'
 import { WireItem } from './WireItem'
 import { usePlay } from './playContext'
 import { turnEntries, type WireEntry } from './playHelpers'
@@ -160,7 +161,13 @@ function RecentResult({ items, fill }: { items: FeedItem[]; fill: (s: string) =>
  * 상황실 tab: one headline read large, two or three supporting one-liners, the result of the
  * last decision, and the status board. Everything else lives in 피드 전체.
  */
-export function SituationPanel({ onOpenFeed }: { onOpenFeed: (entryId?: string) => void }) {
+export function SituationPanel({
+  onOpenFeed,
+  onOpenDashboard,
+}: {
+  onOpenFeed: (entryId?: string) => void
+  onOpenDashboard: () => void
+}) {
   const { scenario, state, view } = usePlay()
   const entries = useMemo(() => turnEntries(view), [view])
   const events = useMemo(() => entries.filter((e) => e.event), [entries])
@@ -235,6 +242,13 @@ export function SituationPanel({ onOpenFeed }: { onOpenFeed: (entryId?: string) 
         The situation column answers "what just happened"; a table of counterparties does not.
       */}
       <RecentResult items={feedItems.slice(-2)} fill={fill} />
+
+      {/*
+        "무엇이 바뀌었나"는 결과 릴이 한 번 재생하고 사라지면 다시 물을 방법이 없었다. 대시보드는
+        숫자가 *어디* 있는지 말하지만 방금 *무엇을 했는지*는 말하지 않는다. 계산은 없다 —
+        metricsHistory 의 두 스냅샷 차이다.
+      */}
+      <TurnChanges scenario={scenario} state={state} onSeeAll={onOpenDashboard} />
 
       <div className="flex justify-end">
         <Button size="sm" variant="ghost" onClick={() => onOpenFeed()}>

@@ -311,6 +311,7 @@ function PlayScreen({
                     </div>
                   )}
                   <SituationPanel
+                    onOpenDashboard={() => goZone(3)}
                     onOpenFeed={(entryId) => {
                       goZone(4)
                       if (!entryId) return

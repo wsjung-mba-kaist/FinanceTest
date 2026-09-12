@@ -5,7 +5,6 @@ import { useHelp } from '../help/helpContext'
 import { usePlay } from '../play/playContext'
 import type { PreviewState } from '../play/playHelpers'
 import { Icon } from '../ui/Icon'
-import { BalanceSheetMini } from './BalanceSheetMini'
 import { KpiTile } from './KpiTile'
 import { buildKpiRows, sortedKpis } from './kpiRows'
 import { MarketStrip } from './MarketStrip'
@@ -67,7 +66,7 @@ export function Dashboard({ preview }: { preview: PreviewState | null }) {
             전체 지표
             <span className="num text-muted">({rest.length})</span>
             <span className="ml-auto text-sm text-muted">
-              {showAll ? '접기' : '나머지 지표 펼치기'}
+              {showAll ? '접기' : '더 보기'}
             </span>
           </button>
           {showAll && (
@@ -99,9 +98,12 @@ export function Dashboard({ preview }: { preview: PreviewState | null }) {
         units={scenario.units}
         thresholds={thresholds}
       />
-      <BalanceSheetMini />
-      {/* Moved off the situation column: ~460px of slow-changing reference was pushing
-          최근 결과 — the outcome of the decision just made — below the fold every turn. */}
+      {/*
+        Moved off the situation column: ~460px of slow-changing reference was pushing 최근 결과 —
+        the outcome of the decision just made — below the fold every turn.
+        The balance sheet is *not* here: it owns the 대차대조표 tab, and rendering it in both put
+        the same 200px of stacked bars in two of the five info tabs.
+      */}
       <StatusBoard />
     </div>
   )

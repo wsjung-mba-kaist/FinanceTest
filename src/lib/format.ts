@@ -95,23 +95,35 @@ export function formatMetric(
   }
 }
 
-export function formatDelta(delta: number, unit: MetricUnit, units: Units): string {
+/**
+ * `opts.scale` pins the change to the same unit the row's own figures use. Without it a row could
+ * read `$20B → $18B ▼$2.0B` — three numbers, two conventions, in one sentence.
+ */
+export function formatDelta(
+  delta: number,
+  unit: MetricUnit,
+  units: Units,
+  opts: { scale?: CcyScale; decimals?: number } = {},
+): string {
   if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return '±0'
   const arrow = delta > 0 ? '▲' : '▼'
+  const d = opts.decimals
   switch (unit) {
     case '%':
     case 'rate':
-      return `${arrow}${fixed(delta, 1)}%p`
+      return `${arrow}${fixed(delta, d ?? 1)}%p`
     case 'bp':
-      return `${arrow}${fixed(delta, 0)}bp`
+      return `${arrow}${fixed(delta, d ?? 0)}bp`
     case 'x':
-      return `${arrow}${fixed(delta, 2)}x`
+      return `${arrow}${fixed(delta, d ?? 2)}x`
     case 'ccy':
-      return `${arrow}${formatCurrency(Math.abs(delta), units)}`
+      return opts.scale
+        ? `${arrow}${formatAt(Math.abs(delta), 'ccy', units, opts)}`
+        : `${arrow}${formatCurrency(Math.abs(delta), units, { decimals: d })}`
     case 'days':
-      return `${arrow}${fixed(delta, 1)}일`
+      return `${arrow}${fixed(delta, d ?? 1)}일`
     default:
-      return `${arrow}${fixed(delta, 1)}`
+      return `${arrow}${fixed(delta, d ?? 1)}`
   }
 }
 

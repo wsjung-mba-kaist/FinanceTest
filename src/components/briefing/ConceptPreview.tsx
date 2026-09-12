@@ -56,7 +56,7 @@ function ConceptItem({ cardId, onView }: { cardId: string; onView: (id: string) 
         }}
         className="mt-auto inline-flex items-center gap-1 self-start border-0 bg-transparent p-0 pt-2 text-sm text-accent"
       >
-        {open ? '접기' : '펼치기'}
+        {open ? '접기' : '자세히'}
         <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} />
       </button>
     </Card>
