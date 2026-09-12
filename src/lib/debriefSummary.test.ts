@@ -91,6 +91,7 @@ describe('largestExpertGap', () => {
     player,
     historical: undefined,
     expert,
+    series: [],
   })
 
   it('picks the biggest *relative* divergence, not the biggest absolute one', () => {
@@ -107,6 +108,27 @@ describe('largestExpertGap', () => {
     // The expert autoplay has not finished, so nothing can be compared yet.
     expect(largestExpertGap([row('lcr', 100, undefined)])).toBeUndefined()
     expect(largestExpertGap([row('lcr', undefined, 100)])).toBeUndefined()
+  })
+
+  /**
+   * Which way the gap ran used to be withheld on the grounds that `KpiSpec` carries no direction.
+   * It does not — but `Threshold.direction` does, and the play screen has been reading it all
+   * along. The verdict is stated where a band exists and withheld where none does.
+   */
+  describe('direction', () => {
+    const lcr = { lcr: { warn: 110, breach: 100, direction: 'below' as const } }
+
+    it('says the player ended better when they are further from the breach side', () => {
+      expect(largestExpertGap([row('lcr', 130, 100)], lcr)?.direction).toBe('better')
+    })
+
+    it('says worse when they are nearer it', () => {
+      expect(largestExpertGap([row('lcr', 100, 130)], lcr)?.direction).toBe('worse')
+    })
+
+    it('stays neutral for a metric with no threshold band', () => {
+      expect(largestExpertGap([row('outflow', 2, 4)])?.direction).toBe('neutral')
+    })
   })
 
   it('survives a zero on the expert path without dividing by it', () => {

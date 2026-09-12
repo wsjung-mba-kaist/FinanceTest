@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import type { GameState, ScenarioDefinition } from '../../engine/types'
 import { scaleFor } from '../../lib/format'
 import { kpiComparison, type KpiComparisonRow } from '../../lib/debriefSummary'
-import { DataTable, Num, type Column } from '../ui'
+import { Button, DataTable, Num, type Column } from '../ui'
+import { Sparkline } from '../dashboard/Sparkline'
 
 /**
  * 귀하 / 역사 / 전문가 side by side.
@@ -29,7 +31,14 @@ export function KpiComparisonTable({
   /** The historical/expert autoplays are still running. */
   computing: boolean
 }) {
-  const rows = kpiComparison(scenario, state, historical, expert)
+  // `all`: the primaries are the headline, and the rest are what a reader reaches for when the
+  // headline raises a question. The timeline's <select> has had them all along; a table is the
+  // shape for comparing ten metrics across three paths.
+  const [showRest, setShowRest] = useState(false)
+  const all = kpiComparison(scenario, state, historical, expert, { all: true })
+  const primary = all.filter((r) => r.kpi.primary)
+  const rows = primary.length > 0 ? primary : all.slice(0, 3)
+  const rest = all.filter((r) => !rows.includes(r))
 
   /** One scale per row, chosen from whichever of the three paths ran furthest. */
   const scaleOf = (r: KpiComparisonRow) =>
@@ -72,6 +81,22 @@ export function KpiComparisonTable({
     { key: 'player', label: '귀하', align: 'right', render: (r) => cell(r, r.player, 'font-semibold') },
     { key: 'historical', label: '역사', align: 'right', render: (r) => cell(r, r.historical, 'text-muted') },
     { key: 'expert', label: '전문가', align: 'right', render: (r) => cell(r, r.expert, 'text-muted') },
+    {
+      key: 'trend',
+      label: '귀하의 경로',
+      align: 'right',
+      // A final value says where the run stopped; it cannot say whether the metric fell all the way
+      // there or fell and was pulled back. The history is already in hand on this page.
+      render: (r) =>
+        r.series.length >= 2 ? (
+          <Sparkline
+            values={r.series}
+            width={80}
+            height={22}
+            ariaLabel={`${r.kpi.label} 턴별 추이`}
+          />
+        ) : null,
+    },
   ]
 
   return (
@@ -87,6 +112,23 @@ export function KpiComparisonTable({
           rowKey={(r) => r.kpi.metric}
         />
       </div>
+      {rest.length > 0 && (
+        <div className="mt-2">
+          <Button size="sm" variant="ghost" aria-expanded={showRest} onClick={() => setShowRest((v) => !v)}>
+            {showRest ? '접기' : `나머지 지표 ${rest.length}건 더 보기`}
+          </Button>
+          {showRest && (
+            <div className="mt-1">
+              <DataTable
+                caption="보조 지표 최종값 비교"
+                columns={columns}
+                rows={rest}
+                rowKey={(r) => r.kpi.metric}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {computing && (
         <p className="mt-1 text-sm text-muted" role="status">
           역사·전문가 경로를 계산 중…

@@ -7,8 +7,11 @@ import type {
   Threshold,
   Units,
 } from '../../engine'
+import { directionOf, type Direction } from '../../lib/direction'
 import { scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
+
+export { directionOf, type Direction }
 
 export interface KpiRow {
   spec: KpiSpec
@@ -28,15 +31,6 @@ export interface KpiRow {
   threshold?: Threshold
   /** One currency scale for this metric, held for the whole run. `undefined` for non-currency. */
   scale?: CcyScale
-}
-
-export type Direction = 'better' | 'worse' | 'neutral'
-
-/** Whether a change of the given sign moves the metric toward or away from its breach band. */
-export function directionOf(sign: number, t?: Threshold): Direction {
-  if (!t || sign === 0) return 'neutral'
-  const up = sign > 0
-  return (t.direction === 'below') === up ? 'better' : 'worse'
 }
 
 /**

@@ -1,5 +1,6 @@
 import { decisionRegrets, findDecision, findOption } from '../engine'
-import type { GameState, KpiSpec, Option, ScenarioDefinition } from '../engine/types'
+import type { GameState, KpiSpec, Option, ScenarioDefinition, ThresholdMap } from '../engine/types'
+import { directionOf, type Direction } from './direction'
 
 export type Regret = ReturnType<typeof decisionRegrets>[number]
 
@@ -23,6 +24,8 @@ export interface KpiComparisonRow {
   player: number | undefined
   historical: number | undefined
   expert: number | undefined
+  /** The player's path for this metric, turn by turn — the shape a final value cannot show. */
+  series: number[]
 }
 
 export interface DecisionHighlightOption {
@@ -89,20 +92,39 @@ function finalValue(state: GameState | undefined, metric: string): number | unde
   return undefined
 }
 
-/** Top three primary KPIs with the final value on each of the three paths. */
+/** The player's per-turn values for one metric. */
+function seriesOf(state: GameState, metric: string): number[] {
+  const out: number[] = []
+  for (const snap of state.metricsHistory) {
+    const v = snap.metrics[metric]?.value
+    if (v !== undefined && Number.isFinite(v)) out.push(v)
+  }
+  return out
+}
+
+/**
+ * The primary KPIs with the final value on each of the three paths, plus the player's own path.
+ *
+ * `all` adds the secondary metrics. The headline callers stay on the primaries on purpose: the
+ * sentence that names the biggest divergence must not be driven by a metric the scenario author
+ * did not consider headline material.
+ */
 export function kpiComparison(
   scenario: ScenarioDefinition,
   player: GameState,
   historical?: GameState,
   expert?: GameState,
+  opts: { all?: boolean } = {},
 ): KpiComparisonRow[] {
   const primary = scenario.kpis.filter((k) => k.primary)
-  const kpis = (primary.length > 0 ? primary : scenario.kpis).slice(0, 3)
+  const base = primary.length > 0 ? primary : scenario.kpis.slice(0, 3)
+  const kpis = opts.all ? [...base, ...scenario.kpis.filter((k) => !base.includes(k))] : base
   return kpis.map((kpi) => ({
     kpi,
     player: finalValue(player, kpi.metric),
     historical: finalValue(historical, kpi.metric),
     expert: finalValue(expert, kpi.metric),
+    series: seriesOf(player, kpi.metric),
   }))
 }
 
@@ -189,6 +211,11 @@ export interface ExpertGap {
   expert: number
   /** |player − expert| ÷ max(|expert|, |player|, ε) — relative so KPIs of different scale compare. */
   relative: number
+  /**
+   * Whether the player ended on the better side of the expert. `neutral` when the metric has no
+   * threshold band, because then nothing in the model says which direction is good.
+   */
+  direction: Direction
 }
 
 /**
@@ -196,17 +223,27 @@ export interface ExpertGap {
  *
  * A three-column table asks the reader to do this comparison themselves, on a page they are
  * reading once. One sentence naming the metric that actually differed is the answer the table was
- * being scanned for. Deliberately *not* labelled better or worse: `KpiSpec` carries no direction,
- * and inventing one per metric would be a guess dressed as a verdict.
+ * being scanned for.
+ *
+ * It used to refuse to say *which way* the gap ran, on the grounds that `KpiSpec` carries no
+ * direction. That was true of `KpiSpec` and false of the model: `Threshold.direction` says which
+ * side of a band is the bad one, and `directionOf` has been reading it on the play screen all
+ * along. So the verdict is stated where a threshold exists and withheld where none does — which is
+ * the difference between a judgement and a guess dressed as one.
  */
-export function largestExpertGap(rows: KpiComparisonRow[]): ExpertGap | undefined {
+export function largestExpertGap(
+  rows: KpiComparisonRow[],
+  thresholds: ThresholdMap = {},
+): ExpertGap | undefined {
   let best: ExpertGap | undefined
   for (const row of rows) {
     const { player, expert } = row
     if (player === undefined || expert === undefined) continue
     const scale = Math.max(Math.abs(expert), Math.abs(player), 1e-9)
     const relative = Math.abs(player - expert) / scale
-    if (!best || relative > best.relative) best = { row, player, expert, relative }
+    const t = thresholds[row.kpi.metric]
+    const direction = t ? directionOf(Math.sign(player - expert), t) : 'neutral'
+    if (!best || relative > best.relative) best = { row, player, expert, relative, direction }
   }
   // A gap under 2% is the two paths agreeing; saying so is more useful than naming a rounding
   // difference as the headline divergence.

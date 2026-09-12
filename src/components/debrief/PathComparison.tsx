@@ -72,6 +72,27 @@ function OptionCell({
           <InlineMarkdown>{option.trapExplanation}</InlineMarkdown>
         </p>
       )}
+      {/*
+        「그게 실제로 가능했나」는 사후 검토에서 먼저 나오는 질문이다. 저자는 그 답을 출처까지 달아
+        `feasibility.basis`에 써 두었고, 플레이 화면의 선택지 상세가 그걸 한 줄로 보여 준다 — 선택 직전,
+        가장 바쁘 순간에. 정작 천천히 읽을 수 있는 곳인 디브리핑에는 없었고, 출처는 어느 쪽에도 없었다.
+        보정 노트도 같다: 수치의 크기를 무엇으로 정당화했는지는 정확성이 제1 원칙인 제품에서
+        독자가 볼 권리가 있는 것이고, 그 자리는 경로 비교다.
+      */}
+      {option.feasibility && (
+        <p className="mt-1 text-muted">
+          <span className="label-caps">실행 가능성 근거</span>{' '}
+          <InlineMarkdown>{option.feasibility.basis}</InlineMarkdown>
+          {option.feasibility.sourceRefs && option.feasibility.sourceRefs.length > 0 && (
+            <Citation ids={option.feasibility.sourceRefs} local={scenario.meta.sources} />
+          )}
+        </p>
+      )}
+      {option.calibrationNote && (
+        <p className="mt-1 text-muted">
+          <span className="label-caps">보정 노트</span> {option.calibrationNote}
+        </p>
+      )}
     </div>
   )
 }
@@ -130,7 +151,15 @@ export function PathComparison({
               <span className="text-sm text-muted">{turn.timeLabel}</span>
               <span className="font-medium">{decision.title}</span>
               {rec.timedOut && <Badge tone="warning">시간 초과</Badge>}
-              {rec.hintsUsed ? <Badge tone="neutral">힌트 {rec.hintsUsed}단계</Badge> : null}
+              {/* Chrome, not severity — a hint count is a fact about the run, not an alarm. */}
+              {rec.hintsUsed ? <span className="label-caps">힌트 {rec.hintsUsed}단계</span> : null}
+              {/*
+                결정까지 걸린 시간은 엔진이 줄곳 기록해 왔지만 어디에도 표시된 적이 없다. 시간 압박을
+                훈련하는 제품에서 의사결정 지연은 점수만큼 실질적인 지표고, 사후 검토의 재료다.
+              */}
+              {rec.elapsedMs !== undefined && rec.elapsedMs > 0 && (
+                <span className="num label-caps">{Math.round(rec.elapsedMs / 1000)}초</span>
+              )}
               <span className="ml-auto flex items-center gap-1">
                 {/*
                   A symmetric toggle. The control used to only ever `add` to the set, so once a

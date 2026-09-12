@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -145,6 +145,24 @@ export function ScoreRadar({
           </ResponsiveContainer>
           <figcaption className="sr-only">{summary}</figcaption>
         </figure>
+      )}
+      {/*
+        점수의 산출 근거는 엔진이 이미 사람이 읽을 문장으로 만들어 둔다 — 「생존 일수(min) = 0.63
+        → 14점」처럼. 그런데 차트 보기에서는 호버 툴팁 안에만 있어서, 마우스로 점 일곱 개를 찾아가며
+        하나씩 짚어보지 않는 한 「왜 이 점수인가」에 답할 길이 없었다. 점수를 납득하는 것이 이 페이지의
+        일인데 근거는 기본 상태에서 읽혀야 한다. 표 보기에서는 이미 자기 열에 있으므로 중복하지 않는다.
+      */}
+      {!showTable && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+          {rows.map((r) => (
+            <Fragment key={r.dim}>
+              <dt className="text-muted">
+                {r.short} <span className="num">{r.score}</span>
+              </dt>
+              <dd className="m-0 text-muted">{r.explanation.join(' · ')}</dd>
+            </Fragment>
+          ))}
+        </dl>
       )}
     </div>
   )
