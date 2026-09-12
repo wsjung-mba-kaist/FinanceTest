@@ -230,6 +230,18 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Field>
+        <Field label="화면 밀도" hint="간격과 줄 간격 — 글자 크기와는 별개의 축입니다">
+          <RadioRow
+            name="화면 밀도"
+            value={s.density}
+            options={[
+              { id: 'compact', label: '조밀', hint: '한 화면에 더 많이 — 실무 단말에 가깝습니다' },
+              { id: 'normal', label: '보통' },
+              { id: 'comfortable', label: '여유', hint: '장문을 오래 읽을 때' },
+            ]}
+            onChange={(v) => set('density', v)}
+          />
+        </Field>
         <Field label="시스템 글꼴 사용" hint="Pretendard 대신 운영체제 기본 글꼴">
           <Toggle
             id={sysFontId}

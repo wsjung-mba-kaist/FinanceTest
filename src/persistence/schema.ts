@@ -101,6 +101,13 @@ export const settingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
   termDisplay: z.enum(['ko-en', 'en-ko']),
   fontScale: z.number().min(0.85).max(1.3),
+  /**
+   * Spacing rhythm and prose leading — the reading axis orthogonal to `fontScale`.
+   * `.default` rather than `.optional()`: every settings object saved before this field existed
+   * must still parse, and a missing density is not a preference to preserve — it is the default.
+   * The parsed value is therefore always one of the three, so no consumer needs a fallback.
+   */
+  density: z.enum(['compact', 'normal', 'comfortable']).default('normal'),
   reducedMotion: z.boolean(),
   rationaleReveal: z.enum(['mode', 'immediate', 'endOfTurn', 'endOfScenario']),
   timersEnabled: z.boolean(),
@@ -125,6 +132,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   theme: 'system',
   termDisplay: 'ko-en',
   fontScale: 1,
+  density: 'normal',
   reducedMotion: false,
   rationaleReveal: 'mode',
   timersEnabled: true,

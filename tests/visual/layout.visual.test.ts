@@ -89,6 +89,87 @@ describe.skipIf(!up)('layout widths in a real browser', () => {
     expect(mid!.prose).toBeLessThan(large!.prose)
   })
 
+  /**
+   * Density: the *other* reading axis. The token arithmetic is asserted in `tests/ui/density.test.ts`;
+   * what only a browser can say is whether the rule that reads it actually wins, and therefore
+   * whether a real element on a real page changes size when the reader changes the setting.
+   *
+   * `#main` carries `py-6`, which compiles to `calc(var(--spacing) * 6)`. If anything upstream
+   * pinned `--spacing` — an inline style, an `@theme inline` that baked the value in — these three
+   * numbers come back identical and the setting is decorative.
+   */
+  it('changes the rhythm of a painted page', async () => {
+    const seen: { density: string; step: number; pad: number }[] = []
+    for (const density of ['compact', 'normal', 'comfortable'] as const) {
+      const { page, context } = await open(browser, {
+        width: 1280,
+        height: 900,
+        settings: { density },
+      })
+      seen.push(
+        await page.evaluate(() => {
+          const root = getComputedStyle(document.documentElement)
+          return {
+            density: document.documentElement.getAttribute('data-density') ?? 'normal',
+            step: Number.parseFloat(root.getPropertyValue('--spacing')),
+            pad: Number.parseFloat(getComputedStyle(document.getElementById('main')!).paddingTop),
+          }
+        }),
+      )
+      await context.close()
+    }
+    const [compact, normal, comfortable] = seen
+
+    // The setting reached the document at all.
+    expect(seen.map((r) => r.density)).toEqual(['compact', 'normal', 'comfortable'])
+    expect(compact!.step).toBeLessThan(normal!.step)
+    expect(normal!.step).toBeLessThan(comfortable!.step)
+    // …and the pixels a reader sees followed it.
+    expect(compact!.pad).toBeLessThan(normal!.pad)
+    expect(normal!.pad).toBeLessThan(comfortable!.pad)
+  })
+
+  /**
+   * The situation room is one step denser than the rest of the app — *derived* from the density
+   * token, not pinned. It used to be an inline `--spacing` on the play root, which no rule can beat,
+   * so the setting could never have reached the one screen a reader spends 40 minutes on.
+   *
+   * Probed on a detached-but-rendered node rather than by driving a whole scenario to the play
+   * screen: the claim is about which CSS rule wins for `[data-zone='play']`, and that is the same
+   * question wherever the attribute appears.
+   */
+  it('keeps the play zone denser at every density', async () => {
+    for (const density of ['compact', 'normal', 'comfortable'] as const) {
+      const { page, context } = await open(browser, {
+        width: 1280,
+        height: 900,
+        settings: { density },
+      })
+      const { outside, inside } = await page.evaluate(() => {
+        // Measured in *pixels*, not by reading `--spacing` back: an unregistered custom property
+        // computes to its token-substituted text, so the zone's `calc(var(--sp-base) * .875)` comes
+        // back as that literal string and parses to NaN. Padding resolves it for real.
+        const probe = (parent: HTMLElement): number => {
+          const el = document.createElement('div')
+          el.style.paddingTop = 'calc(var(--spacing) * 6)'
+          parent.append(el)
+          const px = Number.parseFloat(getComputedStyle(el).paddingTop)
+          el.remove()
+          return px
+        }
+        const zone = document.createElement('div')
+        zone.setAttribute('data-zone', 'play')
+        document.body.append(zone)
+        const result = { outside: probe(document.body), inside: probe(zone) }
+        zone.remove()
+        return result
+      })
+      expect(inside, `${density}: 플레이 존이 더 조밀하지 않습니다`).toBeLessThan(outside)
+      expect(inside / outside, `${density}: 플레이 존의 비율이 어긋났습니다`).toBeCloseTo(0.875, 2)
+      await context.close()
+    }
+  })
+
   it('never scrolls sideways on a phone', async () => {
     for (const hash of ['', '#/knowledge', '#/progress', '#/settings', '#/knowledge/glossary']) {
       const { page, context } = await open(browser, { width: 390, height: 800, hash })

@@ -6,7 +6,9 @@
 관련 테스트: [`tests/ui/stylesheetLayers.test.ts`](../tests/ui/stylesheetLayers.test.ts) ·
 [`tests/ui/cssEmissionOrder.test.ts`](../tests/ui/cssEmissionOrder.test.ts) ·
 [`tests/ui/contrast.test.ts`](../tests/ui/contrast.test.ts) ·
-[`tests/ui/primitiveAdoption.test.ts`](../tests/ui/primitiveAdoption.test.ts)
+[`tests/ui/primitiveAdoption.test.ts`](../tests/ui/primitiveAdoption.test.ts) ·
+[`tests/ui/fonts.test.ts`](../tests/ui/fonts.test.ts) ·
+[`tests/ui/density.test.ts`](../tests/ui/density.test.ts)
 
 ---
 
@@ -310,3 +312,123 @@ Recharts는 CSS가 아니라 숫자를 받는다. 그래서 `fontSize: 10`을 �
 같은 이유로 «버튼처럼 그린 링크»를 세던 패턴은 실제로는 **강조색 카운트 필**만 잡고 있었다.
 패턴 이름을 바꾸고 `<CountPill>`로 넷을 합쳤다. **대리 지표가 틀렸으면 숫자를 쫓지 말고 지표를
 고친다.**
+
+---
+
+## 15. 선언한 글꼴은 배달한다
+
+`--font-sans`는 첫날부터 `'Pretendard Variable'`을 1순위로 적고 있었다. 그런데 `@font-face`도,
+`<link>`도, `public/fonts/` 안의 파일도, 의존성도 **없었다.** 그래서 이 프로젝트의 주 환경인
+Windows에서 한글은 내내 **맑은 고딕**으로, 모든 수치는 **Consolas**로 그려졌다. 설정의
+«시스템 글꼴 사용 — Pretendard 대신»은 사용자가 갖고 있지 않은 글꼴과 지금 보고 있는 글꼴 사이를
+오가는 토글이었다.
+
+**무엇도 이걸 잡지 못한다.** 스타일시트는 유효하고, 캐스케이드도 맞고, jsdom은 애초에 글꼴을
+해석하지 않으며, 스크린샷은 그저 «조금 덜 예쁠» 뿐이다. 그래서
+[`fonts.test.ts`](../tests/ui/fonts.test.ts)가 «`--font-sans`의 첫 패밀리를 진입 모듈이 실제로
+불러오는 스타일시트가 선언하는가»를 단언한다.
+
+동적 서브셋(`pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css`)을 쓴다. 2MB짜리
+가변 폰트가 92개 `unicode-range` 조각으로 갈라져 있어 **화면에 실제로 나온 글자 구간만** 받는다.
+브라우저로 잰 실비용은 홈 142KB · 지식 베이스 121KB · 용어집 80KB이고 그 뒤로는 캐시다.
+
+### 15-1. 숫자에 필요한 것은 *고정폭*이지 *모노스페이스*가 아니다
+
+`num` 유틸리티는 `--font-mono`를 지정하고 있었고, 그건 실제로는 Consolas였다. 약 230곳에서
+한글 라벨 옆에 라틴 코드 글꼴이 붙어 x-height·굵기·색감이 전부 어긋났다. 열을 읽히게 만드는 성질은
+`font-variant-numeric: tabular-nums` **하나**이고, Pretendard는 그걸 갖고 있다. 지금 `num`·`num-md`·
+`num-lg`는 전부 `--font-sans` + `tabular-nums`다. `--font-mono`에 남은 일은 **진짜 코드**뿐이다
+(`.md code`).
+
+`num-lg`·`num-md`는 크기를 `var(--text-xl)`·`var(--text-lg)`로 **읽는다.** rem을 박아 두면 타입
+스케일을 바꿀 때 이 둘만 조용히 뒤처진다 — 움직이지 않는 것이 아니라, 아무도 모르게 안 움직인다.
+
+> `@utility`는 선언 6개가 상한이다(`stylesheetLayers.test.ts`). `num-lg`가 `font-feature-settings`
+> 까지 달면 7개가 되므로, 레거시 쌍둥이 속성은 `num`에만 남겼다.
+
+---
+
+## 16. 밀도와 글자 크기는 **직교 축**이다
+
+시력은 «얼마나 큰가»의 문제이고 `--fs-scale`이 답한다. 한 화면에 얼마나 담고 싶은가는
+«얼마나 촘촘한가»의 문제이고, 둘을 슬라이더 하나에 합치면 **어느 쪽도 답하지 못한다.** 실무 데스크는
+조밀한 화면을 원하고, 내용을 처음 배우는 사람은 여백을 원하는데 둘 다 글자는 같은 크기로 보고 싶다.
+
+```css
+:root {
+  --sp-base: 0.2857rem;
+  --lh-body: 1.55;
+  --lh-prose: 1.7;
+}
+:root[data-density='compact'] {
+  --sp-base: 0.25rem;
+  --lh-body: 1.5;
+  --lh-prose: 1.6;
+}
+:root[data-density='comfortable'] {
+  --sp-base: 0.3214rem;
+  --lh-body: 1.65;
+  --lh-prose: 1.8;
+}
+@theme {
+  --spacing: var(--sp-base);
+}
+```
+
+장문 행간이 본문보다 넓은 것은 취향이 아니다. 한글은 같은 글자 수에 담는 정보가 라틴보다 많아서,
+영어에서 넉넉하게 읽히는 행간이 여기서는 답답하게 읽힌다(W3C klreq · Typotheque). 세 밀도 모두
+`--lh-prose ≥ 1.6`을 지킨다.
+
+### 16-1. §3의 함정은 한 층 위에서 다시 나타난다
+
+플레이 화면은 자기 리듬을 **인라인 스타일**로 고정하고 있었다.
+
+```tsx
+style={{ '--spacing': '0.25rem' }}   // 인라인은 모든 규칙을 이긴다
+```
+
+즉 밀도 설정은 사용자가 40분을 보내는 **바로 그 화면에만 영원히 닿지 못했을** 것이다. 루트 글꼴에서
+`style.fontSize`가 놓은 함정과 같은 것이고, 답도 같다 — **JS는 값을 주고 CSS가 계산한다.**
+
+```tsx
+<div data-zone="play" …>
+```
+
+```css
+@layer base {
+  [data-zone='play'] {
+    --spacing: calc(var(--sp-base) * 0.875);
+  }
+}
+```
+
+상황실은 이제 «0.25rem»이 아니라 «어느 밀도에서든 한 단계 더 조밀»이다.
+
+**이건 브라우저로만 증명된다.** 등록되지 않은 커스텀 속성은 `calc()`를 계산하지 않고 문자열 그대로
+계산값이 되므로, `--spacing`을 되읽으면 `calc(var(--sp-base) * .875)`라는 글자가 나온다.
+`layout.visual.test.ts`는 그래서 **픽셀을 잰다** — 프로브에 `padding-top: calc(var(--spacing) * 6)`을
+주고 해석된 px를 비교한다.
+
+### 16-2. 인쇄는 자기 밀도를 갖는다
+
+조밀한 화면을 고른 사람이 조밀한 인쇄물을 원한 것은 아니다. 종이는 이미 폭이 고정되고 다시 흐른다.
+`@media print` 블록이 팔레트를 되돌리는 것과 같은 방식으로 `--sp-base`·`--lh-*`도 되돌린다.
+
+---
+
+## 17. 12px은 본문 크기가 아니었다
+
+타입 스케일의 주석은 12px을 «메타데이터용»이라고 적어 두었다. 실제 사용량은 `text-sm` **270회** 대
+`text-base` **106회**였다 — 즉 12px 한글이 사람들이 40분씩 읽는 제품의 **사실상 본문 크기**였다.
+
+270개 호출부를 옮기는 대신 **토큰 값을 옮겼다**(`--text-sm: 0.857rem → 0.929rem`, 12px → 13px).
+`--border` 값 하나로 166개 테두리를 고친 것과 같은 수법이고, 같은 이유로 안전하다 — 호출부가 변하지
+않으면 회귀 표면도 없다.
+
+지금 스케일이 뜻하는 역할:
+
+| 토큰        | 크기(14px 루트) | 역할            |
+| ----------- | --------------- | --------------- |
+| `text-base` | 14px            | 본문            |
+| `text-sm`   | 13px            | 조밀한 본문     |
+| `text-xs`   | 11px            | 메타데이터 전용 |

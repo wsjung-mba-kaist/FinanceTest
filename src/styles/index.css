@@ -73,8 +73,38 @@
    */
   --fs-root: 14px;
   --fs-scale: 1;
+
+  /*
+   * Density: the second reading axis, deliberately orthogonal to `--fs-scale`.
+   * Eyesight is a *size* question and `--fs-scale` answers it; how much a reader wants on screen at
+   * once is a *rhythm* question, and merging the two into one slider answers neither. A finance desk
+   * wants the dense view; someone learning the material wants room. `--sp-base` feeds the spacing
+   * step (see the `@theme` block below) and the two line heights feed body and long-form prose.
+   *
+   * 1.70 for prose is the CJK figure: Hangul carries more information per character than Latin, so
+   * the leading that reads as generous in English reads as cramped here (W3C klreq, Typotheque).
+   */
+  --sp-base: 0.2857rem;
+  --lh-body: 1.55;
+  --lh-prose: 1.7;
+
   --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06);
   color-scheme: light;
+}
+
+/*
+ * The two density variants. Only tokens live here, so these blocks carry no cascade weight of their
+ * own and every consumer — including the play screen's tighter subtree — recomputes from them.
+ */
+:root[data-density='compact'] {
+  --sp-base: 0.25rem;
+  --lh-body: 1.5;
+  --lh-prose: 1.6;
+}
+:root[data-density='comfortable'] {
+  --sp-base: 0.3214rem;
+  --lh-body: 1.65;
+  --lh-prose: 1.8;
 }
 
 /*
@@ -85,10 +115,10 @@
  * Tailwind's default 0.25rem was written for a 16px root and gives 4px. At this project's 14px
  * root it silently became 3.5px, i.e. every gap, pad and margin in the app was 12.5% tighter than
  * the scale it was designed against. 0.2857rem restores 4px exactly — one line, and the whole
- * non-play app breathes.
+ * non-play app breathes. That value now lives in `--sp-base` so the density setting can move it.
  */
 @theme {
-  --spacing: 0.2857rem;
+  --spacing: var(--sp-base);
 }
 
 :root[data-theme='dark'] {
@@ -255,11 +285,18 @@
   --breakpoint-3xl: 1800px;
 
   /* Type scale (rem of --fs-root = 14px base, 15px ≥1440px, 16px ≥1800px).
-     11 / 12 / 14 / 15 / 18 / 22 / 28 px at the 14px base. */
+     11 / 13 / 14 / 15 / 18 / 22 / 28 px at the 14px base.
+
+     `text-sm` was 12px, and the scale's own comment called 12px a metadata size — but the app used
+     it 270 times against 106 for `text-base`, which made 12px Hangul the de-facto body size of a
+     product people read for 40 minutes at a stretch. Moving the *token* lifts all 270 at once with
+     no call-site churn and therefore no regression surface, exactly as the `--border` value change
+     did for 166 borders. The roles the scale now means: `text-base` body, `text-sm` dense body,
+     `text-xs` metadata. */
   --text-xs: 0.786rem;
-  --text-xs--line-height: 1.4;
-  --text-sm: 0.857rem;
-  --text-sm--line-height: 1.45;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.929rem;
+  --text-sm--line-height: 1.5;
   --text-base: 1rem;
   --text-base--line-height: 1.55;
   --text-md: 1.071rem;
@@ -297,7 +334,7 @@
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 1rem;
-    line-height: 1.55;
+    line-height: var(--lh-body);
     /* keep-all avoids breaking Hangul words; anywhere is the fallback so long
        latin/number tokens ($2.25B, CRO/Treasurer) cannot overflow a narrow column. */
     word-break: keep-all;
@@ -313,6 +350,15 @@
   *:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  /*
+   * The situation room keeps one step more density than the rest of the app, at whatever density the
+   * reader chose. This used to be an inline `style={{ '--spacing': '0.25rem' }}` on the play root —
+   * and an inline style outranks every rule, so the density setting could never have reached this
+   * subtree. Same trap as `style.fontSize` in §3: JS gives the value, CSS does the arithmetic.
+   */
+  [data-zone='play'] {
+    --spacing: calc(var(--sp-base) * 0.875);
   }
 }
 
@@ -378,7 +424,7 @@
      element wins — which is what a caller writing one expects.
      ------------------------------------------------------------------------ */
   .md {
-    line-height: 1.65;
+    line-height: var(--lh-prose);
   }
   .md > * + * {
     margin-top: 0.75em;
@@ -680,6 +726,14 @@
     --sev-none-border: #8b8b90;
     --shadow-card: none;
     --fs-root: 11pt;
+    /*
+     * Paper is its own density. A reader who picked the compact screen view is not asking for a
+     * tighter printout — the page is already fixed-width and re-flowed — so the density tokens
+     * reset here the same way the palette does.
+     */
+    --sp-base: 0.2857rem;
+    --lh-body: 1.5;
+    --lh-prose: 1.6;
     color-scheme: light;
   }
   body {

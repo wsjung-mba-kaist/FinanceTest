@@ -47,6 +47,9 @@ export function applySettingsToDocument(s: SettingsState): void {
   // the base in CSS, so the wide-screen bump and the print size still apply and the user's scale
   // multiplies with them. Writing `style.fontSize` here made an inline rule that beat both.
   root.style.setProperty('--fs-scale', String(s.fontScale))
+  // Same contract as the scale above, one level up: an attribute selects a token block and CSS does
+  // the arithmetic, so the play screen's tighter subtree and the print reset both still apply.
+  root.setAttribute('data-density', s.density)
   root.setAttribute('data-reduced-motion', s.reducedMotion ? 'true' : 'false')
   root.setAttribute('data-system-font', s.useSystemFont ? 'true' : 'false')
 }

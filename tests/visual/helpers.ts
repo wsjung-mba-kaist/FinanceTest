@@ -34,6 +34,7 @@ export function settings(overrides: Partial<SettingsState> = {}): SettingsState 
     theme: 'light',
     termDisplay: 'ko-en',
     fontScale: 1,
+    density: 'normal',
     reducedMotion: false,
     rationaleReveal: 'mode',
     timersEnabled: true,

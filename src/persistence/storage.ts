@@ -1,4 +1,4 @@
-import type { ZodType } from 'zod'
+import type { TypeOf, ZodTypeAny } from 'zod'
 
 export const KEYS = {
   settings: 'fcs:settings',
@@ -18,7 +18,13 @@ function safeGet(key: string): string | null {
   }
 }
 
-export function loadValidated<T>(key: string, schema: ZodType<T>): LoadResult<T> {
+/**
+ * Generic over the *schema* rather than over one payload type: a field carrying `.default()` has an
+ * input type that differs from its output (the field is optional going in, always present coming
+ * out), and `ZodType<T>` collapses the two — which silently hands callers the input shape and makes
+ * a defaulted field look possibly-undefined at every use site.
+ */
+export function loadValidated<S extends ZodTypeAny>(key: string, schema: S): LoadResult<TypeOf<S>> {
   const raw = safeGet(key)
   if (!raw) return { value: null, corrupt: false }
   try {

@@ -256,13 +256,14 @@ function PlayScreen({
       <h1 className="sr-only">
         {scenario.meta.title} — {view.turn.label} {view.turn.timeLabel}
       </h1>
-      <div
-        className="flex h-full min-h-0 flex-col overflow-hidden"
-        // The situation room keeps the dense rhythm while the rest of the app breathes: spacing
-        // utilities compile to `calc(var(--spacing) * n)`, so re-scoping the property here
-        // re-scopes every gap, pad and margin below it. See `--spacing` in index.css.
-        style={{ '--spacing': '0.25rem' } as React.CSSProperties}
-      >
+      {/*
+       * `data-zone="play"` is what makes the situation room one step denser than the rest of the
+       * app: `@layer base` re-scopes `--spacing` off `--sp-base` for this subtree, and spacing
+       * utilities compile to `calc(var(--spacing) * n)`, so every gap, pad and margin below follows.
+       * It was an inline `style={{ '--spacing': '0.25rem' }}`, which outranked every rule and so
+       * pinned this screen to one density no matter what the reader chose in settings.
+       */}
+      <div data-zone="play" className="flex h-full min-h-0 flex-col overflow-hidden">
         <LiveRegion message={announce.message} seq={announce.seq} />
         <StatusBar
           compact={bp !== 'desktop'}
