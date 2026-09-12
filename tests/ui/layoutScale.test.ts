@@ -21,9 +21,10 @@ function rootAt(mediaPrelude?: string): Record<string, string> {
   const out: Record<string, string> = {}
   for (const b of base) Object.assign(out, tokensOf(b.body))
   if (!mediaPrelude) return out
-  // *Every* `:root` under that query, in source order — `@media (min-width: 1800px)` appears
-  // twice, once for the type base and once for the widths, and taking only the first would
-  // silently answer with the wrong block.
+  // *Every* `:root` under that query, in source order — both 1440 and 1800 appear twice, once for
+  // the type base and once for the widths, and taking only the first would silently answer with
+  // the wrong block. (They are the same two numbers on purpose: the frame and the text grow at the
+  // same screen widths, which they did not when the widths bumped at 1400 and the type at 1440.)
   for (const b of blocks)
     if (b.prelude === ':root' && b.ancestors.join('|') === mediaPrelude)
       Object.assign(out, tokensOf(b.body))
@@ -46,7 +47,7 @@ describe('layout width tokens', () => {
    * text — the opposite of what enlarging it is for.
    */
   it('measures the frame in px at every breakpoint', () => {
-    for (const at of [undefined, '@media (min-width: 1400px)', '@media (min-width: 1800px)']) {
+    for (const at of [undefined, '@media (min-width: 1440px)', '@media (min-width: 1800px)']) {
       const root = rootAt(at)
       for (const t of FRAME_TOKENS) {
         expect(root[t], `--${t} @ ${at ?? ':root'}`).toMatch(/^\d+px$/)
@@ -64,7 +65,7 @@ describe('layout width tokens', () => {
   })
 
   it('widens the frame monotonically', () => {
-    const steps = [undefined, '@media (min-width: 1400px)', '@media (min-width: 1800px)']
+    const steps = [undefined, '@media (min-width: 1440px)', '@media (min-width: 1800px)']
     for (const t of FRAME_TOKENS) {
       const values = steps.map((at) => Number.parseFloat(rootAt(at)[t]!))
       for (let i = 1; i < values.length; i++)
@@ -75,7 +76,7 @@ describe('layout width tokens', () => {
   it('keeps the document frame narrower than the shell', () => {
     // A 616px reading column inside a 1560px frame reads worse than inside a 960px one: the
     // leftover width becomes a moat rather than content.
-    for (const at of [undefined, '@media (min-width: 1400px)', '@media (min-width: 1800px)']) {
+    for (const at of [undefined, '@media (min-width: 1440px)', '@media (min-width: 1800px)']) {
       const root = rootAt(at)
       expect(
         Number.parseFloat(root['w-doc']!),

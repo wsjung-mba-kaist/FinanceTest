@@ -194,7 +194,10 @@
    */
   --w-play-col: 52em;
 }
-@media (min-width: 1400px) {
+/* 1440, the same step the type size takes. The widths used to bump at 1400 and the root font at
+   1440 — 40px apart, for no reason anyone could state, which meant one narrow band of screen
+   widths where the frame had grown and the text had not. */
+@media (min-width: 1440px) {
   :root {
     --w-shell: 1320px;
     --w-doc: 960px;

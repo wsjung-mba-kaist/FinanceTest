@@ -5,6 +5,10 @@ import type {
   SecuritiesState,
   Units,
 } from '../../engine'
+import {
+  INSTITUTION_FIGURE_LABELS,
+  INSTITUTION_FIGURE_UNITS,
+} from '../../content/institutionLabels'
 import { formatCurrency, formatNumber } from '../../lib/format'
 import { usePlay } from '../play/playContext'
 import { Card } from '../ui'
@@ -212,16 +216,31 @@ function flattenNumbers(
   return out
 }
 
+/**
+ * The generic figure list, for institution shapes with no authored balance sheet.
+ *
+ * It used to print the object path — `firm.liquidityPool`, `external.shortTermDebt` — straight to
+ * the screen. A path with no Korean label is now dropped rather than shown raw: an unlabelled
+ * number is not information, and a reader guessing at what it measures is worse off than one who
+ * never saw it.
+ */
 function KeyFigures({ institution }: { institution: InstitutionState }) {
-  const rows = flattenNumbers(institution).slice(0, 16)
+  const rows = flattenNumbers(institution)
+    .filter(([k]) => INSTITUTION_FIGURE_LABELS[k])
+    .slice(0, 16)
+  if (rows.length === 0)
+    return <p className="text-sm text-muted">이 기관 유형은 주요 수치 목록이 아직 없습니다.</p>
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-xs">
+    <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="truncate text-muted" title={k}>
-            {k}
-          </dt>
-          <dd className="num m-0 text-right">{formatNumber(v, Number.isInteger(v) ? 0 : 2)}</dd>
+          <dt className="truncate text-muted">{INSTITUTION_FIGURE_LABELS[k]}</dt>
+          <dd className="num m-0 text-right">
+            {formatNumber(v, Number.isInteger(v) ? 0 : 2)}
+            {INSTITUTION_FIGURE_UNITS[k] && (
+              <span className="ml-0.5 text-xs text-muted">{INSTITUTION_FIGURE_UNITS[k]}</span>
+            )}
+          </dd>
         </div>
       ))}
     </dl>

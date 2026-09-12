@@ -21,7 +21,15 @@ export function useMediaQuery(query: string): boolean {
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
 
-/** desktop ≥ 1200px · tablet 900–1199px · mobile < 900px (play-view layout breakpoints). */
+/**
+ * desktop ≥ 1200px · tablet 900–1199px · mobile < 900px — the play view's own axis, on purpose.
+ *
+ * These are not the Tailwind breakpoints and are not meant to be. Tailwind's steps answer 「does
+ * this grid still fit」; these answer 「is there room for two scrolling columns and a decision dock
+ * beside each other」, and the answer turns at 1200, between `lg` and `xl`. Aligning them to `xl`
+ * would move the two-column layout to 1280 and leave an 80px band where the situation room is a
+ * single column on a screen that could hold two. See docs/ui-conventions.md §16-3.
+ */
 export function useBreakpoint(): Breakpoint {
   const desktop = useMediaQuery('(min-width: 1200px)')
   const tablet = useMediaQuery('(min-width: 900px)')
