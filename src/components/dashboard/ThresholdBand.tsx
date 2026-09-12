@@ -60,9 +60,25 @@ export function ThresholdBand({
         { color: 'var(--sev-critical)', to: 100 },
       ]
 
-  const caption = lowIsBad
+  const bands = lowIsBad
     ? `위험 <${fmt(breach)} · 경고 <${fmt(warn)}`
     : `경고 >${fmt(warn)} · 위험 >${fmt(breach)}`
+
+  /**
+   * How far the metric is from the line that matters *next*.
+   *
+   * The bar says where the value sits and the caption says where the lines are, but the question a
+   * desk actually asks — 「지금 얼마나 남았나」 — was left for the reader to do in their head, off two
+   * numbers in different places. It is one subtraction, and it is the number the decision turns on.
+   */
+  const headroom = ((): string | undefined => {
+    if (value === undefined || !Number.isFinite(value)) return undefined
+    if (status === 'breach') return `위험 기준 ${fmt(Math.abs(value - breach))} 밖`
+    const next = status === 'warn' ? breach : warn
+    return `${status === 'warn' ? '위험' : '경고'}까지 ${fmt(Math.abs(value - next))}`
+  })()
+
+  const caption = headroom ? `${headroom} · ${bands}` : bands
   const statusWord =
     status === 'breach' ? '위험' : status === 'warn' ? '경고' : status === 'ok' ? '정상' : undefined
   const aria =

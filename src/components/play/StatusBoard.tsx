@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Badge, Button, Card } from '../ui'
+import { Badge, Button, Card, DataTable } from '../ui'
 import { usePlay } from './playContext'
 import { REGULATOR_LABELS } from './playHelpers'
 import { buildStatusRows, confidenceBars, confidenceTone, type StatusRow } from './statusRows'
@@ -14,14 +14,23 @@ const BAR_CLASS: Record<string, string> = {
 
 const VISIBLE = 8
 
-function Row({ row }: { row: StatusRow }) {
-  return (
-    <li className="flex flex-wrap items-baseline gap-x-2 border-t border-border py-1.5 first:border-t-0">
-      <span className="min-w-[8rem] text-base text-muted">{row.label}</span>
-      <Badge tone={row.tone}>{row.value}</Badge>
-      {row.note && <span className="num text-sm text-muted">{row.note}</span>}
-    </li>
-  )
+/**
+ * A pill when something is off, plain text when it is not.
+ *
+ * Every row wore a filled badge, so a board of a dozen rows was a dozen pills and none of them
+ * drew the eye — which is the only thing a pill is for. `neutral` and `positive` are the board's
+ * resting states; they read fine as text and leave the colour to the rows that need it.
+ */
+const TONE_TEXT: Record<string, string> = {
+  warning: 'text-warning font-medium',
+  critical: 'text-critical font-medium',
+  info: 'text-info',
+}
+
+function StatusValue({ row }: { row: StatusRow }) {
+  const alarming = row.tone === 'warning' || row.tone === 'critical'
+  if (alarming) return <Badge tone={row.tone}>{row.value}</Badge>
+  return <span className={TONE_TEXT[row.tone] ?? ''}>{row.value}</span>
 }
 
 /**
@@ -43,14 +52,34 @@ export function StatusBoard() {
       <h3 id="status-board-title" className="text-md font-semibold">
         창구·거래상대 현황판
       </h3>
-      <ul className="mt-1.5 list-none p-0">
-        {shown.map((r) => (
-          <Row key={r.id} row={r} />
-        ))}
-        {rows.length === 0 && (
-          <li className="py-1.5 text-base text-muted">표시할 현황 항목이 없습니다.</li>
-        )}
-      </ul>
+      {rows.length === 0 ? (
+        <p className="mt-1.5 text-base text-muted">표시할 현황 항목이 없습니다.</p>
+      ) : (
+        <div className="mt-1.5">
+          {/* Three aligned columns rather than a flex row: the second figure is a number, and a
+              number that starts wherever the badge before it happened to end is not a column. */}
+          <DataTable
+            caption="창구·거래상대 현황"
+            columns={[
+              { key: 'label', label: '항목', render: (r: StatusRow) => r.label },
+              {
+                key: 'value',
+                label: '상태',
+                align: 'right',
+                render: (r: StatusRow) => <StatusValue row={r} />,
+              },
+              {
+                key: 'note',
+                label: '수치',
+                align: 'right',
+                render: (r: StatusRow) => (r.note ? <span className="num">{r.note}</span> : null),
+              },
+            ]}
+            rows={shown}
+            rowKey={(r) => r.id}
+          />
+        </div>
+      )}
       {rows.length > VISIBLE && (
         <Button
           size="sm"
