@@ -275,42 +275,45 @@ export function ExecutiveSummary({
           )}
         </div>
 
-        <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+        {/* Only the start action belongs beside the prose. The baseline figures and the role frame
+            are both four-item rows that read better across the page than stacked in a 320px rail —
+            keeping them here made the aside roughly twice the height of the column next to it. */}
+        <aside className="lg:sticky lg:top-4 lg:self-start">
           <StartCard scenario={scenario} mode={mode} setMode={setMode} actions={actions} />
-
-          <Card className="p-3" aria-labelledby="bf-kpi-h">
-            <h2 id="bf-kpi-h" className="text-md font-semibold">
-              핵심 지표 기준선
-            </h2>
-            {baseline ? (
-              <ul className="m-0 mt-2 grid list-none grid-cols-2 gap-x-3 gap-y-2 p-0">
-                {summary.kpis.map(({ kpi, value, status }) => (
-                  <li key={kpi.metric} className="min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm text-muted">{kpi.label}</span>
-                      <StatusBadge status={status} />
-                    </div>
-                    <div className="num-md mt-0.5">
-                      {value === undefined
-                        ? '—'
-                        : formatMetric(value, kpi.unit, scenario.units, kpi.decimals)}
-                    </div>
-                    {kpi.referenceLabel && (
-                      <div className="text-sm text-muted">{kpi.referenceLabel}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-sm text-critical">기준선을 계산하지 못했습니다.</p>
-            )}
-          </Card>
-
-          <Card className="p-3">
-            <RoleFramePanel scenario={scenario} state={baselineState} />
-          </Card>
         </aside>
       </div>
+
+      <section className="mt-4" aria-labelledby="bf-kpi-h">
+        <h2 id="bf-kpi-h" className="text-md font-semibold">
+          핵심 지표 기준선
+        </h2>
+        {baseline ? (
+          <ul className="m-0 mt-2 grid list-none gap-2 p-0 sm:grid-cols-2 xl:grid-cols-4">
+            {summary.kpis.map(({ kpi, value, status }) => (
+              <li key={kpi.metric} className="min-w-0 rounded-lg border border-border bg-surface p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm text-muted">{kpi.label}</span>
+                  <StatusBadge status={status} />
+                </div>
+                <div className="num-lg mt-0.5">
+                  {value === undefined
+                    ? '—'
+                    : formatMetric(value, kpi.unit, scenario.units, kpi.decimals)}
+                </div>
+                {kpi.referenceLabel && (
+                  <div className="text-sm text-muted">{kpi.referenceLabel}</div>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1 text-sm text-critical">기준선을 계산하지 못했습니다.</p>
+        )}
+      </section>
+
+      <section className="mt-4">
+        <RoleFramePanel scenario={scenario} state={baselineState} layout="grid" />
+      </section>
 
       {/* Mobile: the start action follows the reader down the page. */}
       <div

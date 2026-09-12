@@ -16,10 +16,13 @@ export function RoleFramePanel({
   scenario,
   state,
   showLinks = true,
+  layout = 'stack',
 }: {
   scenario: ScenarioDefinition
   state?: GameState
   showLinks?: boolean
+  /** 'grid' lays the items out across the page width; 'stack' is the narrow help-sheet shape. */
+  layout?: 'stack' | 'grid'
 }) {
   const family = roleFamilyOf(scenario.meta.role)
   const frame = ROLE_FRAMES[family]
@@ -36,7 +39,7 @@ export function RoleFramePanel({
           같은 질문을 같은 순서로. 상황이 바뀌어도 이 네 가지는 매 턴 확인합니다.
         </p>
       </header>
-      <ol className="space-y-2">
+      <ol className={layout === 'grid' ? 'grid gap-2 sm:grid-cols-2 xl:grid-cols-4' : 'space-y-2'}>
         {items.map((item, i) => (
           <li key={item.id} className="rounded-md border border-border bg-surface p-2">
             <div className="flex items-center gap-1.5">
