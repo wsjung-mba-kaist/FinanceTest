@@ -3,7 +3,7 @@ import { useReducedMotion } from '../../lib/useMediaQuery'
 import { useHelp } from '../help/helpContext'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui'
-import { DIR_CLASS, DIR_TEXT } from '../dashboard/kpiRows'
+import { DIR_TEXT, dirClass } from '../dashboard/kpiRows'
 import { Sparkline } from '../dashboard/Sparkline'
 import { usePlay } from './playContext'
 import { buildStripCells, type MetricCell, type StripCell } from './stripCells'
@@ -94,9 +94,16 @@ function Cell({ cell, mobile }: { cell: MetricCell; mobile?: boolean }) {
       <div className="flex items-baseline gap-1.5">
         <span className={`truncate ${VALUE_CLASS[cell.status] ?? 'num-md'}`}>{cell.value}</span>
         {cell.delta && (
-          <span className={`num text-sm ${DIR_CLASS[cell.direction]}`}>
+          <span
+            className={`num inline-flex items-baseline gap-0.5 text-sm ${dirClass(cell.direction, cell.crossed)}`}
+          >
             {cell.delta}
-            <span className="sr-only"> (전 턴 대비 {DIR_TEXT[cell.direction]})</span>
+            {/* Whether ▲ is good news depends on the metric — up is bad for an outflow — and with
+                colour reserved for band crossings the word is the only thing that says which. */}
+            {cell.direction !== 'neutral' && (
+              <span className="text-xs">{DIR_TEXT[cell.direction]}</span>
+            )}
+            <span className="sr-only"> (전 턴 대비)</span>
           </span>
         )}
         {cell.series.length >= 2 && (
@@ -135,7 +142,7 @@ function Legend({
         {cell.figures.map((f) => (
           <span key={f.label} className="whitespace-nowrap">
             <span className="text-muted">{f.label} </span>
-            <span className={`num ${DIR_CLASS[f.direction]}`}>{f.value}</span>
+            <span className={`num ${dirClass(f.direction, false)}`}>{f.value}</span>
           </span>
         ))}
       </div>

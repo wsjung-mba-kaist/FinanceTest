@@ -14,7 +14,6 @@ import { formatMetric } from '../../lib/format'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { PlayContext } from '../play/playContext'
 import { Button, Card, StatusBadge } from '../ui'
-import { NoThresholdChip } from './KpiTile'
 import { useChartType } from './useChartType'
 
 /**
@@ -132,7 +131,7 @@ export function TimeSeriesChart({
                   <td className="num py-0.5">{d.turn}</td>
                   <td className="num py-0.5 text-right">{d.value === null ? '—' : fmt(d.value)}</td>
                   <td className="py-0.5 text-right">
-                    {d.status === 'na' ? <NoThresholdChip /> : <StatusBadge status={d.status} />}
+                    <StatusBadge status={d.status} />
                   </td>
                 </tr>
               ))}

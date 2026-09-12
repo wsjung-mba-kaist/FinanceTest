@@ -5,7 +5,7 @@ import { useHelp } from '../help/helpContext'
 import type { PreviewFidelity } from '../play/playHelpers'
 import { Badge, Card, StatusBadge } from '../ui'
 import { Icon } from '../ui/Icon'
-import { DIR_CLASS, DIR_TEXT, directionOf, type KpiRow } from './kpiRows'
+import { DIR_TEXT, dirClass, directionOf, type KpiRow } from './kpiRows'
 import { Sparkline } from './Sparkline'
 import { ThresholdBand } from './ThresholdBand'
 
@@ -16,30 +16,26 @@ const STATUS_TEXT: Record<MetricStatus, string> = {
   na: '기준 없음',
 }
 
-/**
- * 임계값이 없는 지표는 '정상'이 아니라 중립 회색 '기준 없음'으로 표시한다.
- * (누적 예금 유출처럼 구간이 정의되지 않은 지표가 뱅크런 내내 초록 배지를 다는 문제.)
- */
-export function NoThresholdChip() {
-  return (
-    <Badge tone="none" title="이 지표에는 경고·위험 구간이 정의되어 있지 않습니다">
-      기준 없음
-    </Badge>
-  )
-}
 
-/** 델타는 색만으로 말하지 않는다 — 화살표 + 개선/악화 단어를 함께 붙인다. */
+/**
+ * 델타는 색만으로 말하지 않는다 — 화살표 + 개선/악화 단어를 함께 붙인다.
+ * `crossed` — whether the change moved the metric across a threshold band — is what earns colour.
+ */
 function DeltaText({
   text,
   dir,
+  crossed = false,
   className = '',
 }: {
   text: string
   dir: 'better' | 'worse' | 'neutral'
+  crossed?: boolean
   className?: string
 }) {
   return (
-    <span className={`num inline-flex items-center gap-0.5 text-sm ${DIR_CLASS[dir]} ${className}`}>
+    <span
+      className={`num inline-flex items-center gap-0.5 text-sm ${dirClass(dir, crossed)} ${className}`}
+    >
       <span>{text}</span>
       <span className="text-xs">{DIR_TEXT[dir]}</span>
     </span>
@@ -72,6 +68,9 @@ export function KpiTile({
   const value = current ? formatAt(current.value, spec.unit, units, { scale, decimals: spec.decimals }) : '—'
   const deltaText = delta !== undefined ? formatDelta(delta, spec.unit, units) : undefined
   const dir = delta !== undefined ? directionOf(Math.sign(delta), threshold) : 'neutral'
+  // A band was crossed when the status itself moved. That, not the sign of the change, is what the
+  // reader has to react to.
+  const crossed = Boolean(current && row.previous && current.status !== row.previous.status)
   const explain = KPI_EXPLAIN[spec.metric]
   const tip = spec.description ?? explain?.why
 
@@ -112,9 +111,11 @@ export function KpiTile({
           )}
         </span>
         <span className="num shrink-0 font-semibold">{value}</span>
-        {deltaText && <DeltaText text={deltaText} dir={dir} className="shrink-0" />}
+        {deltaText && (
+          <DeltaText text={deltaText} dir={dir} crossed={crossed} className="shrink-0" />
+        )}
         <span className="shrink-0">
-          {status === 'na' ? <NoThresholdChip /> : <StatusBadge status={status} />}
+          <StatusBadge status={status} />
         </span>
         <HelpButton onClick={openHelp} label={spec.label} />
       </div>
@@ -138,14 +139,14 @@ export function KpiTile({
           </span>
         )}
         <span className="shrink-0">
-          {status === 'na' ? <NoThresholdChip /> : <StatusBadge status={status} />}
+          <StatusBadge status={status} />
         </span>
         <HelpButton onClick={openHelp} label={spec.label} />
       </div>
 
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2" aria-label={aria}>
         <span className="num-lg">{value}</span>
-        {deltaText && <DeltaText text={deltaText} dir={dir} />}
+        {deltaText && <DeltaText text={deltaText} dir={dir} crossed={crossed} />}
       </div>
 
       {threshold ? (
@@ -180,7 +181,7 @@ export function KpiTile({
 
       {projectedText && (
         <div
-          className={`num mt-1 inline-block rounded-sm border border-dashed border-accent px-1.5 py-0.5 text-xs ${DIR_CLASS[projectedDir]}`}
+          className={`num mt-1 inline-block rounded-sm border border-dashed border-accent px-1.5 py-0.5 text-xs ${dirClass(projectedDir, Boolean(projected && projected.statusBefore !== projected.statusAfter))}`}
         >
           {projectedText}
         </div>

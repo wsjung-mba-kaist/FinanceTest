@@ -22,6 +22,8 @@ export interface MetricCell {
   status: MetricStatus
   delta?: string
   direction: Direction
+  /** The change moved the metric across a threshold band — the one case a delta earns colour. */
+  crossed: boolean
   /** Secondary line, e.g. 익일 담보 여력. */
   sub?: string
   /** Intraday sparkline values from `tickHistory` (empty on an un-ticked run). */
@@ -105,6 +107,7 @@ function metricCell(
     status: mv.status,
     delta: delta !== undefined ? formatDelta(delta, mv.unit, ctx.units) : undefined,
     direction: directionOf(delta ? Math.sign(delta) : 0, thresholds[metric]),
+    crossed: Boolean(prev && prev.status !== mv.status),
     sub: opts.sub,
     series: ctx.seriesFor(metric),
   }

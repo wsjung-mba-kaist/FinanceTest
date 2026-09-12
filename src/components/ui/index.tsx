@@ -154,7 +154,14 @@ export function StatusBadge({ status }: { status: 'ok' | 'warn' | 'breach' | 'na
   if (status === 'ok') return <Badge tone="positive">● 정상</Badge>
   if (status === 'warn') return <Badge tone="warning">⚠ 경고</Badge>
   if (status === 'breach') return <Badge tone="critical">■ 위험</Badge>
-  return <Badge tone="neutral">기준 없음</Badge>
+  // `none`, not `neutral` — see the note on `toneClass`. 'no threshold defined' is a stated fact
+  // about the metric, and `NoThresholdChip` has always rendered the same words in that tone; the
+  // two disagreeing meant the same sentence changed colour depending on which surface said it.
+  return (
+    <Badge tone="none" title="이 지표에는 경고·위험 구간이 정의되어 있지 않습니다">
+      기준 없음
+    </Badge>
+  )
 }
 
 type CardProps = {

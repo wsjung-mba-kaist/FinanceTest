@@ -29,42 +29,48 @@ function severityBadge(sev: Severity): ReactNode {
   return null
 }
 
-const TONE_OF: Record<'routine' | 'concerned' | 'urgent', { label: string; tone: Tone }> = {
-  routine: { label: '통상', tone: 'neutral' },
+/**
+ * `routine` has no entry on purpose: 통상 is the default state of a wire item, and a pill that says
+ * "nothing unusual" spends the reader's attention to tell them there was nothing to spend it on.
+ */
+const TONE_OF: Record<'concerned' | 'urgent', { label: string; tone: Tone }> = {
   concerned: { label: '우려', tone: 'warning' },
   urgent: { label: '긴급', tone: 'critical' },
 }
 
+/**
+ * The channel a wire item arrived on. It carried a `tone` until the tag stopped being a badge —
+ * severity is already said by the left border, the severity badge and the reliability flag, and a
+ * fourth opinion about colour on the same row was what made none of them stand out.
+ */
 interface Header {
   tag: string
   meta?: string
-  tone: Tone
 }
 
 function eventHeader(e: GameEvent): Header {
   switch (e.kind) {
     case 'newswire':
-      return { tag: '[속보]', meta: e.outlet, tone: 'info' }
+      return { tag: '[속보]', meta: e.outlet }
     case 'market':
-      return { tag: '[시장]', tone: 'neutral' }
+      return { tag: '[시장]' }
     case 'memo':
-      return { tag: '[내부메모]', meta: `${e.from} → ${e.to}`, tone: 'neutral' }
+      return { tag: '[내부메모]', meta: `${e.from} → ${e.to}` }
     case 'call':
       return {
         tag: '[전화]',
         meta: `${e.caller} → ${e.callee}${e.agency ? ` (${e.agency})` : ''}`,
-        tone: 'neutral',
       }
     case 'board':
-      return { tag: '[이사회]', tone: 'neutral' }
+      return { tag: '[이사회]' }
     case 'regulator':
-      return { tag: '[감독당국]', meta: e.agency, tone: 'warning' }
+      return { tag: '[감독당국]', meta: e.agency }
     case 'data':
-      return { tag: '[데이터]', tone: 'neutral' }
+      return { tag: '[데이터]' }
     case 'rumor':
-      return { tag: '[미확인]', meta: e.source, tone: 'warning' }
+      return { tag: '[미확인]', meta: e.source }
     case 'dialogue':
-      return { tag: '[대화]', tone: 'neutral' }
+      return { tag: '[대화]' }
   }
 }
 
@@ -183,7 +189,7 @@ export function WireItem({
   const severity: Severity = e?.severity ?? f?.severity ?? 'info'
   const header: Header = e
     ? eventHeader(e)
-    : { tag: '[결과]', meta: f ? FEED_SUBLABEL[f.kind] : undefined, tone: 'info' }
+    : { tag: '[결과]', meta: f ? FEED_SUBLABEL[f.kind] : undefined }
   const title = e ? eventTitle(e) : (f?.title ?? '')
   // `correctionOf` holds an authoring id; showing it raw ("정정: t2-rumor-1") tells the player
   // nothing. Resolve it to the headline of the item being corrected.
@@ -216,7 +222,7 @@ export function WireItem({
             role="img"
           />
         )}
-        <Badge tone={header.tone}>{header.tag}</Badge>
+        <span className="label-caps shrink-0">{header.tag}</span>
         <span className="min-w-0 flex-1 truncate text-base">{title}</span>
         {time && <span className="num shrink-0 text-sm text-muted">{time}</span>}
       </button>
@@ -242,9 +248,17 @@ export function WireItem({
             role="img"
           />
         )}
-        <Badge tone={header.tone}>{header.tag}</Badge>
+        {/*
+          * The channel tag is an identifier, not a severity: `[속보]`, `[내부메모]`, `[시장]` say
+          * *where this came from*, and drawing them as filled, bordered pills put a badge on every
+          * row of the densest repeated unit on the screen. With the tag, the tone, the reliability
+          * flag and the severity all wearing the same pill, none of them read as the important one.
+          * The brackets already mark it as a tag; `label-caps` is the styling for exactly this.
+          */}
+        <span className="label-caps">{header.tag}</span>
         {header.meta && <span className="text-muted">{header.meta}</span>}
-        {tone && <Badge tone={TONE_OF[tone].tone}>{TONE_OF[tone].label}</Badge>}
+        {/* `통상` is the default state of a wire item and costs a pill to say nothing. */}
+        {tone && tone !== 'routine' && <Badge tone={TONE_OF[tone].tone}>{TONE_OF[tone].label}</Badge>}
         {e?.reliability === 'unconfirmed' && <Badge tone="warning">미확인 정보</Badge>}
         {e?.reliability === 'false' && <Badge tone="critical">오보</Badge>}
         {e?.correctionOf && (

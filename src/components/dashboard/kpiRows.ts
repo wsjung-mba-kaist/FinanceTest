@@ -39,10 +39,22 @@ export function directionOf(sign: number, t?: Threshold): Direction {
   return (t.direction === 'below') === up ? 'better' : 'worse'
 }
 
-export const DIR_CLASS: Record<Direction, string> = {
-  better: 'text-positive',
-  worse: 'text-critical',
-  neutral: 'text-muted',
+/**
+ * Colour says one thing on this screen: **what state the metric is in now**.
+ *
+ * It used to say two. A status badge is coloured by `ok | warn | breach`, and a delta was coloured
+ * by `better | worse` — so one row could carry a green delta beside a red badge, and the reader had
+ * to work out which green meant what. Worse, a delta's colour was the *only* channel carrying its
+ * direction for the ~8% of men with a red-green deficiency, on a screen whose other greens and reds
+ * mean something else entirely.
+ *
+ * So direction is spoken by shape and word — `formatDelta`'s ▲/▼ plus 개선/악화 — and keeps its
+ * colour for exactly one case: a change that crossed a threshold band. That is the moment the eye
+ * is supposed to be pulled, and reserving the colour for it is what makes the pull work.
+ */
+export function dirClass(dir: Direction, crossed: boolean): string {
+  if (!crossed || dir === 'neutral') return 'text-muted'
+  return dir === 'better' ? 'text-positive' : 'text-critical'
 }
 export const DIR_TEXT: Record<Direction, string> = {
   better: '개선',

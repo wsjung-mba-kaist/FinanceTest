@@ -1,7 +1,7 @@
 import type { KpiSpec, MetricDelta, Option, PreviewResult, ThresholdMap, Units } from '../../engine'
 import { formatAt, formatDelta, scaleFor } from '../../lib/format'
 import { StatusBadge } from '../ui'
-import { DIR_CLASS, DIR_TEXT, directionOf } from '../dashboard/kpiRows'
+import { DIR_TEXT, dirClass, directionOf } from '../dashboard/kpiRows'
 import type { PreviewFidelity } from './playHelpers'
 
 /** Relative size bucket → 1..3 arrows. */
@@ -88,9 +88,11 @@ export function ImpactPreview({
                     )
                   })()}
                 </span>
-                <span className={`num ${DIR_CLASS[dir]}`}>
+                <span className={`num inline-flex items-center gap-0.5 ${dirClass(dir, changed)}`}>
                   {formatDelta(d.delta, d.unit, units)}
-                  <span className="sr-only"> ({DIR_TEXT[dir]})</span>
+                  {/* Visible, not sr-only: with colour reserved for band crossings this word is
+                      what tells a sighted reader whether the move was the good direction. */}
+                  {dir !== 'neutral' && <span className="text-xs">{DIR_TEXT[dir]}</span>}
                 </span>
                 {changed && (
                   <span className="flex items-center gap-1">
@@ -115,12 +117,10 @@ export function ImpactPreview({
                     <span className="text-muted">
                       {kpiByMetric.get(h.metric)?.label ?? h.metric}
                     </span>
-                    <span className={`num ml-auto ${DIR_CLASS[dir]}`}>
+                    <span className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}>
                       {arrows(sign, h.magnitude)}
-                      <span className="sr-only">
-                        {' '}
-                        {DIR_TEXT[dir]} (강도 {h.magnitude})
-                      </span>
+                      {dir !== 'neutral' && <span className="text-xs">{DIR_TEXT[dir]}</span>}
+                      <span className="sr-only"> (강도 {h.magnitude})</span>
                     </span>
                     {h.note && <span className="w-full text-muted">{h.note}</span>}
                   </li>
@@ -133,12 +133,10 @@ export function ImpactPreview({
                 return (
                   <li key={d.key} className="flex items-center gap-x-2">
                     <span className="text-muted">{kpiByMetric.get(d.key)?.label ?? d.label}</span>
-                    <span className={`num ml-auto ${DIR_CLASS[dir]}`}>
+                    <span className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}>
                       {arrows(sign, n)}
-                      <span className="sr-only">
-                        {' '}
-                        {DIR_TEXT[dir]} (강도 {n})
-                      </span>
+                      {dir !== 'neutral' && <span className="text-xs">{DIR_TEXT[dir]}</span>}
+                      <span className="sr-only"> (강도 {n})</span>
                     </span>
                   </li>
                 )
