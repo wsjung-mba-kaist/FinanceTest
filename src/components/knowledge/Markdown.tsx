@@ -1,6 +1,7 @@
 import { useId, useRef, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { GFM_OPTIONS } from './remarkOptions'
 import { remarkCjkStrong } from './remarkCjkStrong'
 import {
   createGlossaryScope,
@@ -70,7 +71,7 @@ export function Markdown({
   return (
     <div className={`md ${className ?? ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkCjkStrong]}
+        remarkPlugins={[[remarkGfm, GFM_OPTIONS], remarkCjkStrong]}
         components={{
           a: ({ href, children: c }) => {
             if (href?.startsWith('term:'))

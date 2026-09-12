@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { GFM_OPTIONS } from './remarkOptions'
 import { remarkCjkStrong } from './remarkCjkStrong'
 import { GlossaryTerm } from './GlossaryTerm'
 
@@ -16,7 +17,7 @@ export function InlineMarkdown({ children, className }: { children: string; clas
   return (
     <span className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkCjkStrong]}
+        remarkPlugins={[[remarkGfm, GFM_OPTIONS], remarkCjkStrong]}
         components={{
           // Unwrap the block elements a phrase can still produce, so nothing nests a <p> in a <p>.
           p: ({ children: c }) => <>{c}</>,

@@ -61,3 +61,41 @@ describe('InlineMarkdown', () => {
     expect(container.querySelector('strong')?.textContent).toBe('굵게')
   })
 })
+
+/**
+ * The Korean numeric range and GFM strikethrough collide on the same character.
+ *
+ * `7~10%` is how a range is written here; GFM reads a *pair* of single tildes as strikethrough, so
+ * a line of ranges came out as struck-through nonsense — the reader was shown `710%` and `1525%` in
+ * a knowledge base whose whole claim is that the figures are right. `src/content` holds 840 tilde
+ * ranges, so this was not an edge case.
+ */
+const ranges: [name: string, src: string, shown: string][] = [
+  [
+    'a line of ranges, as the discount-window card writes them',
+    'FHLB 헤어컷 국채 ~3% / MBS 7~10% / 주택담보 15~25% / CRE 30~40%',
+    'FHLB 헤어컷 국채 ~3% / MBS 7~10% / 주택담보 15~25% / CRE 30~40%',
+  ],
+  ['a single range', 'LCR 100~120% 구간', 'LCR 100~120% 구간'],
+  ['a range spanning a unit', '마진 250~300bp', '마진 250~300bp'],
+]
+
+describe('numeric ranges survive the markdown renderer', () => {
+  it.each(ranges)('%s', (_name, src, shown) => {
+    const { container } = render(<Markdown>{src}</Markdown>)
+    expect(container.querySelectorAll('del')).toHaveLength(0)
+    expect(container.textContent).toBe(shown)
+  })
+
+  it.each(ranges)('%s (inline)', (_name, src, shown) => {
+    const { container } = render(<InlineMarkdown>{src}</InlineMarkdown>)
+    expect(container.querySelectorAll('del')).toHaveLength(0)
+    expect(container.textContent).toBe(shown)
+  })
+
+  /** Explicit `~~…~~` still strikes through: only the accidental single-tilde form is off. */
+  it('keeps deliberate strikethrough', () => {
+    const { container } = render(<Markdown>{'~~취소됨~~ 확정'}</Markdown>)
+    expect(container.querySelector('del')?.textContent).toBe('취소됨')
+  })
+})
