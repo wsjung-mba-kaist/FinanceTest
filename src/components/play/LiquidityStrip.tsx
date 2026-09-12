@@ -163,7 +163,11 @@ export function LiquidityStrip({ mobile }: { mobile?: boolean }) {
       className={
         mobile
           ? 'grid grid-cols-2 gap-x-1 gap-y-0.5 border-b border-border bg-surface px-1 py-1'
-          : 'flex h-[4.5rem] shrink-0 items-stretch gap-1 overflow-x-auto border-b border-border bg-surface px-2'
+          : // Height comes from the content, not from a number typed once against one type scale:
+            // `h-[4.5rem]` was 72px chosen when the dense body size was 12px, and it clipped the
+            // `누적 / 예상` sub-line the moment that became 13px. `items-stretch` still squares the
+            // cells off against each other. See docs/ui-conventions.md §7-1.
+            'flex shrink-0 items-stretch gap-1 overflow-x-auto border-b border-border bg-surface px-2 py-1'
       }
     >
       {cells.map((c) =>

@@ -14,6 +14,8 @@ import { useTabListKeys } from './useTabListKeys'
 export type { ButtonSize, ButtonVariant }
 export type { CardTier }
 export type { ChipSize }
+export { Num } from './Num'
+export { DataTable, type Column } from './DataTable'
 
 export type Tone = 'info' | 'warning' | 'critical' | 'positive' | 'neutral' | 'none'
 

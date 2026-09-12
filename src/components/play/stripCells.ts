@@ -7,9 +7,9 @@ import type {
   Units,
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
-import { formatBp, formatDelta, formatMetric, formatNumber } from '../../lib/format'
+import { formatAt, formatBp, formatDelta, formatNumber, scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
-import { directionOf, type Direction } from '../dashboard/kpiRows'
+import { directionOf, metricScale, type Direction } from '../dashboard/kpiRows'
 
 export interface MetricCell {
   kind: 'metric'
@@ -69,6 +69,12 @@ interface Ctx {
   units: Units
   /** Live values of the current turn only, so the strip shows what moved *today*. */
   seriesFor: (metric: string) => number[]
+  /**
+   * The currency unit a metric keeps for the whole run. Without it the headline figure re-scales
+   * itself as it falls — 3.2조원 → 8,500억원 → 920억원 — and the reader has to notice the *unit*
+   * changed before they can see the number did.
+   */
+  scaleFor: (metric: string) => CcyScale | undefined
 }
 
 function metricCell(
@@ -79,6 +85,7 @@ function metricCell(
   const mv = ctx.current[metric]
   if (!mv || !Number.isFinite(mv.value)) return undefined
   const spec = ctx.scenario.kpis.find((k) => k.metric === metric)
+  const scale = ctx.scaleFor(metric)
   const prev = ctx.previous?.[metric]
   const thresholds = mergeThresholds(ctx.scenario.thresholds)
   const delta =
@@ -90,7 +97,10 @@ function metricCell(
     id: metric,
     metric,
     label: opts.label ?? spec?.label ?? mv.label,
-    value: formatMetric(mv.value, mv.unit, ctx.units, opts.decimals ?? spec?.decimals),
+    value: formatAt(mv.value, mv.unit, ctx.units, {
+      scale,
+      decimals: opts.decimals ?? spec?.decimals,
+    }),
     raw: mv.value,
     status: mv.status,
     delta: delta !== undefined ? formatDelta(delta, mv.unit, ctx.units) : undefined,
@@ -109,9 +119,12 @@ function pairCell(ctx: Ctx, a: string, b: string, label: string): MetricCell | u
   const cell = metricCell(ctx, base.key, { label })
   if (!cell) return undefined
   if (!first || !second) return cell
+  // One scale for both halves: `누적 / 예상` is a comparison, and two units make it a non-sequitur.
+  const shared = scaleFor([first.value, second.value], ctx.units)
+  const pairScale = first.unit === 'ccy' ? shared : undefined
   return {
     ...cell,
-    value: `${formatMetric(first.value, first.unit, ctx.units)} / ${formatMetric(second.value, second.unit, ctx.units)}`,
+    value: `${formatAt(first.value, first.unit, ctx.units, { scale: pairScale })} / ${formatAt(second.value, second.unit, ctx.units, { scale: pairScale })}`,
     sub: '누적 / 예상',
     status: worse(first.status, second.status),
   }
@@ -158,6 +171,12 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
     current: snap.metrics,
     previous: prevSnap?.metrics,
     units: scenario.units,
+    scaleFor: (metric) => {
+      const spec = scenario.kpis.find((k) => k.metric === metric)
+      const unit = snap.metrics[metric]?.unit
+      if (unit !== 'ccy') return undefined
+      return metricScale(state, spec ?? { metric, label: metric, unit: 'ccy' }, scenario.units)
+    },
     seriesFor: (metric) => {
       if (intraday.length < 2) return []
       return intraday
@@ -175,7 +194,7 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
         metricCell(ctx, 'facilityHeadroom', {
           sub:
             pending && Number.isFinite(pending.value) && pending.value > 0
-              ? `익일 +${formatMetric(pending.value, pending.unit, ctx.units)}`
+              ? `익일 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
               : undefined,
         }),
         pairCell(ctx, 'cumulativeOutflow', 'projectedDailyOutflow', '오늘 유출 누적/예상'),

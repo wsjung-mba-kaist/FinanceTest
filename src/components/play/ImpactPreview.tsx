@@ -1,5 +1,5 @@
 import type { KpiSpec, MetricDelta, Option, PreviewResult, ThresholdMap, Units } from '../../engine'
-import { formatDelta, formatMetric } from '../../lib/format'
+import { formatAt, formatDelta, scaleFor } from '../../lib/format'
 import { StatusBadge } from '../ui'
 import { DIR_CLASS, DIR_TEXT, directionOf } from '../dashboard/kpiRows'
 import type { PreviewFidelity } from './playHelpers'
@@ -76,8 +76,17 @@ export function ImpactPreview({
               <li key={d.key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="text-muted">{spec?.label ?? d.label}</span>
                 <span className="num ml-auto">
-                  {formatMetric(d.before, d.unit, units, decimals)} →{' '}
-                  {formatMetric(d.after, d.unit, units, decimals)}
+                  {/* Both halves on one scale: `before → after` is a comparison, and a row that
+                      changes unit halfway across compares nothing. */}
+                  {(() => {
+                    const scale = d.unit === 'ccy' ? scaleFor([d.before, d.after], units) : undefined
+                    return (
+                      <>
+                        {formatAt(d.before, d.unit, units, { scale, decimals })} →{' '}
+                        {formatAt(d.after, d.unit, units, { scale, decimals })}
+                      </>
+                    )
+                  })()}
                 </span>
                 <span className={`num ${DIR_CLASS[dir]}`}>
                   {formatDelta(d.delta, d.unit, units)}

@@ -5,7 +5,9 @@ import type {
   Mode,
   ScenarioDefinition,
   Threshold,
+  Units,
 } from '../../engine'
+import { scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
 
 export interface KpiRow {
@@ -24,6 +26,8 @@ export interface KpiRow {
   /** Turns of staleness applied (expert `lagTurns`), 0 otherwise. */
   lag: number
   threshold?: Threshold
+  /** One currency scale for this metric, held for the whole run. `undefined` for non-currency. */
+  scale?: CcyScale
 }
 
 export type Direction = 'better' | 'worse' | 'neutral'
@@ -75,8 +79,27 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
       series: metricSeries(state, spec.metric, shownTurn),
       lag,
       threshold: thresholds[spec.metric],
+      scale: metricScale(state, spec, scenario.units),
     }
   })
+}
+
+/**
+ * The currency scale a metric keeps for the whole run, chosen from every value observed so far.
+ *
+ * Per-value scaling is what makes a falling number unreadable: cash that goes 3.2조원 → 8,500억원 →
+ * 920억원 has changed axis twice, and the reader has to notice the *unit* changed before they can
+ * see the *number* fell. Choosing once from the peak means the same figure reads 3.20 → 0.85 → 0.09
+ * 조원 — three points on one axis, which is the shape of the event.
+ */
+export function metricScale(
+  state: GameState,
+  spec: KpiSpec,
+  units: Units,
+): CcyScale | undefined {
+  if (spec.unit !== 'ccy') return undefined
+  const seen = metricSeries(state, spec.metric, state.turnIndex)
+  return scaleFor(seen, units)
 }
 
 /**

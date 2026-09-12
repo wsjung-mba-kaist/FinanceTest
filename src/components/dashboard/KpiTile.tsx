@@ -1,6 +1,6 @@
 import type { MetricDelta, MetricStatus, Units } from '../../engine'
 import { KPI_EXPLAIN } from '../../content/kpiExplain'
-import { formatDelta, formatMetric } from '../../lib/format'
+import { formatAt, formatDelta, formatMetric } from '../../lib/format'
 import { useHelp } from '../help/helpContext'
 import type { PreviewFidelity } from '../play/playHelpers'
 import { Badge, Card, StatusBadge } from '../ui'
@@ -65,9 +65,11 @@ export function KpiTile({
   compact?: boolean
 }) {
   const help = useHelp()
-  const { spec, current, delta, series, lag, threshold } = row
+  const { spec, current, delta, series, lag, threshold, scale } = row
   const status: MetricStatus = current?.status ?? 'na'
-  const value = current ? formatMetric(current.value, spec.unit, units, spec.decimals) : '—'
+  // `scale` pins a currency metric to one unit for the whole run, so a falling figure stays on one
+  // axis instead of stepping 3.2조원 → 8,500억원 → 920억원 while the reader tries to read a trend.
+  const value = current ? formatAt(current.value, spec.unit, units, { scale, decimals: spec.decimals }) : '—'
   const deltaText = delta !== undefined ? formatDelta(delta, spec.unit, units) : undefined
   const dir = delta !== undefined ? directionOf(Math.sign(delta), threshold) : 'neutral'
   const explain = KPI_EXPLAIN[spec.metric]
@@ -79,7 +81,7 @@ export function KpiTile({
     projectedDir = directionOf(Math.sign(projected.delta), threshold)
     projectedText =
       fidelity === 'numeric'
-        ? `→ ${formatMetric(projected.after, spec.unit, units, spec.decimals)} (${formatDelta(projected.delta, spec.unit, units)})`
+        ? `→ ${formatAt(projected.after, spec.unit, units, { scale, decimals: spec.decimals })} (${formatDelta(projected.delta, spec.unit, units)})`
         : `${projected.delta > 0 ? '▲' : '▼'} 예상 ${DIR_TEXT[projectedDir]}`
   }
 
@@ -148,6 +150,7 @@ export function KpiTile({
 
       {threshold ? (
         <ThresholdBand
+          scale={scale}
           value={current?.value}
           threshold={threshold}
           unit={spec.unit}

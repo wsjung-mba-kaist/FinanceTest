@@ -1,5 +1,5 @@
 import type { MetricStatus, MetricUnit, Threshold, Units } from '../../engine'
-import { formatMetric } from '../../lib/format'
+import { formatAt, type CcyScale } from '../../lib/format'
 
 /**
  * 임계 구간 막대 — 위험 / 경고 / 정상 구간을 6px 바로 그리고 현재 값에 표식을 둔다.
@@ -16,6 +16,7 @@ export function ThresholdBand({
   label,
   status,
   showCaption = true,
+  scale,
 }: {
   value?: number
   threshold: Threshold
@@ -25,8 +26,10 @@ export function ThresholdBand({
   label: string
   status?: MetricStatus
   showCaption?: boolean
+  /** The scale the metric's own figure is pinned to, so the caption agrees with it. */
+  scale?: CcyScale
 }) {
-  const fmt = (v: number) => formatMetric(v, unit, units, decimals)
+  const fmt = (v: number) => formatAt(v, unit, units, { scale, decimals })
   const { warn, breach, direction } = threshold
   const spread = Math.abs(warn - breach)
   const pad = spread > 0 ? spread : Math.max(Math.abs(warn), 1) * 0.25

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MetricDelta, MetricUnit, Units } from '../../engine'
-import { formatDelta, formatMetric } from '../../lib/format'
+import { formatAt, formatDelta, scaleFor } from '../../lib/format'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { firstSentence } from '../../lib/text'
 import { Badge, Button, Card, LiveRegion, StatusBadge } from '../ui'
@@ -20,12 +20,17 @@ function RollingMetric({
 }) {
   const value = useRollingNumber(delta.after, { durationMs: 600, enabled: animate })
   const worse = delta.statusAfter === 'breach' || delta.statusAfter === 'warn'
+  // Chosen from the endpoints, never from the rolling value: deriving it from a number that is
+  // mid-animation would re-scale the unit while the figure counts, which is the exact flicker the
+  // fixed scale exists to remove.
+  const scale =
+    delta.unit === 'ccy' ? scaleFor([delta.before, delta.after], units) : undefined
   return (
     <li className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span className="text-base text-muted">{delta.label}</span>
       <span className="num ml-auto text-base">
-        {formatMetric(delta.before, delta.unit, units)} →{' '}
-        <span className="num-md">{formatMetric(value, delta.unit, units)}</span>
+        {formatAt(delta.before, delta.unit, units, { scale })} →{' '}
+        <span className="num-md">{formatAt(value, delta.unit, units, { scale })}</span>
       </span>
       <span className={`num text-sm ${worse ? 'text-critical' : 'text-muted'}`}>
         {formatDelta(delta.delta, delta.unit, units)}
@@ -46,13 +51,14 @@ function MarketRow({
 }) {
   const value = useRollingNumber(item.after, { durationMs: 600, enabled: animate })
   const down = item.after < item.before
+  const scale = item.unit === 'ccy' ? scaleFor([item.before, item.after], units) : undefined
   return (
     <li className="flex items-baseline gap-2">
       <span className="text-base text-muted">{item.label}</span>
       <span className="num ml-auto text-base">
-        {formatMetric(item.before, item.unit, units)} →{' '}
+        {formatAt(item.before, item.unit, units, { scale })} →{' '}
         <span className={down ? 'text-critical' : 'text-positive'}>
-          {formatMetric(value, item.unit, units)}
+          {formatAt(value, item.unit, units, { scale })}
         </span>
       </span>
     </li>
