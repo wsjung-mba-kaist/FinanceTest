@@ -60,34 +60,50 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       {!inPlay && (
         <header className="border-b border-border bg-surface" data-noprint>
-          <div className="mx-auto flex h-12 max-w-shell items-center gap-6 px-4">
-            <NavLink to="/" className="font-semibold tracking-tight">
+          {/*
+            한 줄로 버티지 않는다.
+            이 줄은 `flex h-12 … gap-6` 하나였다 — 줄바꿈도, 축소 금지도, 모바일 변형도 없이.
+            390px 에서 담아야 할 폭은 640px 남짓이라 모든 항목이 최소 폭까지 눌렸는데, `body` 의
+            `overflow-wrap: anywhere`(§CJK 줄바꿈) 때문에 한글의 최소 폭은 **한 글자**다. 그래서
+            «시나리오» 가 네 줄 세로로 서서 48px 높이에 잘렸다.
+
+            고치는 방법은 `anywhere` 를 걷어내는 것이 아니라(그건 좁은 칸의 `$2.25B` 를 지키는
+            규칙이다) 줄을 넘치지 않게 만드는 것이다: 라벨은 `whitespace-nowrap` 으로 세로로 서지
+            않게 하고, 좁은 화면에서는 메뉴 묶음이 둘째 줄로 내려간다.
+
+            메뉴와 도움을 한 `<div>` 로 묶은 이유는 **DOM 순서가 곧 화면 순서**이기 때문이다.
+            `order` 로 자리를 바꾸면 시각 순서와 탭 순서가 어긋난다.
+          */}
+          <div className="mx-auto flex min-h-12 max-w-shell flex-wrap items-center gap-x-6 gap-y-1 px-4 py-1.5 sm:flex-nowrap sm:py-0">
+            <NavLink to="/" className="shrink-0 whitespace-nowrap font-semibold tracking-tight">
               금융위기 대응 시뮬레이터
             </NavLink>
-            <nav aria-label="주 메뉴" className="flex gap-1 text-base">
-              {nav.map((n) => (
-                <NavLink
-                  key={n.to}
-                  to={n.to}
-                  end={n.to === '/'}
-                  className={({ isActive }) =>
-                    `rounded-md px-3 py-1.5 ${isActive ? 'bg-surface-2 text-text' : 'text-muted hover:text-text'}`
-                  }
-                >
-                  {n.label}
-                </NavLink>
-              ))}
-            </nav>
-            <button
-              type="button"
-              onClick={() => help.open()}
-              aria-expanded={help.isOpen}
-              className="ml-auto inline-flex min-h-tap-compact items-center gap-1 rounded-md border border-border-control bg-surface px-2.5 text-sm text-text hover:bg-surface-2"
-            >
-              <Icon name="help" size={16} />
-              도움
-              <CountPill count={help.badge} label="새 도움말" />
-            </button>
+            <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
+              <nav aria-label="주 메뉴" className="flex flex-wrap gap-1 text-sm sm:text-base">
+                {nav.map((n) => (
+                  <NavLink
+                    key={n.to}
+                    to={n.to}
+                    end={n.to === '/'}
+                    className={({ isActive }) =>
+                      `shrink-0 whitespace-nowrap rounded-md px-2 py-1.5 sm:px-3 ${isActive ? 'bg-surface-2 text-text' : 'text-muted hover:text-text'}`
+                    }
+                  >
+                    {n.label}
+                  </NavLink>
+                ))}
+              </nav>
+              <button
+                type="button"
+                onClick={() => help.open()}
+                aria-expanded={help.isOpen}
+                className="ml-auto inline-flex min-h-tap-compact shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border-control bg-surface px-2.5 text-sm text-text hover:bg-surface-2"
+              >
+                <Icon name="help" size={16} />
+                도움
+                <CountPill count={help.badge} label="새 도움말" />
+              </button>
+            </div>
           </div>
         </header>
       )}

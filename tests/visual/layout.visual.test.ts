@@ -181,6 +181,46 @@ describe.skipIf(!up)('layout widths in a real browser', () => {
       await context.close()
     }
   })
+
+  /**
+   * 좁은 화면에서 한글 라벨이 세로로 서지 않는다.
+   *
+   * 주 메뉴는 줄바꿈도 축소 금지도 없는 `flex` 한 줄이었다. 390px 에서 담아야 할 폭이 640px
+   * 남짓이라 항목마다 최소 폭까지 눌렸는데, `body` 의 `overflow-wrap: anywhere` 때문에 한글의
+   * 최소 폭은 **한 글자**다 — 네 라벨이 전부 5줄(120px)로 서서 48px 헤더 안에서 잘렸다.
+   * 클래스 이름으로는 보이지 않고 jsdom 도 볼 수 없다. 오직 칠한 높이에서만 보인다.
+   *
+   * 그래서 «몇 줄인가»를 잰다: 라벨 높이가 자기 행간의 두 배를 넘으면 줄이 넘친 것이다.
+   */
+  it('never stacks a menu label into a column on a phone', async () => {
+    for (const width of [360, 390, 768]) {
+      const { page, context } = await open(browser, { width, height: 800 })
+      const labels = await page.evaluate(() =>
+        [...document.querySelectorAll('nav[aria-label="주 메뉴"] a')].map((a) => {
+          const style = getComputedStyle(a)
+          return {
+            text: (a.textContent ?? '').trim(),
+            height: a.getBoundingClientRect().height,
+            lineHeight: parseFloat(style.lineHeight),
+            padding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+          }
+        }),
+      )
+      expect(labels.length, `${width}px 주 메뉴를 찾지 못했습니다`).toBeGreaterThan(0)
+      for (const l of labels)
+        expect(
+          l.height - l.padding,
+          `${width}px «${l.text}» 가 ${Math.round((l.height - l.padding) / l.lineHeight)}줄로 섰습니다`,
+        ).toBeLessThan(l.lineHeight * 2)
+      // 잘리지도 않는다: 헤더는 자기가 담은 것보다 낮을 수 없다.
+      const clipped = await page.evaluate(() => {
+        const header = document.querySelector('header')
+        return header ? header.scrollHeight - header.clientHeight : 0
+      })
+      expect(clipped, `${width}px 헤더가 내용을 잘랐습니다`).toBeLessThanOrEqual(1)
+      await context.close()
+    }
+  })
 })
 
 describe.skipIf(!up)('focus order', () => {
