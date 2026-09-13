@@ -506,10 +506,22 @@
     border-radius: 0.25rem;
     padding: 0.1em 0.35em;
   }
+  /*
+   * Every fenced block in this project's content is a *formula*, not code:
+   * `경제적 TCE = 유형보통주자본 − (AFS + HTM 미실현손실) × (1 − 세율)`. Left to scroll, a line like
+   * that is simply cut off at the column edge — measured at 689px of content in a 533px knowledge
+   * card, with nothing on screen to say the rest existed. Formulas wrap without harm, so they wrap;
+   * `overflow-x` stays as the backstop for a single unbreakable run.
+   *
+   * `break-word`, not the `anywhere` inherited from `body`: a formula should break at a space
+   * before it breaks inside 유형보통주자본.
+   */
   .md pre {
     margin: 0;
     padding: 0.75em;
     overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
     background: var(--surface-2);
     border-radius: 0.375rem;
   }

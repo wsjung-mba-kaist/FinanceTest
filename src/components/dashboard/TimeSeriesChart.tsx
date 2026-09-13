@@ -67,7 +67,11 @@ export function TimeSeriesChart({
   const lo = nums.length ? Math.min(...nums) : 0
   const hi = nums.length ? Math.max(...nums) : 1
   const pad = (hi - lo || 1) * 0.08
-  const domain: [number, number] = [lo - pad, hi + pad]
+  // A metric whose observed values *and* thresholds are all non-negative has no negative region to
+  // show, and padding the axis below zero invented one: the 생존 일수 chart carried a `−6.8일` tick,
+  // which is not a quantity that exists. Metrics that do go negative (경제적 TCE, a negative cash
+  // balance) have `lo < 0` and keep their headroom.
+  const domain: [number, number] = [lo >= 0 ? Math.max(0, lo - pad) : lo - pad, hi + pad]
 
   return (
     <Card as="section" aria-labelledby="ts-title" className="p-2">
