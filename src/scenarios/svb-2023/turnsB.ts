@@ -166,14 +166,14 @@ export const t5: T = {
     {
       id: 't5-memo-close',
       kind: 'memo',
-      time: '17:05',
+      time: '17:00',
       from: '결제팀',
       to: 'CRO/Treasurer · CFO · CEO',
       subject: '마감 결제 결과',
-      body: `- 당일 누적 예금 순유출: {{metric:dailyOutflow}} (예금의 {{metric:dailyOutflowPct}}).
-- 마감 시 현금·연준 계좌 잔고: **{{metric:cash}}**.
-- 잔고가 음수이면 연준 cash letter가 결제되지 않으며, 감독당국은 익일 개장 전 조치를 검토합니다.
-- 담보차입 여력: 당일 {{metric:facilityHeadroom}}, 익일 반영 예정 {{metric:facilityPending}}.`,
+      body: `- 위기 시작 이후 누적 예금 순유출: {{metric:cumulativeOutflow}}.
+- 현재 현금·연준 계좌 잔고: **{{metric:cash}}** (야간 조달에 따라 변동).
+- 목요일 마감 잔고 기록은 자금·마감 확인의 결제·자금 일정표를 참조하십시오. 마감 잔고가 음수이면 감독당국은 익일 개장 전 조치를 검토합니다.
+- 담보차입 여력: 미인출 {{metric:facilityHeadroom}}, 반영 대기 {{metric:facilityPending}}.`,
       severity: 'critical',
       sourceRefs: [S.dfpi],
       relatedMetrics: ['cash', 'dailyOutflow', 'facilityPending'],
@@ -182,7 +182,7 @@ export const t5: T = {
       id: 't5-call-dfpi-cold',
       kind: 'call',
       when: { notFlag: 'regulator_engaged' },
-      time: '17:40',
+      time: '17:00',
       caller: 'DFPI 감독관',
       callee: 'CEO',
       agency: 'California DFPI',
@@ -572,7 +572,7 @@ export const t6: T = {
     },
     {
       id: 't6-sector-stress',
-      description: '시그니처·퍼스트리퍼블릭 인출 보도로 지역은행 전반 불안 → 신뢰지수 −5',
+      description: '지역은행으로의 전염 우려를 반영한 훈련 스트레스 → 신뢰지수 −5',
       effects: [confidence(-5, '지역은행 전반 불안(외생)')],
     },
   ],
@@ -593,17 +593,18 @@ export const t6: T = {
     },
     {
       id: 't6-news-halt',
-      kind: 'newswire',
-      outlet: 'Nasdaq',
-      time: '05:45',
-      headline: '퍼시픽밸리은행 주식 프리마켓 거래정지 — "추가 정보 대기"',
-      body: '거래소는 중요 정보 공시를 이유로 거래를 정지했다.',
+      kind: 'memo',
+      from: 'IR·법무팀',
+      to: '경영진',
+      time: '05:00',
+      subject: '거래소 공시 및 거래 상태 확인',
+      body: '중요 정보 공시와 거래 상태를 거래소에 확인하고 있습니다. 자본 조달 계획과 유동성 현황을 정리해 회신할 준비가 필요합니다.',
       severity: 'critical',
     },
     {
       id: 't6-memo-onsite',
       kind: 'memo',
-      time: '06:00',
+      time: '05:00',
       from: '법무실장',
       to: '경영진',
       subject: 'DFPI·FDIC 현장 도착',
@@ -613,11 +614,12 @@ export const t6: T = {
     },
     {
       id: 't6-news-signature',
-      kind: 'newswire',
-      outlet: 'Bloomberg',
-      time: '06:30',
-      headline: '뉴욕 시그니처은행도 예금 이탈 — 수 시간 만에 $18.6B',
-      body: '암호화폐·부동산 예금 비중이 높은 시그니처은행에서 대규모 인출이 보고되고 있다. 퍼스트리퍼블릭도 인출 압력을 받고 있다.',
+      kind: 'memo',
+      from: '시장위험팀',
+      to: 'CRO/Treasurer',
+      time: '05:00',
+      subject: '동종 은행으로의 전염 위험 점검',
+      body: '예금이 특정 업종에 집중된 은행으로 불안이 번질 가능성을 점검하고 있습니다. 타행의 당일 최종 유출 규모는 확인되지 않았습니다.',
       severity: 'critical',
       sourceRefs: [S.sig],
     },
@@ -727,9 +729,9 @@ export const t6: T = {
 export const t7: T = {
   id: 't7',
   label: 'T7',
-  timeLabel: '2023년 3월 11~12일 (토·일)',
+  timeLabel: '2023년 3월 12일 (일) 21:00 ET',
   title: '주말',
-  time: '2023-03-12T18:15:00-05:00',
+  time: '2023-03-12T21:00:00-04:00',
   entryEffects: [
     {
       id: 't7-friday-runoff',
@@ -764,7 +766,7 @@ export const t7: T = {
       subject: 'BTFP 활용 검토',
       body: `- 적격 담보: UST, 기관채, 기관 MBS(3/12 기준 보유분). 지방채·회사채 제외.
 - **액면가 평가** → HTM $15B 미실현손실이 담보 여력을 깎지 않음.
-- 우리 HTM 장부가 {{metric:cbAdvances}} 외 잔여분 대부분이 적격. 월요일 아침부터 신청 가능.
+- 잔여 증권의 적격성, 기준일 보유 여부와 기존 담보권을 확인해야 합니다. 월요일 신청을 준비하세요.
 - 대안: 재할인창구(시가−마진, 90일).`,
       severity: 'positive',
       sourceRefs: [S.btfp],
@@ -933,19 +935,20 @@ export const t8: T = {
   events: [
     {
       id: 't8-news-frc',
-      kind: 'newswire',
-      outlet: 'CNBC',
-      time: '06:45 PT',
-      headline: '퍼스트리퍼블릭 −62%, 지역은행주 급락 — 재할인창구 차입 사상 최대 전망',
-      body: '시스템리스크 예외가 SVB·시그니처에만 적용되면서 시장은 "다음 은행"을 찾고 있다. 2년물 국채는 하루 60bp 급락했다.',
+      kind: 'memo',
+      from: '시장위험팀',
+      to: 'CRO/Treasurer',
+      time: '06:00 PT',
+      subject: '정책 발표 이후의 시장 스트레스 점검',
+      body: '전일 발표는 SVB·시그니처 예금 보호와 새로운 자금 지원 창구를 포함합니다. 자행의 예금 안정이 보장된 것은 아닙니다. 아래 모의 시세와 현재 자금 상태를 기준으로 조달 계획을 검토하세요.',
       severity: 'critical',
       sourceRefs: [S.frc, S.fred],
     },
     {
       id: 't8-market',
       kind: 'market',
-      time: '06:30 PT',
-      headline: '개장 시세',
+      time: '06:00 PT',
+      headline: '장전 모의 시세 — 훈련 스트레스',
       items: [
         { label: 'KRE', value: '−12%', change: '' },
         { label: 'UST 2Y', value: '4.03%', change: '−60bp' },

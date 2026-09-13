@@ -1,3 +1,4 @@
+import { InformationBasis } from './InformationBasis'
 import { useEffect, useMemo, useState } from 'react'
 import type { FeedItem, GameEvent, Severity } from '../../engine'
 import { firstSentence } from '../../lib/text'
@@ -98,6 +99,7 @@ function Headline({ entry, fill }: { entry: WireEntry; fill: (s: string) => stri
       <h3 id="situation-headline" className="prose-col mt-1 text-md font-semibold">
         {title}
       </h3>
+      <InformationBasis information={e?.information} />
       {open ? (
         <Markdown className="prose-col md-compact mt-1 text-base">{body}</Markdown>
       ) : (

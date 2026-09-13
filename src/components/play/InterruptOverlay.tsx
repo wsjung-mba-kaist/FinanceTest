@@ -177,7 +177,7 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
                 <span className="block text-base font-medium">{ov.option.label}</span>
                 <span className="block text-sm text-muted">
                   {ov.available
-                    ? optionEffectLine(ov.option, scenario.kpis)
+                    ? optionEffectLine(ov.option, scenario.kpis, mode)
                     : (ov.reason ?? '지금은 선택할 수 없습니다')}
                 </span>
               </span>

@@ -278,7 +278,7 @@ export default function SettingsPage() {
         </Field>
         <Field
           label="선택 근거 공개 시점"
-          hint="'모드 기본'은 안내: 즉시 / 표준: 턴 종료 / 전문가: 시나리오 종료"
+          hint="'모드 기본'은 안내: 즉시 / 표준: 턴 종료. 전문가 모드는 아래 설정과 관계없이 시나리오 종료 후 공개합니다."
         >
           <RadioRow
             name="선택 근거 공개 시점"

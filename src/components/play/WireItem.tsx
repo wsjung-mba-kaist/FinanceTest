@@ -1,3 +1,4 @@
+import { InformationBasis } from './InformationBasis'
 import { useContext, useEffect, useRef, type ReactNode } from 'react'
 import type { DialogueLine, FeedItem, GameEvent, Severity, Source } from '../../engine'
 import { Badge, type Tone } from '../ui'
@@ -249,16 +250,18 @@ export function WireItem({
           />
         )}
         {/*
-          * The channel tag is an identifier, not a severity: `[속보]`, `[내부메모]`, `[시장]` say
-          * *where this came from*, and drawing them as filled, bordered pills put a badge on every
-          * row of the densest repeated unit on the screen. With the tag, the tone, the reliability
-          * flag and the severity all wearing the same pill, none of them read as the important one.
-          * The brackets already mark it as a tag; `label-caps` is the styling for exactly this.
-          */}
+         * The channel tag is an identifier, not a severity: `[속보]`, `[내부메모]`, `[시장]` say
+         * *where this came from*, and drawing them as filled, bordered pills put a badge on every
+         * row of the densest repeated unit on the screen. With the tag, the tone, the reliability
+         * flag and the severity all wearing the same pill, none of them read as the important one.
+         * The brackets already mark it as a tag; `label-caps` is the styling for exactly this.
+         */}
         <span className="label-caps">{header.tag}</span>
         {header.meta && <span className="text-muted">{header.meta}</span>}
         {/* `통상` is the default state of a wire item and costs a pill to say nothing. */}
-        {tone && tone !== 'routine' && <Badge tone={TONE_OF[tone].tone}>{TONE_OF[tone].label}</Badge>}
+        {tone && tone !== 'routine' && (
+          <Badge tone={TONE_OF[tone].tone}>{TONE_OF[tone].label}</Badge>
+        )}
         {e?.reliability === 'unconfirmed' && <Badge tone="warning">미확인 정보</Badge>}
         {e?.reliability === 'false' && <Badge tone="critical">오보</Badge>}
         {e?.correctionOf && (
@@ -270,6 +273,7 @@ export function WireItem({
         </span>
       </div>
       <h4 className="mt-1 text-base font-semibold leading-snug">{title}</h4>
+      <InformationBasis information={e?.information} />
       {e ? (
         <EventBody e={e} fill={fill} />
       ) : f ? (

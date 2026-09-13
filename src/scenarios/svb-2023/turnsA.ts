@@ -71,7 +71,7 @@ export const t0: T = {
     {
       id: 't0-memo-treasury',
       kind: 'memo',
-      time: '09:10',
+      time: '09:00',
       from: '자금부장',
       to: 'CRO/Treasurer',
       subject: '2월 예금 동향 및 유동성 현황',
@@ -86,7 +86,7 @@ export const t0: T = {
     {
       id: 't0-call-moodys',
       kind: 'call',
-      time: '10:30',
+      time: '09:00',
       caller: '무디스 애널리스트',
       callee: 'CFO',
       tone: 'concerned',
@@ -103,7 +103,7 @@ export const t0: T = {
     {
       id: 't0-memo-gs',
       kind: 'memo',
-      time: '14:00',
+      time: '09:00',
       from: '골드만삭스 자문팀',
       to: 'CEO/CFO/CRO',
       subject: '자본 재편 대안 (사전 검토)',
@@ -156,7 +156,10 @@ export const t0: T = {
           trap: true,
           trapExplanation:
             '규제자본이 양호하므로 "투명하게 정리하고 넘어가자"는 판단은 합리적으로 보인다. 그러나 무보험 예금 94%의 은행에서 손실 공개는 자본 문제가 아니라 유동성 문제를 만든다. 백스톱 없는 증자 발표는 실패 시 증폭기(×2.0)가 된다.',
-          feasibility: { basis: '골드만 자문 및 8-K 실제 구조', sourceRefs: [S.k8] },
+          feasibility: {
+            basis: '자문팀의 사전 검토안. 매각·손실·증자 구조와 인수 확약 범위를 확인해야 함',
+            sourceRefs: [S.k8],
+          },
         },
         {
           id: 't0-b',
@@ -205,7 +208,7 @@ export const t0: T = {
           id: 't0-d',
           label: '헤지 복원: AFS $12B pay-fixed 스왑으로 듀레이션 축소, HTM 레이어 헤지 개시',
           description:
-            '2022년에 해제한 금리 헤지를 복원한다. 네거티브 캐리(스왑 4.9% − 자산 1.8%)가 발생하며, 3월 중순 금리 급락 시 헤지 손실이 난다.',
+            '2022년에 해제한 금리 헤지를 복원한다. 네거티브 캐리(스왑 4.9% − 자산 1.8%)가 발생하며, 향후 금리가 하락하면 헤지에서 평가손실이 날 수 있다.',
           effects: [
             op('institution.securities.afs.modDuration', 'set', 1.1, 'AFS 듀레이션 3.6→1.1y'),
             counter('hedgeNotional', 12),
@@ -327,7 +330,7 @@ export const t1: T = {
       kind: 'newswire',
       outlet: 'Bloomberg',
       time: '05:30',
-      headline: '파월 의회 증언 여파로 2년물 5.07% — 2007년 이후 최고',
+      headline: '파월 의회 증언 이후 단기금리 상승 압력',
       body: '연준 의장이 "최종 금리가 예상보다 높을 수 있다"고 발언한 뒤 단기물이 급등했다. 은행 보유 채권의 평가손실이 다시 확대되고 있다.',
       severity: 'warning',
       sourceRefs: ['fred-dgs2'],
@@ -338,14 +341,14 @@ export const t1: T = {
       outlet: 'WSJ',
       time: '06:00',
       headline: '실버게이트, 10-K 제출 지연 후 존속 능력 의문 — 암호화폐 예금 이탈 지속',
-      body: '3월 1일 연차보고서 제출을 연기한 실버게이트캐피털은 "지속기업으로서의 능력"을 재평가 중이라고 밝혔다. 오늘 저녁 추가 발표가 있을 것이라는 관측이 나온다.',
+      body: '3월 1일 연차보고서 제출을 연기한 실버게이트캐피털은 "지속기업으로서의 능력"을 재평가 중이라고 밝혔다. 추가 공시 여부와 자금 조달 상황을 확인할 필요가 있다.',
       severity: 'warning',
       sourceRefs: [S.metrick],
     },
     {
       id: 't1-memo-execution',
       kind: 'memo',
-      time: '06:15',
+      time: '06:00',
       from: '자금부장',
       to: 'CRO/Treasurer',
       subject: '오늘의 실행 준비 상태',
@@ -359,7 +362,7 @@ export const t1: T = {
       id: 't1-memo-collateral-ok',
       kind: 'memo',
       when: { flag: 'collateral_prepositioned' },
-      time: '06:20',
+      time: '06:00',
       from: '결제·담보팀',
       to: 'CRO/Treasurer',
       subject: '재할인창구·FHLB 담보 설정 완료 보고',
@@ -373,7 +376,7 @@ export const t1: T = {
       title: '계획 실행 또는 수정',
       prompt: '오늘 무엇을 실행하시겠습니까?',
       context:
-        '실버게이트는 오늘 저녁 청산을 발표할 가능성이 높습니다(아직 모릅니다). 발표 순서가 예금자의 해석을 결정합니다.',
+        '실버게이트의 공시 지연으로 동종 은행에 대한 우려가 커졌습니다. 추가 발표의 내용과 시각은 확인되지 않았습니다. 자행의 발표 순서와 자금 확정 여부를 판단하세요.',
       requiredConcepts: ['capital-raise-sequencing', 'crisis-communication'],
       dimensions: ['solvency', 'communication', 'timeliness'],
       options: [
@@ -577,7 +580,7 @@ export const t2: T = {
       outlet: 'Bloomberg',
       time: '16:05',
       headline: '실버게이트캐피털, 은행 영업 종료 및 자발적 청산 발표',
-      body: '암호화폐 업계 은행 실버게이트가 "모든 예금을 전액 상환"하며 청산하겠다고 밝혔다. 미국 은행이 예금 이탈로 문을 닫는 첫 사례가 되었다.',
+      body: '암호화폐 업계 은행 실버게이트가 "모든 예금을 전액 상환"하며 청산하겠다고 밝혔다. 예금 이탈과 유가증권 매각 손실이 누적된 가운데 내린 결정이다.',
       severity: 'critical',
       sourceRefs: [S.metrick],
       cardRefs: ['bank-run-dynamics'],
@@ -606,11 +609,11 @@ export const t2: T = {
     {
       id: 't2-memo-clients',
       kind: 'memo',
-      time: '18:40',
+      time: '16:30',
       from: 'RM 총괄',
       to: 'CRO/Treasurer',
       subject: '고객 문의 급증',
-      body: `- 저녁 6시 이후 VC 파트너 및 포트폴리오 CFO로부터 문의 47건. 대부분 "예금이 안전한가"라는 질문.
+      body: `- 발표 이후 VC 파트너 및 포트폴리오 CFO로부터 문의 47건(훈련 가정). 대부분 "예금이 안전한가"라는 질문.
 - 트위터·슬랙에 오늘 발표문이 확산 중. 일부 VC가 "내일 아침 잔액을 옮기라"고 조언한다는 소문.
 - 송금 창구는 닫혀 있어 아직 실제 인출은 없음.`,
       severity: 'warning',
@@ -621,7 +624,7 @@ export const t2: T = {
       id: 't2-data-book',
       kind: 'data',
       when: { flag: 'raise_announced' },
-      time: '19:30',
+      time: '16:30',
       title: '골드만 북빌딩 초기 반응',
       rows: [
         { label: '앵커 확약', value: 'GA $0.5B (22%)' },

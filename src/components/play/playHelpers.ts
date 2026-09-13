@@ -12,6 +12,8 @@ import type {
   TurnView,
 } from '../../engine'
 import { getTurnView } from '../../engine'
+import { informationReleased } from '../../engine/core/information'
+import { observedTurnState } from '../../lib/observedTurn'
 import { firstSentence, splitOptionLabel, truncateKo } from '../../lib/text'
 import type { SettingsState } from '../../persistence/schema'
 
@@ -51,6 +53,7 @@ export function rationaleTiming(
   setting: SettingsState['rationaleReveal'],
   mode: Mode,
 ): RevealTiming {
+  if (mode === 'expert') return 'endOfScenario'
   if (setting !== 'mode') return setting
   if (mode === 'guided') return 'immediate'
   if (mode === 'standard') return 'endOfTurn'
@@ -109,11 +112,16 @@ export function deadlineCaption(turn: Turn, decision: Decision, tick: number): s
 }
 
 /** The tick a feed item or authored event belongs to (0 when it is not tick-scheduled). */
-export function tickOfEntry(entry: WireEntry, state: GameState): number {
+export function tickOfEntry(entry: WireEntry, state: GameState, turn?: Turn): number {
   if (entry.feed) return entry.feed.tick ?? 0
   const e = entry.event
   if (!e) return 0
-  return state.tickSchedule[e.id] ?? e.atTick ?? 0
+  const scheduled = state.tickSchedule[e.id] ?? e.atTick ?? 0
+  if (!turn?.tickTimes || !e.information) return scheduled
+  const released = turn.tickTimes.findIndex((_, tick) =>
+    informationReleased(turn, tick, e.information),
+  )
+  return Math.max(scheduled, released)
 }
 
 function arrowsFor(direction: 'up' | 'down' | 'flat', magnitude: number): string {
@@ -126,8 +134,8 @@ function arrowsFor(direction: 'up' | 'down' | 'flat', magnitude: number): string
  * Priority: authored `preview` hints → the part of the label after `: ` → the first sentence
  * of the description. Never longer than one line at the play column width.
  */
-export function optionEffectLine(option: Option, kpis: KpiSpec[]): string {
-  if (option.preview && option.preview.length > 0) {
+export function optionEffectLine(option: Option, kpis: KpiSpec[], mode: Mode = 'standard'): string {
+  if (mode !== 'expert' && option.preview && option.preview.length > 0) {
     return option.preview
       .slice(0, 3)
       .map((h) => {
@@ -176,7 +184,7 @@ export function previousTurnEntries(
 ): PreviousTurn[] {
   const out: PreviousTurn[] = []
   for (let i = 0; i < state.turnIndex; i++) {
-    const snapshot = history[i]
+    const snapshot = observedTurnState(scenario, state, history, i, mode)
     let events: GameEvent[] = []
     if (snapshot) {
       try {

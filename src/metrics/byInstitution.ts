@@ -122,7 +122,7 @@ function bankRows(state: GameState, thresholds: ThresholdMap): Row[] {
       'facilityPending',
       b.wholesale.cbFacilityPending,
       'ccy',
-      '담보차입 여력(익일)',
+      '담보차입 여력(반영 대기)',
       'Facility Headroom (T+1)',
     ],
     [
@@ -228,14 +228,8 @@ function securitiesRows(state: GameState): Row[] {
     ],
     ['liquidAssets', liquidAssets, 'ccy', '유동자산', 'Liquid Assets'],
     ['cash', s.liquidity.cash, 'ccy', '현금', 'Cash'],
-    [
-      'abcpMaturingNext',
-      maturingNext,
-      'ccy',
-      '차환 만기 도래액(이번 턴)',
-      'ABCP Maturing (this turn)',
-    ],
-    ['abcpMaturing30', maturing30, 'ccy', '차환 만기 도래액(30일)', 'ABCP Maturing (30d)'],
+    ['abcpMaturingNext', maturingNext, 'ccy', '미처리 첫 만기', 'First Unprocessed Maturity'],
+    ['abcpMaturing30', maturing30, 'ccy', '미처리 만기 4개 합계', 'Next Four Maturity Buckets'],
     ['rollRate', s.pf.rollRate * 100, '%', '차환 성공률', 'Rollover Success Rate'],
     ['abcpGuaranteed', s.pf.abcpGuaranteed, 'ccy', '매입약정·신용공여 잔액', 'Guaranteed ABCP'],
     ['abcpHeld', s.pf.abcpHeld, 'ccy', '자체 매입 ABCP', 'ABCP Held'],
@@ -278,6 +272,7 @@ function pensionRows(state: GameState): Row[] {
     p.assets.illiquid +
     p.assets.ldi.equity
   return [
+    ['schemeCash', p.assets.cash, 'ccy', '스킴 현금', 'Scheme Cash'],
     ['hedgeRatio', p.hedgeRatio * 100, '%', '헤지비율', 'Hedge Ratio'],
     ['ldiLeverage', ldi.leverage, 'x', 'LDI 레버리지', 'LDI Leverage'],
     [

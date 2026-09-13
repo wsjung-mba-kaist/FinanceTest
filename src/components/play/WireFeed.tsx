@@ -78,7 +78,13 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
   const [announce, setAnnounce] = useState('')
   const [urgent, setUrgent] = useState('')
 
-  const current = useMemo(() => turnEntries(view), [view])
+  const current = useMemo(() => {
+    const entries = turnEntries(view)
+    if (!view.turn.tickTimes) return entries
+    return entries.sort(
+      (a, b) => tickOfEntry(a, state, view.turn) - tickOfEntry(b, state, view.turn),
+    )
+  }, [view, state])
   const previous = useMemo(
     () => previousTurnEntries(history, state, scenario, mode),
     [history, state, scenario, mode],
@@ -199,8 +205,8 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
         />
         {current.length === 0 && <p className="text-sm text-muted">아직 새 소식이 없습니다.</p>}
         {current.map((e, i) => {
-          const tick = tickOfEntry(e, state)
-          const prevTick = i > 0 ? tickOfEntry(current[i - 1]!, state) : -1
+          const tick = tickOfEntry(e, state, currentTurn)
+          const prevTick = i > 0 ? tickOfEntry(current[i - 1]!, state, currentTurn) : -1
           return (
             <Fragment key={e.id}>
               {ticked && tick !== prevTick && (

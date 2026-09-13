@@ -397,6 +397,7 @@ function DecisionBlock({
               ov={ov}
               letter={letterFor(i)}
               kpis={scenario.kpis}
+              mode={mode}
               role={multi ? 'checkbox' : 'radio'}
               checked={selected.includes(ov.option.id)}
               tabIndex={i === focusIdx ? 0 : -1}

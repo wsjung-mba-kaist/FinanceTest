@@ -92,11 +92,15 @@ function Cell({ cell, mobile }: { cell: MetricCell; mobile?: boolean }) {
           <Icon name="help" size={14} />
         </button>
       </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className={`truncate ${VALUE_CLASS[cell.status] ?? 'num-md'}`}>{cell.value}</span>
+      <div className={`flex items-baseline gap-1.5 ${mobile ? 'flex-wrap' : ''}`}>
+        <span
+          className={`${mobile ? 'shrink-0 whitespace-nowrap' : 'truncate'} ${VALUE_CLASS[cell.status] ?? 'num-md'}`}
+        >
+          {cell.value}
+        </span>
         {cell.delta && (
           <span
-            className={`num inline-flex items-baseline gap-0.5 text-sm ${dirClass(cell.direction, cell.crossed)}`}
+            className={`num inline-flex items-baseline gap-0.5 text-sm ${mobile ? 'order-last w-full whitespace-nowrap' : ''} ${dirClass(cell.direction, cell.crossed)}`}
           >
             {cell.delta}
             {/* Whether ▲ is good news depends on the metric — up is bad for an outflow — and with

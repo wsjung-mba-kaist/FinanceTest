@@ -12,6 +12,7 @@
 [`tests/ui/colourMeaning.test.ts`](../tests/ui/colourMeaning.test.ts) ·
 [`tests/ui/disclosureVocabulary.test.ts`](../tests/ui/disclosureVocabulary.test.ts) ·
 [`tests/ui/machineNames.test.ts`](../tests/ui/machineNames.test.ts) ·
+[`tests/ui/thresholdBasis.test.tsx`](../tests/ui/thresholdBasis.test.tsx) ·
 [`src/lib/format.test.ts`](../src/lib/format.test.ts)
 
 ---
@@ -543,3 +544,22 @@ Tailwind의 단계는 「이 그리드가 아직 들어가나」를 묻고, 플�
 
 **기계 이름은 화면에 오지 않는다.** 라벨 없는 경로는 **감춘다** — 라벨 없는 숫자는 정보가 아니고,
 무엇을 재는지 잘못 짚은 독자는 못 본 독자보다 나쁘다.
+
+## 23. 근거는 저작된 것만 말한다 — 기본값으로 지어내지 않는다
+
+`ThresholdBand`에 한때 이런 기본값이 있었다: `basis`가 없으면 「훈련 경고선」.
+
+그런데 이 저장소의 threshold 중 `basis`를 저작한 것은 **하나도 없다**(시나리오 13개의
+`thresholds` 블록 60여 개, `metrics/thresholds.ts`의 기본값 25개 모두 `{warn, breach, direction}`
+뿐이다). 그래서 그 «기본값»은 사실상 유일한 값이었고, 규제로 정해진 선까지 전부 훈련용이라고
+화면이 단언했다 — NCR 100%(경영개선권고 발동선), CET1 8%, LCR 100%. 그 옆에서 같은 타일이
+저작된 `referenceLabel`로 「권고 100%」·「내부 기준 100%」·「사후 규제 기준: …」을 적고 있었다.
+한 화면이 같은 숫자를 두고 서로 다른 말을 했다.
+
+§22가 「라벨 없는 경로는 감춘다」로 끝나는 것과 같은 규칙이다. **모르는 것을 잘못 말하는 것은
+아무 말도 하지 않는 것보다 나쁘다.** 근거 문구는 `basis`가 실제로 저작됐을 때만 나타난다.
+`Threshold.asOf`·`sourceRefs`도 같은 취급 — 타입은 저작 경로를 열어 두기 위해 남기고, 값이 없으면
+줄 자체가 없다.
+
+`tests/ui/thresholdBasis.test.tsx`가 양방향으로 잠근다: 저작하지 않으면 캡션에도 접근명에도 근거
+낱말이 없을 것, 저작하면 그 낱말이 나올 것.

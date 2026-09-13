@@ -78,17 +78,30 @@ export function ThresholdBand({
     return `${status === 'warn' ? '위험' : '경고'}까지 ${fmt(Math.abs(value - next))}`
   })()
 
+  /**
+   * 근거는 **저작된 것만** 말한다.
+   *
+   * 이 자리에 한때 «basis 가 없으면 훈련 경고선» 이라는 기본값이 있었다. 그런데 13개 시나리오
+   * 60여 개 threshold 중 `basis` 를 저작한 것은 하나도 없어서, 규제로 정해진 선(NCR 100%,
+   * CET1 8%, LCR 100%)까지 전부 «훈련 경고선» 이라고 화면이 단언했다 — 같은 타일이 저작된
+   * `referenceLabel` 로 «권고 100%» · «내부 기준 100%» 를 적고 있는 동안에.
+   *
+   * 모르는 것은 말하지 않는다. 근거 문구는 `basis` 가 실제로 저작됐을 때만 나타난다.
+   */
   const basis =
     threshold.basis === 'regulatory'
       ? '규제 기준'
       : threshold.basis === 'internal'
         ? '내부 한도'
-        : '훈련 경고선'
-  const caption = `${basis} · ${headroom ? `${headroom} · ${bands}` : bands}`
+        : threshold.basis === 'simulation'
+          ? '훈련 경고선'
+          : undefined
+  const body = headroom ? `${headroom} · ${bands}` : bands
+  const caption = basis ? `${basis} · ${body}` : body
   const statusWord =
     status === 'breach' ? '위험' : status === 'warn' ? '경고' : status === 'ok' ? '정상' : undefined
   const aria =
-    `${label} 기준 — ${basis}. 경고 ${fmt(warn)}, 위험 ${fmt(breach)}` +
+    `${label} 기준 — ${basis ? `${basis}. ` : ''}경고 ${fmt(warn)}, 위험 ${fmt(breach)}` +
     (value !== undefined && Number.isFinite(value)
       ? `. 현재 ${fmt(value)}${statusWord ? ` (${statusWord})` : ''}`
       : '')

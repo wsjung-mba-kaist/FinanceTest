@@ -8,7 +8,7 @@ import type {
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
 import { formatAt, formatBp, formatDelta, formatNumber, type CcyScale } from '../../lib/format'
-import { isWindowMetric } from '../../lib/metricContext'
+import { isWindowMetric, metricLabel } from '../../lib/metricContext'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { directionOf, metricScale, type Direction } from '../dashboard/kpiRows'
 
@@ -102,7 +102,7 @@ function metricCell(
     kind: 'metric',
     id: metric,
     metric,
-    label: opts.label ?? spec?.label ?? mv.label,
+    label: opts.label ?? metricLabel(metric, spec?.label ?? mv.label),
     value: formatAt(mv.value, mv.unit, ctx.units, {
       scale,
       decimals: opts.decimals ?? spec?.decimals,
@@ -174,7 +174,7 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
         metricCell(ctx, 'facilityHeadroom', {
           sub:
             pending && Number.isFinite(pending.value) && pending.value > 0
-              ? `다음 구간 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
+              ? `반영 대기 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
               : undefined,
         }),
         metricCell(ctx, 'dailyOutflow', {
@@ -187,18 +187,18 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
     }
     case 'pension':
       cells.push(
-        metricCell(ctx, 'collateralHeadroomBp'),
+        metricCell(ctx, 'schemeCash'),
         metricCell(ctx, 'marginCallPending'),
+        metricCell(ctx, 'collateralHeadroomBp'),
         metricCell(ctx, 'hedgeRatio'),
-        metricCell(ctx, 'liquidAssets'),
       )
       break
     case 'securities':
       cells.push(
-        metricCell(ctx, 'ncr'),
-        metricCell(ctx, 'abcpMaturing30'),
         metricCell(ctx, 'cash'),
-        metricCell(ctx, 'liquidityRatio'),
+        metricCell(ctx, 'abcpMaturingNext', { sub: '처리 후 다음 만기로 이동' }),
+        metricCell(ctx, 'rollRate'),
+        metricCell(ctx, 'ncr'),
       )
       break
     default:

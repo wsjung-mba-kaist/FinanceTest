@@ -1,6 +1,8 @@
 import type { BankState, ScenarioDefinition } from '../../engine/types'
 import { defineScenario } from '../_shared/define'
 import { svbDebrief } from './debrief'
+import { svbFundingPlan } from './funding'
+import { BTFP_KNOWN_AT, withSvbInformation } from './information'
 import { svbInitialBank, svbInitialConfidence, svbInitialMarket } from './initialState'
 import { svbScoring } from './scoring'
 import { SVB_SOURCES } from './sources'
@@ -263,7 +265,15 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     facilityHeadroom: { warn: 10, breach: 2, direction: 'below' },
     cumulativeOutflowPct: { warn: 10, breach: 25, direction: 'above' },
   },
-  turns: [...turnsA, ...turnsB],
+  fundingPlan: svbFundingPlan,
+  informationEmbargoes: [
+    {
+      terms: ['BTFP', 'Bank Term Funding Program'],
+      knownAt: BTFP_KNOWN_AT,
+      sourceRefs: ['fed-btfp-2023-03-12'],
+    },
+  ],
+  turns: withSvbInformation([...turnsA, ...turnsB]),
   gameOver: [
     {
       id: 'orderly',

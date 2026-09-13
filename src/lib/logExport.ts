@@ -1,5 +1,6 @@
 import type { GameEvent, GameState, Mode, ScenarioDefinition } from '../engine'
 import { getTurnView } from '../engine'
+import { observedTurnState } from './observedTurn'
 import type { RunInfo } from '../store/gameStore'
 import { MODE_LABELS } from './labels'
 import { stripInlineMarkdown } from './text'
@@ -34,7 +35,7 @@ function eventsOfTurn(
   turnIndex: number,
   mode: Mode,
 ): GameEvent[] {
-  const snapshot = turnIndex === state.turnIndex ? state : history?.[turnIndex]
+  const snapshot = observedTurnState(scenario, state, history, turnIndex, mode)
   if (!snapshot) return []
   try {
     return getTurnView(snapshot, scenario, { mode }).events

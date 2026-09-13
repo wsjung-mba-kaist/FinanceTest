@@ -15,6 +15,7 @@ import type {
 } from './common'
 import type { Condition } from './conditions'
 import type { ConditionalEffects, DelayedEffectSpec, Effect } from './effects'
+import type { BankFundingPlan } from './funding'
 import type { KpiSpec, ThresholdMap } from './metrics'
 import type { ScoringSpec } from './scoring'
 import type { ConfidenceState, InstitutionState, MarketState } from './state'
@@ -60,6 +61,14 @@ export interface DialogueLine {
   text: string
 }
 
+export interface EventInformation {
+  /** Earliest permitted display time; ISO timestamp with an explicit UTC offset. */
+  knownAt: string
+  basis: 'public' | 'reconstructed'
+  /** Distinguishes a fictional report or model stress from an observed historical fact. */
+  note?: string
+}
+
 export type Reliability = 'confirmed' | 'unconfirmed' | 'false'
 
 interface EventBase<S extends InstitutionState> {
@@ -76,6 +85,7 @@ interface EventBase<S extends InstitutionState> {
   /** Only shown in expert mode (noise). */
   expertOnly?: boolean
   relatedMetrics?: string[]
+  information?: EventInformation
   /** Time label shown in the feed, e.g. '09:12'. */
   time?: string
   /** Sub-turn tick at which the event fires (defaults to 0 = turn start). */
@@ -293,6 +303,8 @@ export interface Turn<S extends InstitutionState = InstitutionState> {
   timeLabel: string
   /** Optional title, e.g. '개장'. */
   title?: string
+  /** Absolute clock for each tick; needed when gating information within a turn. */
+  tickTimes?: string[]
   /** ISO timestamp for hindsight lint. */
   time?: string
   entryEffects?: ConditionalEffects<S>[]
@@ -433,6 +445,10 @@ export interface ScenarioDefinition<S extends InstitutionState = InstitutionStat
   briefing: Briefing
   kpis: KpiSpec[]
   thresholds?: ThresholdMap
+  /** Optional operational reporting; does not schedule additional payments or change calibration. */
+  fundingPlan?: BankFundingPlan
+  /** Authoring guard for named public developments that must not appear in live decision text early. */
+  informationEmbargoes?: { terms: string[]; knownAt: string; sourceRefs: string[] }[]
   turns: Turn<S>[]
   /** Volatility magnitudes used when `variance > 0`. */
   noise?: NoiseSpec

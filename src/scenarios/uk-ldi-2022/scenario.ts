@@ -177,6 +177,14 @@ const scenario: ScenarioDefinition<PensionState> = defineScenario<PensionState>(
   },
   kpis: [
     {
+      metric: 'schemeCash',
+      label: '스킴 현금',
+      labelEn: 'Scheme Cash',
+      unit: 'ccy',
+      sparkline: true,
+      decimals: 0,
+    },
+    {
       metric: 'collateralHeadroomBp',
       label: '담보 여력(bp)',
       labelEn: 'Collateral Headroom',
@@ -219,7 +227,9 @@ const scenario: ScenarioDefinition<PensionState> = defineScenario<PensionState>(
     },
     {
       metric: 'liquidAssets',
-      label: '유동자산(현금+직접보유 길트)',
+      label: '스킴 현금+미담보 길트',
+      description:
+        '스킴 현금과 미담보 길트 시가의 합계. 길트는 매각·이전 전 현금이 아니며 풀 내부 담보는 제외.',
       labelEn: 'Liquid Assets',
       unit: 'ccy',
       sparkline: true,

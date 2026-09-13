@@ -234,7 +234,7 @@ export const t5: T = {
       body: `- 우리 후순위채 500억(영업용순자본 가산분)의 콜이 11/15 도래합니다. 차환 발행 호가는 **8%대**(기존 4%대). 콜을 건너뛰면 스텝업 금리로 5년 연장됩니다.
 - 흥국생명 사례 직후라 시장은 모든 금융기관의 콜 결정을 지켜보고 있습니다.
 - 증권금융 창구가 열렸습니다(RP·증권담보대출). 산은 CP 매입은 일반기업 CP 위주로 증권사 CP 편입은 미정.
-- 현금 {{metric:cash}}, 유동성비율 {{metric:liquidityRatio}}, 이번 턴 만기 {{metric:abcpMaturingNext}}.`,
+- 현금 {{metric:cash}}, 유동성비율 {{metric:liquidityRatio}}, 미처리 첫 만기 {{metric:abcpMaturingNext}}.`,
       severity: 'critical',
       sourceRefs: [S.pHeungkuk, S.fsc1028],
       relatedMetrics: ['cash', 'liquidityRatio', 'abcpMaturingNext'],

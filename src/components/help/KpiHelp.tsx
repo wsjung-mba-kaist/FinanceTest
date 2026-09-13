@@ -6,7 +6,7 @@ import {
   type ScenarioDefinition,
 } from '../../engine'
 import { getCard, getSource } from '../../content'
-import { KPI_EXPLAIN } from '../../content/kpiExplain'
+import { kpiExplanation } from '../../content/kpiExplain'
 import { metricContext, metricLabel } from '../../lib/metricContext'
 import { formatMetric } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
@@ -48,7 +48,7 @@ export function KpiHelp({
         경고·위험 구간이 없는 지표는 &apos;정상&apos;이 아니라 &apos;기준 없음&apos;으로 표시합니다.
       </p>
       {scenario.kpis.map((spec) => {
-        const explain = KPI_EXPLAIN[spec.metric]
+        const explain = kpiExplanation(spec.metric, scenario.initialState.institution.kind)
         const shown =
           expertTraining && spec.lagTurns && state
             ? state.metricsHistory.find(
@@ -119,6 +119,9 @@ export function KpiHelp({
               </p>
             )}
 
+            {/* `Threshold.asOf` · `sourceRefs` 를 저작한 시나리오는 아직 없다 — 두 줄 모두
+                지금은 그려지지 않는다. 타입과 함께 남겨 두어 저작 경로를 열어 두되, 없는 근거를
+                기본값으로 지어내지는 않는다(`ThresholdBand` 의 basis 와 같은 규칙). */}
             {threshold?.asOf && <p className="text-xs text-muted">기준일: {threshold.asOf}</p>}
             {!expertTraining && threshold?.sourceRefs && <Citation ids={threshold.sourceRefs} />}
             {value?.detail && Object.keys(value.detail).length > 0 && (

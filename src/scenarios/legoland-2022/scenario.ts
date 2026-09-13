@@ -96,7 +96,7 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
 | CP·전단채 | 7,000 | 1~3개월, 자사 A2 발행금리 4.4% |
 | RP 매도 | 1,000 | |
 | 콜차입 | 1,000 | 한도 1,500(자기자본 15%) |
-| **유동성비율(게임 단순화)** | **120%** | (현금 + 미사용 라인 + 채권×0.9) / (30일 만기×(1−차환률) + 콜 + CP×0.5) |
+| **유동성비율(게임 단순화)** | **120%** | (현금 + 미사용 라인 + 채권×0.9) / (미처리 4개 만기×(1−차환률) + 콜 + CP×0.5) |
 
 **만기 사다리(억원)**: 9/28~10/4 150 · 10/5 400 · 10/14 400 · 10/21 250 · 10/24 450 · 11/1 750 · 11/9 1,050 · 11/24 700 · 12/1 300 · 2023.1~ 250. 10월 1,500(32%)·11월 2,500(53%)은 업계 만기(6.5조·10.7조 / 20.2조) 비율로 스케일한 값입니다.
 
@@ -193,18 +193,18 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
       primary: true,
       sparkline: true,
       description:
-        '(현금 + 미사용 라인 + 채권×0.9) / (30일 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜)',
+        '(현금 + 미사용 라인 + 채권×0.9) / (미처리 4개 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜)',
       referenceLabel: '내부 기준 100%',
       decimals: 0,
     },
     {
       metric: 'abcpMaturing30',
-      label: '차환 만기 도래액(30일)',
-      labelEn: 'ABCP Maturing (30d)',
+      label: '미처리 만기 4개 합계',
+      labelEn: 'Next Four Maturity Buckets',
       unit: 'ccy',
       primary: true,
       sparkline: true,
-      description: '향후 4턴 만기 합계 — 차환 실패율을 곱하면 자체매입 예상액',
+      description: '현재 미처리 만기 4개 합계 — 차환 실패율을 곱하면 자체매입 예상액',
       decimals: 0,
     },
     {
@@ -218,8 +218,8 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
     },
     {
       metric: 'abcpMaturingNext',
-      label: '차환 만기 도래액(이번 턴)',
-      labelEn: 'ABCP Maturing (this turn)',
+      label: '미처리 첫 만기',
+      labelEn: 'First Unprocessed Maturity',
       unit: 'ccy',
       decimals: 0,
     },

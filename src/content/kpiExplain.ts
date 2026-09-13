@@ -195,16 +195,22 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'cgfs-36',
   },
   abcpMaturingNext: {
-    why: '이번 턴에 반드시 막아야 하는 금액이다. 차환 성공률 가정이 틀리면 그 즉시 자체매입으로 전환되므로 현금·약정과 직접 비교한다.',
-    formula: '만기 버킷[0]의 PF-ABCP 잔액',
+    why: '처리하지 않은 첫 만기 금액이다. 차환이 실패할 부분과 전액 상환 시 필요한 현금을 나눠 확인한다. 처리 후에는 다음 만기로 이동한다.',
+    formula: '현재 미처리 만기 배열[0]의 PF-ABCP 잔액',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-23-10',
   },
   abcpMaturing30: {
-    why: '30일 파이프라인이다. 차환 성공률을 곱한 잔여분이 곧 유동성비율의 분모가 되므로, 한 주 앞이 아니라 한 달 앞으로 조달 계획을 세운다.',
-    formula: 'Σ 만기 버킷[0..3] (약 30일) PF-ABCP 잔액',
+    why: '미처리 만기 4개를 합한 금액이다. 구간 간격이 서로 달라 달력상 30일 합계로 해석할 수 없다. 실제 날짜별 만기표는 별도 확인한다.',
+    formula: 'Σ 현재 미처리 만기 배열[0..3] PF-ABCP 잔액',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-lee-2022-18',
+  },
+  schemeCash: {
+    why: '스킴이 보유한 현금이다. 풀 납입 승인·송금·반영을 확인한 뒤 담보로 사용할 수 있다.',
+    formula: '스킴 자산의 현금 잔고 (LDI 풀 내부 현금 제외)',
+    cards: ['ldi-collateral-waterfall'],
+    sourceRef: 'boe-breeden-2022',
   },
   rollRate: {
     why: '차환 시장의 온도계다. 90% 아래로 떨어지면 시장이 아니라 자기 대차대조표로 막아야 한다는 뜻이므로, 미리 자체매입 한도와 NCR 여파를 정해 둔다.',
@@ -354,4 +360,16 @@ export function hasKpiExplain(metric: string): boolean {
 /** `KpiSpec.description` → `KPI_EXPLAIN[metric].why` 순으로 폴백한 설명 문장. */
 export function kpiWhy(metric: string, description?: string): string | undefined {
   return description ?? KPI_EXPLAIN[metric]?.why
+}
+
+/** Shared metric keys can have different balance-sheet meanings for each institution. */
+export function kpiExplanation(metric: string, institution: string): KpiExplain | undefined {
+  if (metric === 'liquidAssets' && institution === 'pension')
+    return {
+      why: '스킴 현금과 미담보 길트의 합계다. 길트는 매각·이전 전 현금이 아니며, LDI 풀 내부 담보는 이 합계에 포함하지 않는다.',
+      formula: '스킴 현금 + 직접보유 길트 시가 × (1 − 기담보 비중)',
+      cards: ['ldi-collateral-waterfall'],
+      sourceRef: 'boe-breeden-2022',
+    }
+  return KPI_EXPLAIN[metric]
 }

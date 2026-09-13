@@ -1,4 +1,7 @@
 import { Card } from '../ui'
+import { FundingSchedule } from './FundingSchedule'
+import { FundingOperations } from './FundingOperations'
+import { pendingFundingInstructions } from '../../lib/fundingOperations'
 import { gridClass } from '../../lib/grid'
 import { latestSnapshot } from '../../engine'
 import { formatAt } from '../../lib/format'
@@ -29,10 +32,14 @@ const BASIS = {
     '가용 외환보유액과 지원 약정액을 구분하세요. 약정만으로 인출 완료나 지원 권한이 확정되지는 않습니다.',
 } as const
 
-/** Operational facts already modelled; never invent a settlement schedule or sum unlike periods. */
+/** Role overview; authored bank plans add current-window funding estimates. */
 export function FundingBrief({ compact = false }: { compact?: boolean }) {
   const { scenario, state, view, mode } = usePlay()
   const snapshot = latestSnapshot(state)
+  const operational =
+    state.institution.kind === 'pension' || state.institution.kind === 'securities'
+  const instructions = pendingFundingInstructions(state, scenario)
+  const hasFundingPlan = Boolean(scenario.fundingPlan && state.institution.kind === 'bank')
   const unresolved = [...view.decisions, ...view.interrupts]
     .filter((d) => !d.resolved)
     .sort(
@@ -47,7 +54,9 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
           ? `${next.title} · ${deadlineCaption(view.turn, next, state.tick) || '이번 구간 내 판단'}`
           : '현재 요청된 미결 결정 없음'}
       </p>
-      {!compact && (
+      {hasFundingPlan && <FundingSchedule compact={compact} />}
+      {operational && <FundingOperations compact={compact} />}
+      {!compact && !hasFundingPlan && !operational && (
         <>
           <dl className={`mt-2 grid gap-2 ${gridClass('metric', 2)}`}>
             {METRICS[state.institution.kind].map((key) => {
@@ -63,7 +72,7 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
               return (
                 <div key={key}>
                   <dt className="text-muted">
-                    {key === 'facilityPending' ? '다음 구간 반영 예정 한도' : metric.label}
+                    {key === 'facilityPending' ? '반영 대기 한도' : metric.label}
                     {lag > 0 && ` (T+${shown?.turnIndex} 기준)`}
                   </dt>
                   <dd className="num m-0 font-medium">
@@ -81,26 +90,29 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
             확정 지급액·결제 시각별 원장은 제공되지 않습니다. 위 수치만으로 마감 시점의 현금
             부족액을 확정할 수 없습니다.
           </p>
-          <details className="mt-2">
-            <summary className="cursor-pointer">
-              후속 처리 대기 {state.pending.length}건 · 미결 요청 {unresolved.length}건
-            </summary>
-            {state.pending.length === 0 ? (
-              <p className="mt-1 text-muted">등록된 후속 처리 없음</p>
-            ) : (
-              <ul className="mt-1 space-y-1">
-                {state.pending.map((p) => (
-                  <li key={p.id}>
-                    T+{p.dueTurn}, {p.dueTick ?? 0}틱 ·{' '}
-                    {mode === 'expert'
-                      ? '선택에 따른 후속 처리 예정 — 이행 여부는 도래 시 확인'
-                      : `${p.description} (조건에 따라 실행 여부 변동)`}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </details>
         </>
+      )}
+      {!compact && (
+        <details className="mt-2">
+          <summary className="cursor-pointer">
+            후속 처리 대기 {state.pending.length}건 · 미결 요청 {unresolved.length}건
+          </summary>
+          {state.pending.length === 0 ? (
+            <p className="mt-1 text-muted">등록된 후속 처리 없음</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {instructions.map((p) => (
+                <li key={p.id}>
+                  <span className="font-medium">{p.instruction}</span>
+                  <div className="text-xs text-muted">예정: {p.due} · 시나리오 처리 시점</div>
+                  <div className="text-xs text-muted">
+                    조건 충족·처리 완료 후 반영 · 예정은 입금·이행 완료를 뜻하지 않습니다.
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
       )}
     </Card>
   )

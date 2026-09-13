@@ -83,9 +83,7 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
         ? current.value - previous.value
         : undefined
     return {
-      spec: isWindowMetric(spec.metric)
-        ? { ...spec, label: metricLabel(spec.metric, spec.label) }
-        : spec,
+      spec: { ...spec, label: metricLabel(spec.metric, spec.label) },
       current,
       previous,
       delta,

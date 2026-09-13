@@ -78,7 +78,7 @@ export const ROLE_FRAMES: Record<RoleFamily, { title: string; items: RoleFrameIt
         id: 'sec-rollover',
         label: '차환 만기',
         question:
-          '이번 주와 30일 안에 막아야 할 금액은 얼마이고, 차환 실패를 몇 %로 가정하고 있는가?',
+          '앞으로 처리할 만기 금액은 얼마이고, 차환 실패를 몇 %로 가정하고 있는가? 실제 만기일도 확인했는가?',
         cardRef: 'pf-abcp-commitment-ncr',
         frameworkRef: 'korea-crisis-toolkit',
         metrics: ['abcpMaturingNext', 'abcpMaturing30', 'rollRate', 'ownCpRate'],
@@ -290,8 +290,8 @@ export const PREFLIGHT_BY_FAMILY: Record<RoleFamily, PreflightCheck[]> = {
   securities: [
     {
       id: 'sec-pre-maturity',
-      label: '30일 차환 만기',
-      hint: '한 달 안에 막아야 할 금액과 현재 차환 성공률을 함께 봅니다.',
+      label: '미처리 만기 4개 합계',
+      hint: '미처리 만기와 현재 차환 성공률을 함께 봅니다. 달력상 30일 합계는 아닙니다.',
       metric: 'abcpMaturing30',
     },
     {

@@ -9,6 +9,8 @@ import type {
   ScenarioDefinition,
 } from '../types'
 import { SCORE_DIMENSIONS } from '../types/common'
+import { validateFundingPlan } from './fundingPlan'
+import { validateInformation } from './information'
 import { createGame } from '../core/createGame'
 import { validateDialogue } from '../core/dialogue'
 import { getNumberPath } from '../core/paths'
@@ -470,6 +472,7 @@ export function validateScenario<S extends InstitutionState>(
       err('debrief-turn', 'debrief.historical.timeline', `턴 ${t.turnId} 없음`)
     checkRefs(undefined, t.sourceRefs, `debrief.historical.timeline(${t.turnId})`)
   }
+  issues.push(...validateFundingPlan(sc, sourceIds), ...validateInformation(sc))
   // --- briefing / kpis
   checkRefs(sc.briefing.cardRefs, undefined, 'briefing.cardRefs')
   if (sc.kpis.length === 0) warn('kpis', 'kpis', 'KPI가 정의되지 않았습니다')

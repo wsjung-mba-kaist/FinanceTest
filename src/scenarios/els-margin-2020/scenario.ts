@@ -103,7 +103,7 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
 | 콜차입 | 4,000 | 한도 6,750(자기자본 15%) |
 | **자체헤지 ELS** | **100,000** | 헤지 델타 26% = 명목 26,000 |
 | 백투백헤지 ELS | 40,000 | |
-| **유동성비율(게임 단순화)** | **124%** | (현금 + 미사용 원화라인 + 채권×0.9) / (30일 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜) |
+| **유동성비율(게임 단순화)** | **124%** | (현금 + 미사용 원화라인 + 채권×0.9) / (미처리 4개 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜) |
 
 **만기 사다리(CP·전단채, 억원)**: 3/12 2,000 · 3/13 3,000 · 3/16 5,000 · 3/19 6,000 · **3/23 9,000** · 3/24 4,000 · 3/26 5,000 · 3/31 7,000 · 4월 7,000.
 
@@ -222,17 +222,17 @@ const scenario: ScenarioDefinition<SecuritiesState> = defineScenario<SecuritiesS
       unit: '%',
       sparkline: true,
       description:
-        '(현금 + 미사용 원화라인 + 채권×0.9) / (30일 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜)',
+        '(현금 + 미사용 원화라인 + 채권×0.9) / (미처리 4개 만기×(1−차환률) + 콜 + CP×0.5 + 마진콜)',
       referenceLabel: '내부 기준 100%',
       decimals: 0,
     },
     {
       metric: 'abcpMaturing30',
-      label: '30일 차환 만기 도래액(CP·전단채)',
-      labelEn: 'Short-term Debt Maturing (30d)',
+      label: '미처리 만기 4개 합계(CP·전단채)',
+      labelEn: 'Next Four Short-term Maturity Buckets',
       unit: 'ccy',
       sparkline: true,
-      description: '향후 4턴 만기 합계 — 차환 실패율을 곱하면 예상 현금 유출액',
+      description: '현재 미처리 만기 4개 합계 — 차환 실패율을 곱하면 예상 현금 유출액',
       decimals: 0,
     },
     {

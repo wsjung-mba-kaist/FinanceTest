@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { KpiSpec, OptionView } from '../../engine'
+import type { KpiSpec, Mode, OptionView } from '../../engine'
 import { splitOptionLabel } from '../../lib/text'
 import { Badge } from '../ui'
 import { Icon } from '../ui/Icon'
@@ -14,6 +14,7 @@ export function OptionRow({
   ov,
   letter,
   kpis,
+  mode = 'standard',
   role,
   checked,
   tabIndex,
@@ -28,6 +29,7 @@ export function OptionRow({
   ov: OptionView
   letter: string
   kpis: KpiSpec[]
+  mode?: Mode
   role: 'radio' | 'checkbox'
   checked: boolean
   tabIndex: number
@@ -44,7 +46,7 @@ export function OptionRow({
   const { option, available, reason } = ov
   const descId = `opt-${option.id}-effect`
   const { title } = splitOptionLabel(option.label)
-  const effect = optionEffectLine(option, kpis)
+  const effect = optionEffectLine(option, kpis, mode)
   return (
     <div
       className={`rounded-md border ${checked ? 'border-accent bg-accent-soft' : 'border-border-control bg-surface'} ${available ? '' : 'opacity-80'}`}

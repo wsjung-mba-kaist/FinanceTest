@@ -18,6 +18,7 @@ import { isDecisionResolved } from './applyDecision'
 import { buildConditionContext, evaluate } from './conditions'
 import { availableReplies, entryStep, hasDialogue, walk } from './dialogue'
 import { tickCount } from './lookup'
+import { informationReleased } from './information'
 
 export interface OptionView<S extends InstitutionState = InstitutionState> {
   option: Option<S>
@@ -123,7 +124,8 @@ export function getTurnView<S extends InstitutionState>(
     (e) =>
       evaluate(e.when, ctx) &&
       (mode === 'expert' || !e.expertOnly) &&
-      (state.tickSchedule[e.id] ?? e.atTick ?? 0) <= state.tick,
+      (state.tickSchedule[e.id] ?? e.atTick ?? 0) <= state.tick &&
+      informationReleased(turn as Turn, state.tick, e.information),
   )
   const toView = (decision: Decision<S>): DecisionView<S> => {
     const record = state.decisions.find(
