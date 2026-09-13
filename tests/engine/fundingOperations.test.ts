@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createGame, applyDecision, latestSnapshot, replay } from '@/engine'
 import { securitiesFx } from '@/engine/fx/securities'
 import { fundingPosition, pendingFundingInstructions } from '@/lib/fundingOperations'
-import { metricLabel } from '@/lib/metricContext'
 import { kpiExplanation } from '@/content/kpiExplain'
 import { buildStripCells } from '@/components/play/stripCells'
 import lego from '@/scenarios/legoland-2022/scenario'
@@ -59,7 +58,7 @@ describe('operational funding views', () => {
     const after = applyDecision(state, scenario, original.id, [original.options[0]!.id])
     expect(fundingPosition(after)).toMatchObject({ maturity: before })
     expect(latestSnapshot(after).metrics.abcpMaturingNext!.label).toBe('미처리 첫 만기')
-    expect(metricLabel('abcpMaturing30', '30일')).toBe('미처리 만기 4개 합계')
+    expect(latestSnapshot(after).metrics.abcpMaturing30!.label).toBe('미처리 만기 4개 합계')
     const restored = replay(scenario, {
       seed: 3,
       variance: 0,

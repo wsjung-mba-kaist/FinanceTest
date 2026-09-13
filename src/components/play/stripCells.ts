@@ -8,7 +8,7 @@ import type {
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
 import { formatAt, formatBp, formatDelta, formatNumber, type CcyScale } from '../../lib/format'
-import { isWindowMetric, metricLabel } from '../../lib/metricContext'
+import { isWindowMetric } from '../../lib/metricContext'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { directionOf, metricScale, type Direction } from '../dashboard/kpiRows'
 
@@ -102,7 +102,7 @@ function metricCell(
     kind: 'metric',
     id: metric,
     metric,
-    label: opts.label ?? metricLabel(metric, spec?.label ?? mv.label),
+    label: opts.label ?? spec?.label ?? mv.label,
     value: formatAt(mv.value, mv.unit, ctx.units, {
       scale,
       decimals: opts.decimals ?? spec?.decimals,
@@ -177,10 +177,7 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
               ? `반영 대기 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
               : undefined,
         }),
-        metricCell(ctx, 'dailyOutflow', {
-          label: '현재 구간 유출',
-          sub: '구간 시작부터 누적 · 구간마다 초기화',
-        }),
+        metricCell(ctx, 'dailyOutflow', { sub: '구간 시작부터 누적 · 구간마다 초기화' }),
         metricCell(ctx, 'survivalDays'),
       )
       break

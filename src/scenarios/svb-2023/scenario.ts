@@ -192,16 +192,16 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     },
     {
       metric: 'facilityHeadroom',
-      label: '담보차입 여력(당일)',
-      labelEn: 'Same-day Secured Headroom',
+      label: '담보차입 여력(인출 가능)',
+      labelEn: 'Drawable Secured Headroom',
       unit: 'ccy',
       sparkline: true,
       decimals: 1,
     },
     {
       metric: 'facilityPending',
-      label: '담보차입 여력(익일)',
-      labelEn: 'Headroom (T+1)',
+      label: '담보차입 여력(반영 대기)',
+      labelEn: 'Headroom (pending)',
       unit: 'ccy',
       decimals: 1,
     },
@@ -247,8 +247,9 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
     { metric: 'deposits', label: '총예금', labelEn: 'Deposits', unit: 'ccy', decimals: 1 },
     {
       metric: 'dailyOutflowPct',
-      label: '당일 유출률',
-      labelEn: 'Daily Outflow %',
+      // 이 시나리오의 한 턴은 하루가 아니라 한 시간대다 — '당일' 은 여기서 틀린 말이다.
+      label: '구간 유출률',
+      labelEn: 'Outflow % (this window)',
       unit: '%',
       decimals: 1,
     },

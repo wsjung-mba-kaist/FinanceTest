@@ -7,7 +7,7 @@ import {
 } from '../../engine'
 import { getCard, getSource } from '../../content'
 import { kpiExplanation } from '../../content/kpiExplain'
-import { metricContext, metricLabel } from '../../lib/metricContext'
+import { metricContext } from '../../lib/metricContext'
 import { formatMetric } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { ThresholdBand } from '../dashboard/ThresholdBand'
@@ -63,13 +63,13 @@ export function KpiHelp({
           <section
             key={spec.metric}
             id={kpiAnchorId(spec.metric)}
-            aria-label={metricLabel(spec.metric, spec.label)}
+            aria-label={spec.label}
             className={`scroll-mt-2 rounded-md border p-2 ${
               highlighted ? 'border-accent bg-accent-soft/40' : 'border-border bg-surface'
             }`}
           >
             <div className="flex flex-wrap items-baseline gap-x-2">
-              <h3 className="text-base font-semibold">{metricLabel(spec.metric, spec.label)}</h3>
+              <h3 className="text-base font-semibold">{spec.label}</h3>
               {spec.labelEn && <span className="text-xs text-muted">{spec.labelEn}</span>}
               {spec.primary && <Badge tone="info">핵심</Badge>}
               <span className="ml-auto flex items-center gap-1.5">

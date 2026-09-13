@@ -10,7 +10,7 @@ import type {
 import { directionOf, type Direction } from '../../lib/direction'
 import { scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
-import { isWindowMetric, metricLabel } from '../../lib/metricContext'
+import { isWindowMetric } from '../../lib/metricContext'
 
 export { directionOf, type Direction }
 
@@ -83,7 +83,7 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
         ? current.value - previous.value
         : undefined
     return {
-      spec: { ...spec, label: metricLabel(spec.metric, spec.label) },
+      spec,
       current,
       previous,
       delta,

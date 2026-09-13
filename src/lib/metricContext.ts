@@ -18,12 +18,3 @@ export function metricContext(key: string): string | undefined {
   if (key === 'confidence') return '시뮬레이션 신뢰지수 · 실제 관측 통계 아님'
   return undefined
 }
-
-/** Labels that remain correct when a scenario uses hourly, daily or weekly turns. */
-export function metricLabel(key: string, fallback: string): string {
-  if (key === 'dailyOutflow') return '현재 구간 예금 유출'
-  if (key === 'dailyOutflowPct') return '현재 구간 유출률'
-  if (key === 'abcpMaturingNext') return '미처리 첫 만기'
-  if (key === 'abcpMaturing30') return '미처리 만기 4개 합계'
-  return fallback
-}

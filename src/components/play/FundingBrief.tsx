@@ -2,35 +2,13 @@ import { Card } from '../ui'
 import { FundingSchedule } from './FundingSchedule'
 import { FundingOperations } from './FundingOperations'
 import { pendingFundingInstructions } from '../../lib/fundingOperations'
+import { BASIS, fundingBriefRows } from './fundingBriefRows'
 import { gridClass } from '../../lib/grid'
 import { latestSnapshot } from '../../engine'
 import { formatAt } from '../../lib/format'
 import { metricContext } from '../../lib/metricContext'
 import { usePlay } from './playContext'
 import { deadlineCaption } from './playHelpers'
-
-const METRICS = {
-  bank: ['cash', 'facilityHeadroom', 'facilityPending', 'projectedDailyOutflow'],
-  securities: ['cash', 'abcpMaturingNext', 'rollRate', 'marginCallPending'],
-  pension: ['liquidAssets', 'marginCallPending', 'collateralHeadroomBp', 'hedgeRatio'],
-  prime_broker: ['grossExposure', 'marginCoverage', 'liquidationVaR', 'concentrationDays'],
-  asset_manager: ['nav', 'redemptionsPendingPct', 'cashBufferPct', 'weeklyLiquidityPct'],
-  central_bank: ['usableReserves', 'guidottiRatio', 'imfCommitted', 'distressedBanks'],
-} as const
-
-const BASIS = {
-  bank: '차입 한도는 인출 전 현금이 아닙니다. 향후 1일 유출 추정과 실제 결제 마감은 구분하세요.',
-  securities:
-    '이번 구간 차환 만기와 마진콜을 함께 확인하세요. 차환 실패분과 외화 지급의 결제 시각은 별도 확인이 필요합니다.',
-  pension:
-    '유동자산에는 미담보 국채가 포함됩니다. 매각·담보 이전이 끝나기 전에는 현금으로 사용할 수 없습니다.',
-  prime_broker:
-    '청산 VaR는 손실 추정치입니다. 고객에게 받은 마진을 회사의 가용 현금으로 계산하지 않습니다.',
-  asset_manager:
-    '1일 유동성에는 현금화 가능한 자산이 포함됩니다. 환매 금액·지급일과 잔존 수익자의 희석을 함께 판단하세요.',
-  central_bank:
-    '가용 외환보유액과 지원 약정액을 구분하세요. 약정만으로 인출 완료나 지원 권한이 확정되지는 않습니다.',
-} as const
 
 /** Role overview; authored bank plans add current-window funding estimates. */
 export function FundingBrief({ compact = false }: { compact?: boolean }) {
@@ -40,6 +18,16 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
     state.institution.kind === 'pension' || state.institution.kind === 'securities'
   const instructions = pendingFundingInstructions(state, scenario)
   const hasFundingPlan = Boolean(scenario.fundingPlan && state.institution.kind === 'bank')
+  /**
+   * 저작자가 KPI 로 올린 지표만 상황실에 올린다.
+   *
+   * 이 목록은 기관 종류로만 골랐었다. 그러면 그 시나리오가 쓰지 않는 필드까지 끌려 나온다 —
+   * 크레디트스위스 상황실에 «IMF 지원 약정액 0» 이 상주했고(`initialState` 주석이 "지표에는
+   * 나오지만 KPI 로 노출하지 않는다"고 못박아 둔 바로 그 값이다), 레고랜드에는 자체헤지가
+   * 없는데 «마진콜 대기 0» 이 떴다. `kpis` 와 교차하면 그 셋이 함께 풀린다: 구조적 0 이
+   * 사라지고, `lagTurns` 가 일관되게 걸리고, 라벨을 저작된 것으로 쓸 수 있다.
+   */
+  const rows = fundingBriefRows(scenario)
   const unresolved = [...view.decisions, ...view.interrupts]
     .filter((d) => !d.resolved)
     .sort(
@@ -56,35 +44,41 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
       </p>
       {hasFundingPlan && <FundingSchedule compact={compact} />}
       {operational && <FundingOperations compact={compact} />}
-      {!compact && !hasFundingPlan && !operational && (
+      {/* 교차 결과가 비면 본문을 통째로 접는다. 태영처럼 현금·차입 지표를 KPI 로 올리지 않은
+          시나리오에 은행용 «차입 한도는 인출 전 현금이 아닙니다» 안내만 남기면, 화면에 없는
+          숫자에 대한 주의문이 된다. 그때는 마감 한 줄만 남는 것이 맞다. */}
+      {!compact && !hasFundingPlan && !operational && rows.length > 0 && (
         <>
-          <dl className={`mt-2 grid gap-2 ${gridClass('metric', 2)}`}>
-            {METRICS[state.institution.kind].map((key) => {
-              const spec = scenario.kpis.find((k) => k.metric === key)
-              const lag = mode === 'expert' ? (spec?.lagTurns ?? 0) : 0
-              const shown = lag
-                ? state.metricsHistory.find(
-                    (s) => s.turnIndex === Math.max(0, state.turnIndex - lag),
-                  )
-                : snapshot
-              const metric = shown?.metrics[key]
-              if (!metric) return null
-              return (
-                <div key={key}>
-                  <dt className="text-muted">
-                    {key === 'facilityPending' ? '반영 대기 한도' : metric.label}
-                    {lag > 0 && ` (T+${shown?.turnIndex} 기준)`}
-                  </dt>
-                  <dd className="num m-0 font-medium">
-                    {formatAt(metric.value, metric.unit, scenario.units)}
-                  </dd>
-                  {metricContext(key) && (
-                    <dd className="m-0 text-xs text-muted">{metricContext(key)}</dd>
-                  )}
-                </div>
-              )
-            })}
-          </dl>
+          {
+            <dl className={`mt-2 grid gap-2 ${gridClass('metric', 2)}`}>
+              {rows.map((spec) => {
+                const lag = mode === 'expert' ? (spec.lagTurns ?? 0) : 0
+                const shown = lag
+                  ? state.metricsHistory.find(
+                      (s) => s.turnIndex === Math.max(0, state.turnIndex - lag),
+                    )
+                  : snapshot
+                const metric = shown?.metrics[spec.metric]
+                if (!metric) return null
+                const context = metricContext(spec.metric)
+                return (
+                  <div key={spec.metric}>
+                    <dt className="text-muted">
+                      {/* 저작된 이름이 이긴다. 등록부 라벨을 쓰면 `CentralBankState` 를 다른
+                          용도로 저작한 시나리오에서 틀린 이름이 나온다 — 저축은행 «저축은행계정
+                          가용재원» 과 CS «SNB 즉시 공여 여력» 이 둘 다 «가용외환보유액» 이 됐다. */}
+                      {spec.label}
+                      {lag > 0 && ` (T+${shown?.turnIndex} 기준)`}
+                    </dt>
+                    <dd className="num m-0 font-medium">
+                      {formatAt(metric.value, metric.unit, scenario.units)}
+                    </dd>
+                    {context && <dd className="m-0 text-xs text-muted">{context}</dd>}
+                  </div>
+                )
+              })}
+            </dl>
+          }
           <p className="mt-2 text-muted">{BASIS[state.institution.kind]}</p>
           <p className="mt-1 text-xs text-muted">
             확정 지급액·결제 시각별 원장은 제공되지 않습니다. 위 수치만으로 마감 시점의 현금

@@ -96,14 +96,10 @@ describe('HelpSheet', () => {
     expect(within(dialog).getByRole('tab', { name: '지표 설명', selected: true })).toBeTruthy()
     for (const spec of scenario.kpis) {
       expect(
-        within(dialog).getAllByRole('heading', {
-          name:
-            spec.metric === 'dailyOutflowPct'
-              ? '현재 구간 유출률'
-              : spec.metric === 'dailyOutflow'
-                ? '현재 구간 예금 유출'
-                : spec.label,
-        }).length,
+        // 특례 없이 저작된 라벨 그대로. 한때 여기에 두 지표의 예외가 있었는데, 그것은
+        // `src/lib` 의 오버라이드가 시나리오 라벨을 덮고 있다는 증상이었지 테스트의 문제가
+        // 아니었다. 오버라이드를 걷어내자 특례도 함께 사라졌다.
+        within(dialog).getAllByRole('heading', { name: spec.label }).length,
         `${spec.metric} (${spec.label}) 누락`,
       ).toBeGreaterThan(0)
     }

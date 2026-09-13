@@ -115,7 +115,9 @@ function bankRows(state: GameState, thresholds: ThresholdMap): Row[] {
       'facilityHeadroom',
       b.wholesale.cbFacilityCapacity,
       'ccy',
-      '담보차입 여력(당일)',
+      // 「당일」이 아니라 「인출 가능」이다. 한 턴이 한 시간인 시나리오도, 한 주인 시나리오도
+      // 있으므로 공유 등록부는 턴 길이를 말할 수 없다. 짝이 되는 `facilityPending` 은 «반영 대기».
+      '담보차입 여력(인출 가능)',
       'Secured Facility Headroom',
     ],
     [
@@ -148,13 +150,13 @@ function bankRows(state: GameState, thresholds: ThresholdMap): Row[] {
       '무보험예금 비중',
       'Uninsured Share',
     ],
-    ['dailyOutflow', lastOutflow, 'ccy', '당일 예금 순유출', 'Daily Outflow'],
+    ['dailyOutflow', lastOutflow, 'ccy', '구간 예금 순유출', 'Outflow (this window)'],
     [
       'dailyOutflowPct',
       startDeposits > 0 ? (lastOutflow / startDeposits) * 100 : 0,
       '%',
-      '당일 유출률',
-      'Daily Outflow %',
+      '구간 유출률',
+      'Outflow % (this window)',
     ],
     ['cumulativeOutflow', cumOutflow, 'ccy', '누적 예금 유출', 'Cumulative Outflow'],
     [
