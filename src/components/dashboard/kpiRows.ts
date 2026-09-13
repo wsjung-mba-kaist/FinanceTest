@@ -10,7 +10,8 @@ import type {
 import { directionOf, type Direction } from '../../lib/direction'
 import { scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
-import { isWindowMetric } from '../../lib/metricContext'
+import { isWindowMetric } from '../../metrics/window'
+import { kpiExplanation, type KpiExplain } from '../../content/kpiExplain'
 
 export { directionOf, type Direction }
 
@@ -32,6 +33,12 @@ export interface KpiRow {
   threshold?: Threshold
   /** One currency scale for this metric, held for the whole run. `undefined` for non-currency. */
   scale?: CcyScale
+  /**
+   * 이 기관에 맞게 해석된 지표 설명. 행이 들고 다니는 이유는 타일과 도움 시트가 **같은 것**을
+   * 읽게 하기 위해서다 — 기관별 변형(`liquidAssets` 는 연기금에서 다른 것을 뜻한다)이 도움
+   * 시트에만 걸려 있어서 같은 지표를 두 화면이 다르게 설명하고 있었다.
+   */
+  explain?: KpiExplain
 }
 
 /**
@@ -96,6 +103,7 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
       lag,
       threshold: thresholds[spec.metric],
       scale: metricScale(state, spec, scenario.units),
+      explain: kpiExplanation(spec.metric, scenario.initialState.institution.kind),
     }
   })
 }

@@ -1,6 +1,6 @@
 import type { GameState, MetricDelta, MetricStatus, ScenarioDefinition } from '../../engine'
 import { latestSnapshot } from '../../engine'
-import { isWindowMetric } from '../../lib/metricContext'
+import { isWindowMetric } from '../../metrics/window'
 
 const STATUS_RANK: Record<MetricStatus, number> = { na: 0, ok: 1, warn: 2, breach: 3 }
 

@@ -1,7 +1,5 @@
 import type { MetricDelta, MetricStatus, Units } from '../../engine'
-import { KPI_EXPLAIN } from '../../content/kpiExplain'
 import { formatAt, formatDelta } from '../../lib/format'
-import { metricContext } from '../../lib/metricContext'
 import { useHelp } from '../help/helpContext'
 import type { PreviewFidelity } from '../play/playHelpers'
 import { Badge, Card, StatusBadge } from '../ui'
@@ -61,7 +59,7 @@ export function KpiTile({
   compact?: boolean
 }) {
   const help = useHelp()
-  const { spec, current, delta, series, lag, threshold, scale } = row
+  const { spec, current, delta, series, lag, threshold, scale, explain } = row
   const status: MetricStatus = current?.status ?? 'na'
   // `scale` pins a currency metric to one unit for the whole run, so a falling figure stays on one
   // axis instead of stepping 3.2조원 → 8,500억원 → 920억원 while the reader tries to read a trend.
@@ -73,7 +71,6 @@ export function KpiTile({
   // A band was crossed when the status itself moved. That, not the sign of the change, is what the
   // reader has to react to.
   const crossed = Boolean(current && row.previous && current.status !== row.previous.status)
-  const explain = KPI_EXPLAIN[spec.metric]
   const tip = spec.description ?? explain?.why
 
   let projectedText: string | undefined
@@ -170,9 +167,7 @@ export function KpiTile({
       {threshold && spec.referenceLabel && (
         <div className="text-xs text-muted">{spec.referenceLabel}</div>
       )}
-      {metricContext(spec.metric) && (
-        <p className="mt-1 text-xs text-muted">{metricContext(spec.metric)}</p>
-      )}
+      {explain?.caveat && <p className="mt-1 text-xs text-muted">{explain.caveat}</p>}
 
       {spec.sparkline && series.length >= 2 && (
         <div className="mt-1">

@@ -8,7 +8,7 @@ import type {
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
 import { formatAt, formatBp, formatDelta, formatNumber, type CcyScale } from '../../lib/format'
-import { isWindowMetric } from '../../lib/metricContext'
+import { isWindowMetric } from '../../metrics/window'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { directionOf, metricScale, type Direction } from '../dashboard/kpiRows'
 

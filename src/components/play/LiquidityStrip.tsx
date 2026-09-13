@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { isWindowMetric } from '../../lib/metricContext'
+import { isWindowMetric } from '../../metrics/window'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { useHelp } from '../help/helpContext'
 import { Icon } from '../ui/Icon'

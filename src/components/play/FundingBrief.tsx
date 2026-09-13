@@ -6,7 +6,7 @@ import { BASIS, fundingBriefRows } from './fundingBriefRows'
 import { gridClass } from '../../lib/grid'
 import { latestSnapshot } from '../../engine'
 import { formatAt } from '../../lib/format'
-import { metricContext } from '../../lib/metricContext'
+import { kpiExplanation } from '../../content/kpiExplain'
 import { usePlay } from './playContext'
 import { deadlineCaption } from './playHelpers'
 
@@ -60,7 +60,7 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
                   : snapshot
                 const metric = shown?.metrics[spec.metric]
                 if (!metric) return null
-                const context = metricContext(spec.metric)
+                const caveat = kpiExplanation(spec.metric, state.institution.kind)?.caveat
                 return (
                   <div key={spec.metric}>
                     <dt className="text-muted">
@@ -73,7 +73,7 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
                     <dd className="num m-0 font-medium">
                       {formatAt(metric.value, metric.unit, scenario.units)}
                     </dd>
-                    {context && <dd className="m-0 text-xs text-muted">{context}</dd>}
+                    {caveat && <dd className="m-0 text-xs text-muted">{caveat}</dd>}
                   </div>
                 )
               })}

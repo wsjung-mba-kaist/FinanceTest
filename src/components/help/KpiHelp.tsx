@@ -7,7 +7,6 @@ import {
 } from '../../engine'
 import { getCard, getSource } from '../../content'
 import { kpiExplanation } from '../../content/kpiExplain'
-import { metricContext } from '../../lib/metricContext'
 import { formatMetric } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { ThresholdBand } from '../dashboard/ThresholdBand'
@@ -86,9 +85,7 @@ export function KpiHelp({
               </span>
             </div>
 
-            {metricContext(spec.metric) && (
-              <p className="mt-1 text-sm text-muted">{metricContext(spec.metric)}</p>
-            )}
+            {explain?.caveat && <p className="mt-1 text-sm text-muted">{explain.caveat}</p>}
             {expertTraining && spec.lagTurns && shown && (
               <p className="text-xs text-muted">T+{shown.turnIndex} 관측값</p>
             )}

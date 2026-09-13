@@ -6,12 +6,23 @@
  *
  * 작성 기준
  * - `why`는 실무자가 이 숫자를 보고 **바꿔야 할 판단**을 1~2문장으로 적는다(정의 반복 금지).
+ * - `caveat`는 **집계 기간·단위·기준**을 한 줄로 적는다. `why`를 줄여 쓴 것이 아니다 — 둘이
+ *   같은 말을 하면 도움 시트에서 같은 문장이 두 번 쌓인다. 라벨이 이미 말하는 것도 쓰지 않는다.
  * - `formula`는 `src/metrics/*`가 실제로 계산하는 식을 그대로 적는다.
  * - `cards`는 `src/content/cards/`의 실재 id, `sourceRef`는 `src/content/sources.ts`의 실재 id만 쓴다.
+ *
+ * 한때 이 중 `caveat`만 `src/lib/metricContext.ts`의 하드코딩 `if` 사슬로 따로 살았다. 그래서
+ * 같은 지표를 두 곳이 각각 설명했고(`abcpMaturing30`은 두 문장이 거의 글자까지 같았다), 그쪽에는
+ * 출처도 카드 연결도 콘텐츠 검증기도 없었다. 설명은 저작 계층 한 곳에서만 온다.
  */
 export interface KpiExplain {
   /** 이 숫자가 바꿔야 할 판단. */
   why: string
+  /**
+   * 집계 기간·단위·기준 한 줄. 타일에 상시 노출되고, 전문가 모드에서도 가려지지 않는다 —
+   * 사후 정보가 아니라 «지금 이 숫자가 무엇을 재는가» 이기 때문이다.
+   */
+  caveat?: string
   /** 실제 계산식. */
   formula?: string
   /** 관련 지식카드 id. */
@@ -24,6 +35,7 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   // ─────────────────────────── 공통 ───────────────────────────
   confidence: {
     why: '런 상태(S0~S3)와 유출 계수를 구동하는 선행 변수다. 60 아래로 내려가면 유출률이 계단식으로 뛰므로, 지표가 아직 멀쩡해도 커뮤니케이션·감독 접촉 순서를 앞당겨야 한다.',
+    caveat: '시뮬레이션 신뢰지수 · 실제 관측 통계 아님',
     formula: '예금자·거래상대·투자자·이사회 신뢰의 가중 합(0~100), 사건별 ΔCI 누적',
     cards: ['bank-run-dynamics', 'crisis-communication'],
     sourceRef: 'fsb-depositor-behaviour-2024',
@@ -61,18 +73,21 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   },
   survivalDays: {
     why: '이 플랫폼의 1차 의사결정 지표다. 3일 아래면 담보 이송·창구 신청을 지금 시작해야 하고, 1일 아래면 매각·감독 접촉·매각 타진을 동시에 열어야 한다.',
+    caveat: '현재 유출 속도 기준 추정 · 결제 마감까지의 시간 아님',
     formula: '(현금 + 당일 담보차입 여력 − 최소 보유 현금) ÷ 예상 일일 순유출',
     cards: ['contingency-funding-plan', 'uninsured-deposits-and-run-speed'],
     sourceRef: 'bcbs-144',
   },
   facilityHeadroom: {
-    why: '"오늘" 빌릴 수 있는 담보 여력이다. 담보가 사전 예치·평가되어 있지 않으면 장부상 여력은 0과 같으므로, 이 숫자가 줄면 원인이 담보 소진인지 운영 지연인지를 먼저 구분한다.',
+    why: '지금 빌릴 수 있는 담보 여력이다. 담보가 사전 예치·평가되어 있지 않으면 장부상 여력은 0과 같으므로, 이 숫자가 줄면 원인이 담보 소진인지 운영 지연인지를 먼저 구분한다.',
+    caveat: '인출 전에는 현금에 포함되지 않음',
     formula: '중앙은행·FHLB 사전 예치 담보의 시가 × (1 − 헤어컷) − 기차입액',
     cards: ['discount-window-fhlb-btfp', 'hqla-and-haircuts'],
     sourceRef: 'interagency-cfp-addendum-2023',
   },
   facilityPending: {
-    why: '이송·평가 중이라 오늘은 쓸 수 없는 담보다. 생존 일수 계산에 넣지 않는다 — 시그니처는 바로 이 칸의 숫자를 당일 유동성으로 착각해 주말을 넘기지 못했다.',
+    why: '이송·평가 중이라 아직 쓸 수 없는 담보다. 생존 일수 계산에 넣지 않는다 — 시그니처는 바로 이 칸의 숫자를 당일 유동성으로 착각해 주말을 넘기지 못했다.',
+    caveat: '반영 대기 · 현재 현금에 포함되지 않음',
     formula: '이송·리엔 해제·평가 대기 중인 담보의 예상 차입 가능액(T+1)',
     cards: ['discount-window-fhlb-btfp', 'contingency-funding-plan'],
     sourceRef: 'fdic-oig-signature-2023',
@@ -84,6 +99,7 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   },
   lcr: {
     why: '규제 최저선이자 감독 개입(R1)의 트리거다. 다만 30일 전제이므로 하루 25%가 빠지는 런에서는 충족 여부와 생존이 별개라는 점을 함께 보고해야 한다.',
+    caveat: '30일 스트레스 기준 · 당일 결제 여력은 별도 확인',
     formula: 'HQLA(헤어컷·상한 적용) ÷ 30일 순현금유출 × 100, 유입 인정 상한 75%',
     cards: ['lcr-basics', 'hqla-and-haircuts'],
     sourceRef: 'bcbs-238',
@@ -96,6 +112,7 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   },
   projectedDailyOutflow: {
     why: '생존 일수의 분모다. 런 상태·증폭·완화 계수가 반영되므로, 커뮤니케이션이나 백스톱이 이 숫자를 얼마나 줄이는지가 그 조치의 실질 가치다.',
+    caveat: '현재 조건에 따른 향후 1일 추정 · 확정 지급액 아님',
     formula: 'Σ(세그먼트 잔액 × 런 상태별 유출률) × 증폭계수 ÷ 완화계수',
     cards: ['bank-run-dynamics', 'uninsured-deposits-and-run-speed'],
     sourceRef: 'fsb-depositor-behaviour-2024',
@@ -113,25 +130,29 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
   dailyOutflow: {
-    why: '오늘의 실제 유출액이다. 예상 유출과의 괴리가 커지면 유출 모형이 아니라 관측치로 생존 일수를 다시 계산하고 감독당국에 보고 주기를 올린다.',
+    why: '이번 구간의 실제 유출액이다. 예상 유출과의 괴리가 커지면 유출 모형이 아니라 관측치로 생존 일수를 다시 계산하고 감독당국에 보고 주기를 올린다.',
+    caveat: '현재 구간 누적 · 구간 시작 때 집계 초기화',
     formula: '당일 예금 순유출(인출 − 유입)',
     cards: ['bank-run-dynamics', 'contingency-funding-plan'],
     sourceRef: 'dfpi-svb-order-2023',
   },
   dailyOutflowPct: {
     why: '감독 반응의 임계 축이다. 3%/일에서 경고, 20%/일을 넘으면 감독당국은 정리 준비(R3)로 넘어간다고 가정해야 한다.',
+    caveat: '현재 구간 누적 · 구간 시작 때 집계 초기화',
     formula: '당일 순유출 ÷ 턴 시작 예금 잔액 × 100',
     cards: ['uninsured-deposits-and-run-speed', 'regulator-escalation-ladder'],
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
   cumulativeOutflow: {
     why: '위기 시작 이후 빠져나간 총액으로, 백스톱 규모와 매각 협상의 기준선이 된다. 임계 구간이 정의돼 있지 않으므로 "정상"이 아니라 절대액과 속도로 판단한다.',
+    caveat: '시나리오 시작 이후 누적',
     formula: 'Σ 일별 순유출',
     cards: ['bank-run-dynamics', 'fdic-resolution-weekend'],
     sourceRef: 'dfpi-svb-order-2023',
   },
   cumulativeOutflowPct: {
     why: '조달 기반이 얼마나 훼손됐는지를 보여 준다. 25%를 넘으면 잔여 예금도 같은 속도로 나간다고 보고 정리·매각 선택지를 실제로 열어 둔다.',
+    caveat: '시나리오 시작 이후 누적',
     formula: '누적 순유출 ÷ 위기 시작 시점 예금 × 100',
     cards: ['uninsured-deposits-and-run-speed', 'fdic-resolution-weekend'],
     sourceRef: 'fsb-depositor-behaviour-2024',
@@ -202,12 +223,14 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   },
   abcpMaturing30: {
     why: '미처리 만기 4개를 합한 금액이다. 구간 간격이 서로 달라 달력상 30일 합계로 해석할 수 없다. 실제 날짜별 만기표는 별도 확인한다.',
+    caveat: '달력상 30일 합계 아님',
     formula: 'Σ 현재 미처리 만기 배열[0..3] PF-ABCP 잔액',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-lee-2022-18',
   },
   schemeCash: {
     why: '스킴이 보유한 현금이다. 풀 납입 승인·송금·반영을 확인한 뒤 담보로 사용할 수 있다.',
+    caveat: 'LDI 풀 내부 현금 제외',
     formula: '스킴 자산의 현금 잔고 (LDI 풀 내부 현금 제외)',
     cards: ['ldi-collateral-waterfall'],
     sourceRef: 'boe-breeden-2022',
