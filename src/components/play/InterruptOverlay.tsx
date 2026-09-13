@@ -3,6 +3,7 @@ import type { DecisionView, Interrupt } from '../../engine'
 import { hasDialogue, isInterrupt } from '../../engine'
 import { useGameStore } from '../../store/gameStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useHelp } from '../help/helpContext'
 import { useResponseCountdown } from '../../lib/useResponseCountdown'
 import { Badge, Button, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
@@ -68,12 +69,22 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
     [decision.id, respondInterrupt, onAnswered],
   )
 
+  /**
+   * 도움 시트가 열려 있으면 응답 예산도 멈춘다.
+   *
+   * 여기만 `held` 를 넘기지 않아서, 사건 시계는 멈춘 채(`useSimulationClock` 이 `openInterrupts` 와
+   * `helpOpen` 둘 다로 잡는다) 응답 예산만 타고 있었다. 화면은 그동안 «사건 진행은 멈춰 있습니다» 와
+   * «다른 탭에서는 응답 시간도 멈춥니다» 라고 적고 있었다 — 용어 하나 찾아보는 사이에 기본 응답으로
+   * 자동 확정되는 것은 그 약속과 다르다. 결정 독과 같은 규칙을 쓴다.
+   */
+  const help = useHelp()
   const { remainingMs, paused, stopped, togglePause } = useResponseCountdown(
     totalMs,
     totalMs > 0,
     () => {
       if (interrupt) answer([interrupt.defaultOptionId], true)
     },
+    help.isOpen,
   )
 
   const warned = useRef<{ 30?: boolean; 10?: boolean }>({})

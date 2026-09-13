@@ -41,6 +41,30 @@ import {
 import { InlineMarkdown } from '../knowledge/InlineMarkdown'
 
 /**
+ * 한 결정에 대해 플레이어가 «아직 확정하지 않고 적어 둔 것».
+ *
+ * `DecisionBlock` 은 열린 결정 하나만 마운트되고 `key` 가 결정 id 라, 다른 결정을 열었다 돌아오면
+ * 통째로 새로 만들어진다. 예전에는 그래서 잃는 것이 메모 하나였는데, 판단 기록 세 칸이 생기면서
+ * 한 번의 전환으로 네 칸이 사라지고 응답 시간까지 처음부터 다시 시작했다. 한 턴에 결정이 둘
+ * 이상 열리는 시나리오에서 실제로 밟는 경로다. 그래서 초안은 독(dock)이 들고 있는다.
+ */
+export interface DecisionDraft {
+  memo: string
+  reasoning: { evidence: string; assumption: string; reconsiderWhen: string }
+  /** 이 결정에 실제로 머문 시간의 합. 디브리핑의 «소요 N초» 가 이 값이다. */
+  elapsedMs: number
+  /** 이미 태운 응답 예산. 돌아왔을 때 처음부터가 아니라 남은 만큼으로 재개한다. */
+  burnedMs: number
+}
+
+const EMPTY_DRAFT: DecisionDraft = {
+  memo: '',
+  reasoning: { evidence: '', assumption: '', reconsiderWhen: '' },
+  elapsedMs: 0,
+  burnedMs: 0,
+}
+
+/**
  * An unresolved decision. Ports the whole selection model of the old `DecisionCard`
  * (radio/checkbox group by `select.max`, exclusive groups, roving tabindex, 1–5, Ctrl+Enter)
  * and drops the second confirmation step: 확정 is one click.
@@ -53,10 +77,14 @@ function DecisionBlock({
   sticky,
   onPreview,
   onCommitted,
+  draft,
+  onDraft,
 }: {
   dv: DecisionView
   index: number
   total: number
+  draft: DecisionDraft
+  onDraft: (patch: Partial<DecisionDraft>) => void
   /**
    * True once this is the decision actually being asked for. On a ticked turn that means the
    * deadline tick has arrived, so the `timeLimitSec` countdown no longer burns down while the
@@ -86,14 +114,15 @@ function DecisionBlock({
   const dialogue = hasDialogue(decision)
 
   const [selected, setSelected] = useState<string[]>([])
-  const [memo, setMemo] = useState('')
-  const [reasoning, setReasoning] = useState({ evidence: '', assumption: '', reconsiderWhen: '' })
-  const reasoningRef = useRef(reasoning)
-  reasoningRef.current = reasoning
+  const { memo, reasoning } = draft
+  const setMemo = (v: string) => onDraft({ memo: v })
+  const setReasoning = (patch: Partial<DecisionDraft['reasoning']>) =>
+    onDraft({ reasoning: { ...draftRef.current.reasoning, ...patch } })
   const savedReasoning = () =>
-    Object.values(reasoningRef.current).some((v) => v.trim())
-      ? { ...reasoningRef.current }
+    Object.values(draftRef.current.reasoning).some((v) => v.trim())
+      ? { ...draftRef.current.reasoning }
       : undefined
+  const written = Boolean(memo.trim()) || Object.values(reasoning).some((v) => v.trim())
   const [memoOpen, setMemoOpen] = useState(false)
   const [contextOpen, setContextOpen] = useState(mode === 'guided')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -112,6 +141,10 @@ function DecisionBlock({
   )
 
   const startedAt = useRef(Date.now())
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+  const onDraftRef = useRef(onDraft)
+  onDraftRef.current = onDraft
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const confirmBtn = useRef<HTMLButtonElement>(null)
   const onPreviewRef = useRef(onPreview)
@@ -171,10 +204,10 @@ function DecisionBlock({
     () => timerConfig(decision, mode, timersEnabled),
     [decision, mode, timersEnabled],
   )
-  const memoRef = useRef(memo)
-  memoRef.current = memo
+  // 남은 예산으로 재개한다 — 다른 결정을 잠깐 보고 왔다고 시간이 되돌아가지도, 사라지지도 않는다.
+  const budgetMs = Math.max(0, (timer?.limitMs ?? 0) - draft.burnedMs)
   const { remainingMs, paused, stopped, togglePause, expired } = useResponseCountdown(
-    timer?.limitMs ?? 0,
+    budgetMs,
     Boolean(timer) && due,
     () => {
       const def = decision.defaultOptionId
@@ -182,7 +215,7 @@ function DecisionBlock({
         const ok = choose(decision.id, [def], {
           timedOut: true,
           elapsedMs: timer.limitMs,
-          memo: memoRef.current.trim() || undefined,
+          memo: draftRef.current.memo.trim() || undefined,
           reasoning: savedReasoning(),
         })
         if (ok) onCommitted('시간이 만료되어 기본 선택지로 확정되었습니다')
@@ -191,8 +224,31 @@ function DecisionBlock({
         setTimerMsg('시간이 만료되었습니다. 이 결정은 계속 확정하실 수 있습니다')
       }
     },
-    help.isOpen && mode !== 'expert',
+    /**
+     * 도움 시트가 열려 있으면 예산을 멈춘다 — **모드와 무관하게.**
+     *
+     * 사건 시계(`useSimulationClock`)는 이미 모드와 무관하게 멈춘다. 그런데 여기만 전문가 모드를
+     * 빼 두어서, 화면이 «시계가 멈췄습니다» 라고 적는 동안 응답 예산만 타는 상태가 있었다.
+     * 전문가 모드의 도움 시트는 지표 설명(단위·기간·기준) 한 탭만 연다 — 사후 정보가 아니라
+     * 지금 화면의 숫자가 무엇을 재는가이고, 그걸 읽는 데 시간을 물릴 이유가 없다.
+     */
+    help.isOpen,
   )
+  // 이 결정을 떠날 때, 머문 시간과 태운 예산을 초안에 남긴다.
+  useEffect(
+    () => () => {
+      const limit = timerRef.current?.limitMs ?? 0
+      onDraftRef.current({
+        elapsedMs: draftRef.current.elapsedMs + (Date.now() - startedAt.current),
+        burnedMs: limit > 0 ? limit - remainingRef.current : 0,
+      })
+    },
+    [],
+  )
+  const remainingRef = useRef(remainingMs)
+  remainingRef.current = remainingMs
+  const timerRef = useRef(timer)
+  timerRef.current = timer
   const warned = useRef<{ 30?: boolean; 10?: boolean }>({})
   useEffect(() => {
     if (!timer || !due) return
@@ -217,7 +273,7 @@ function DecisionBlock({
     const ok = choose(decision.id, selected, {
       memo: memo.trim() || undefined,
       reasoning: savedReasoning(),
-      elapsedMs: Date.now() - startedAt.current,
+      elapsedMs: draft.elapsedMs + (Date.now() - startedAt.current),
     })
     setAttempted(true)
     if (!ok) return
@@ -228,7 +284,7 @@ function DecisionBlock({
     const ok = choose(decision.id, [optionId], {
       memo: memo.trim() || undefined,
       reasoning: savedReasoning(),
-      elapsedMs: Date.now() - startedAt.current,
+      elapsedMs: draft.elapsedMs + (Date.now() - startedAt.current),
       path,
     })
     setAttempted(true)
@@ -456,7 +512,9 @@ function DecisionBlock({
           className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
           onClick={() => setMemoOpen((o) => !o)}
         >
-          근거 메모{memo.trim() ? ' (작성됨)' : ' (선택)'}
+          {/* 칸이 넷인데 «근거 메모» 라는 이름과 `memo` 하나만 세고 있었다 — 근거·가정·재검토
+              조건만 적은 사람에게 접힌 컨트롤이 «적어 둔 것 없음» 이라고 말했다. */}
+          판단 기록{written ? ' (작성됨)' : ' (선택)'}
           <Icon name={memoOpen ? 'chevron-down' : 'chevron-right'} size={14} />
         </button>
         {memoOpen && (
@@ -484,7 +542,7 @@ function DecisionBlock({
                   className="mt-1 w-full rounded-md border border-border-control bg-bg px-2 py-1.5 text-base"
                   rows={2}
                   value={reasoning[key]}
-                  onChange={(e) => setReasoning((v) => ({ ...v, [key]: e.target.value }))}
+                  onChange={(e) => setReasoning({ [key]: e.target.value })}
                 />
               </label>
             ))}
@@ -716,6 +774,17 @@ export function DecisionDock({
    * exactly one primary action on screen" true by construction.
    */
   const [openId, setOpenId] = useState<string | undefined>()
+
+  /**
+   * 결정별 초안은 독이 들고 있는다 — `DecisionBlock` 이 결정마다 새로 마운트되기 때문이다.
+   * 턴이 넘어가면 비운다: 다음 턴의 결정은 다른 질문이고, 남은 초안은 남의 답이다.
+   */
+  const [drafts, setDrafts] = useState<Record<string, DecisionDraft>>({})
+  useEffect(() => setDrafts({}), [state.turnIndex])
+  const draftOf = (id: string) => drafts[id] ?? EMPTY_DRAFT
+  const patchDraft = (id: string, patch: Partial<DecisionDraft>) =>
+    setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? EMPTY_DRAFT), ...patch } }))
+
   const openDecisionId =
     openId && view.decisions.some((d) => !d.resolved && d.decision.id === openId)
       ? openId
@@ -807,6 +876,8 @@ export function DecisionDock({
             sticky={sticky}
             onPreview={onPreview}
             onCommitted={onCommitted}
+            draft={draftOf(dv.decision.id)}
+            onDraft={(patch) => patchDraft(dv.decision.id, patch)}
           />
         ) : (
           <PendingRow

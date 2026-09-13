@@ -9,6 +9,7 @@ import { PlayContext } from '@/components/play/playContext'
 import { InterruptOverlay } from '@/components/play/InterruptOverlay'
 import { OptionComparison } from '@/components/play/OptionComparison'
 import { HelpSheet } from '@/components/help/HelpSheet'
+import { HelpApiContext } from '@/components/help/helpContext'
 import { RestrictedKnowledgeContext } from '@/components/knowledge/knowledgeAccess'
 import { Markdown } from '@/components/knowledge/Markdown'
 import { miniBank } from '../fixtures/miniBank'
@@ -107,5 +108,49 @@ describe('practitioner training controls', () => {
     )
     expect(screen.queryAllByRole('link')).toHaveLength(0)
     expect(screen.getByText(/학습/)).toBeVisible()
+  })
+
+  /**
+   * 도움 시트를 연 채로는 돌발 대응 응답 시간이 타지 않는다.
+   *
+   * 이 파일은 타이머가 **꺼진** 세 조합만 확인하고 있었다(guided+on / standard+off / expert+off).
+   * 그래서 오버레이가 `held` 를 넘기지 않아 — 결정 독은 넘기는데 — 사건 시계는 멈춘 채 응답
+   * 예산만 타던 상태가 그대로 통과했다. 화면은 그동안 «사건 진행은 멈춰 있습니다» 라고 적고 있었다.
+   */
+  it('does not burn the interrupt budget while the help sheet is open', () => {
+    vi.useFakeTimers()
+    const base = asGeneric(miniTicks)
+    const scenario = {
+      ...base,
+      turns: base.turns.map((t) => ({
+        ...t,
+        interrupts: t.interrupts?.map((i) => ({ ...i, timeoutSec: 0.1 })),
+      })),
+    }
+    useSettingsStore.getState().update({ timersEnabled: true })
+    const g = useGameStore.getState()
+    g.start(scenario, 'standard', 1, 0)
+    g.choose('d0_disclosure', ['opt_a_backstopped'])
+    g.next()
+    g.choose('d1_funding', ['draw_fhlb'])
+    g.tickAdvance()
+    const { state, run, history } = useGameStore.getState()
+    const view = getTurnView(state!, scenario, { mode: 'standard' })
+    expect(view.interrupts).toHaveLength(1)
+    render(
+      <MemoryRouter>
+        <HelpApiContext.Provider
+          value={{ open: () => {}, close: () => {}, isOpen: true, badge: 0 }}
+        >
+          <PlayContext.Provider
+            value={{ scenario, state: state!, run: run!, history, mode: 'standard', view }}
+          >
+            <InterruptOverlay dv={view.interrupts[0]!} onAnswered={vi.fn()} />
+          </PlayContext.Provider>
+        </HelpApiContext.Provider>
+      </MemoryRouter>,
+    )
+    act(() => vi.advanceTimersByTime(5000))
+    expect(useGameStore.getState().state?.openInterrupts).toHaveLength(1)
   })
 })
