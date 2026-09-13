@@ -6,6 +6,7 @@ import {
   canAdvanceTick,
   computeScore,
   createGame,
+  hintCostBetween,
   replay,
   type DecisionMeta,
   type GameState,
@@ -17,7 +18,8 @@ import type { InProgressSave } from '../persistence/schema'
 import { useProgressStore } from './progressStore'
 import { useSettingsStore } from './settingsStore'
 
-export const HINT_COSTS: Record<1 | 2 | 3, number> = { 1: 2, 2: 4, 3: 8 }
+/** 표는 엔진이 소유한다(`replay()` 가 읽어야 한다). 여기서는 다시 내보내기만 한다. */
+export { HINT_COSTS } from '../engine'
 
 /**
  * Real milliseconds one simulated tick lasts at ×1, per mode. The `clockTickSec` setting
@@ -237,7 +239,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!scenario || !state || !run) return false
     try {
       const pending = run.hintsRevealed[decisionId] ?? 0
-      const penalty = run.mode === 'standard' ? ([0, 2, 6, 14][pending] ?? 0) : 0
+      const penalty = run.mode === 'standard' ? hintCostBetween(0, pending) : 0
       const next = applyDecision(state, scenario, decisionId, optionIds, {
         ...meta,
         hintsUsed: pending || undefined,
@@ -413,8 +415,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!run) return
     const cur = run.hintsRevealed[decisionId] ?? 0
     if (level <= cur) return
-    const cost =
-      run.mode === 'standard' ? ([0, 2, 6, 14][level] ?? 0) - ([0, 2, 6, 14][cur] ?? 0) : 0
+    const cost = run.mode === 'standard' ? hintCostBetween(cur, level) : 0
     set({
       run: {
         ...run,

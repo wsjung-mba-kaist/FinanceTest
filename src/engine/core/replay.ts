@@ -8,6 +8,7 @@ import type {
 import { advanceTurn } from './advanceTurn'
 import { applyDecision, isDecisionResolved } from './applyDecision'
 import { createGame } from './createGame'
+import { hintCostBetween } from './hintCost'
 import { advanceTick, canAdvanceTick, fastForwardTicks } from './tick'
 
 export interface ReplayLog {
@@ -58,7 +59,7 @@ export function replay<S extends InstitutionState>(
       hintsUsed: rec.hintsUsed,
       hintPenalty:
         rec.hintPenalty ??
-        (log.mode === 'standard' && rec.hintsUsed ? [0, 2, 6, 14][rec.hintsUsed] : undefined),
+        (log.mode === 'standard' && rec.hintsUsed ? hintCostBetween(0, rec.hintsUsed) : undefined),
       reasoning: rec.reasoning,
       // The dialogue path is part of the log: it is re-walked and re-verified, never assumed.
       path: rec.path,
