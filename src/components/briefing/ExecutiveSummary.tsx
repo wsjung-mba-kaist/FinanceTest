@@ -239,11 +239,12 @@ export function ExecutiveSummary({
             <Markdown className="prose-col mt-1">{summary.situation}</Markdown>
             {/* The dossier carries the same ground in full. Saying so here is what lets the
                 summary stop at 220 characters instead of becoming a second copy of it. */}
-            <p className="mt-1 text-sm">
-              {mode !== 'expert' && (
+            {/* 전문가 모드에는 도시에 자체가 없다 — 링크만 감추면 빈 `<p>` 의 여백이 남는다. */}
+            {mode !== 'expert' && (
+              <p className="mt-1 text-sm">
                 <a href="#bf-dossier-h">전체 상황 개요 · 기관 현황 · 시장 배경 →</a>
-              )}
-            </p>
+              </p>
+            )}
           </section>
 
           {/* 역할·권한 and 목표 are each a sentence or two, so they sit side by side rather than

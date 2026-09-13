@@ -12,8 +12,9 @@ export interface DebriefTextInput {
   historical?: GameState
   expert?: GameState
   regrets?: Regret[]
-  /** Omitted from the output when absent, so the text is reproducible in tests. */
+  /** 어떤 조건에서 비교한 것인지 — seed·변동성·비교 시점. 없으면 줄 자체가 나오지 않는다. */
   comparisonNote?: string
+  /** Omitted from the output when absent, so the text is reproducible in tests. */
   generatedAt?: string
 }
 

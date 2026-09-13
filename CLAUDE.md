@@ -80,8 +80,13 @@ Entry point is `src/engine/index.ts`; `core/` has the turn loop, `fx/` the effec
 `src/scenarios/index.ts` is a registry of summaries with lazy `load()`. A scenario module is a fixed
 set of files — `scenario.ts`, `facts.ts`, `initialState.ts`, `turnsA/B.ts`, `scoring.ts`,
 `debrief.ts`, `sources.ts`, `calibration.md`, plus its own `*.test.ts` that reproduces the historical
-path. Follow `docs/authoring-guide.md` for new ones; `src/scenarios/planned.ts` lists those that have
-a research dossier but no implementation yet.
+path. Follow `docs/authoring-guide.md` for new ones. **All 13 are implemented** — `planned.ts` is an
+empty array now, so anything that says "N have a dossier but no implementation" is stale.
+
+Turn length differs per scenario (`turnUnit`: svb = hour, korea-imf and taeyoung = week, the other
+ten = day). Anything shared across scenarios — the metric registry in `src/metrics/byInstitution.ts`,
+`KPI_EXPLAIN` — therefore **cannot say 당일/익일**; only a scenario's own `KpiSpec.label` can.
+`tests/integrity/metricLabels.test.ts` holds that line.
 
 ### Screens
 
@@ -118,6 +123,8 @@ Two consequences worth knowing before you touch any styling:
   telling you the new number to write down.
 
 `docs/visual-check.md` records what is verified by browser and the judgement calls still open.
+`docs/finance-practitioner-ux.md` records the practitioner-facing review and what it deliberately
+left unbuilt (settlement ledgers, per-document release windows).
 
 ## Testing
 

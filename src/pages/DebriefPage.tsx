@@ -67,8 +67,26 @@ interface DebriefData {
 const replayCache = new Map<string, DebriefData | undefined>()
 const REPLAY_CACHE_MAX = 12
 
+/**
+ * 재생 결과를 결정하는 것만 키에 넣는다.
+ *
+ * 한때 `decisions.length` 만 봤는데, 길이가 같고 내용이 다른 기록이 서로의 답을 물려받았다.
+ * 그 다음에는 반대로 `JSON.stringify(attempt)` 전체가 됐다 — 안전하지만 `completedAt` ·
+ * `durationSec` · `score` 처럼 **재생 결과를 바꿀 수 없는** 필드까지 키가 되고, 기록 하나가
+ * 통째로 문자열이 된다. 위 주석이 말하는 «`(scenario version, seed, decisions)` 의 순수 함수» 가
+ * 정확히 이 목록이므로, 그것만 적는다.
+ */
 function attemptKey(scenario: ScenarioDefinition, attempt: AttemptSave): string {
-  return [scenario.meta.id, scenario.meta.version, JSON.stringify(attempt)].join('|')
+  return [
+    scenario.meta.id,
+    scenario.meta.version,
+    attempt.seed,
+    attempt.variance ?? 0,
+    attempt.mode,
+    attempt.endedTurnIndex ?? '',
+    attempt.endedTick ?? '',
+    JSON.stringify(attempt.decisions),
+  ].join('|')
 }
 
 function rebuildFromAttempt(
@@ -386,7 +404,6 @@ export default function DebriefPage() {
   const onCopy = () => {
     const text = buildDebriefText({
       comparisonNote: `seed ${run.seed} · 변동성 ${variance} · ${comparisonFrame === 'same' ? `동일 시점 T+${state.turnIndex}/${state.tick}틱` : `각 경로 최종 시점 — 귀하 T+${state.turnIndex}/${state.tick}틱, 역사 T+${paths.historical?.turnIndex ?? '—'}/${paths.historical?.tick ?? '—'}틱, 전문가 T+${paths.expert?.turnIndex ?? '—'}/${paths.expert?.tick ?? '—'}틱`}`,
-
       scenario,
       state,
       report,
