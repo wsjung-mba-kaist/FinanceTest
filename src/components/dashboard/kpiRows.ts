@@ -10,6 +10,7 @@ import type {
 import { directionOf, type Direction } from '../../lib/direction'
 import { scaleFor, type CcyScale } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
+import { isWindowMetric, metricLabel } from '../../lib/metricContext'
 
 export { directionOf, type Direction }
 
@@ -74,15 +75,26 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
     const current = currentSnap?.metrics[spec.metric]
     const previous = previousSnap?.metrics[spec.metric]
     const delta =
-      current && previous && Number.isFinite(current.value) && Number.isFinite(previous.value)
+      !isWindowMetric(spec.metric) &&
+      current &&
+      previous &&
+      Number.isFinite(current.value) &&
+      Number.isFinite(previous.value)
         ? current.value - previous.value
         : undefined
     return {
-      spec,
+      spec: isWindowMetric(spec.metric)
+        ? { ...spec, label: metricLabel(spec.metric, spec.label) }
+        : spec,
       current,
       previous,
       delta,
-      series: metricSeries(state, spec.metric, shownTurn),
+      series: isWindowMetric(spec.metric)
+        ? state.tickHistory
+            .filter((t) => t.turnIndex === shownTurn)
+            .map((t) => t.values[spec.metric])
+            .filter((v): v is number => v !== undefined && Number.isFinite(v))
+        : metricSeries(state, spec.metric, shownTurn),
       lag,
       threshold: thresholds[spec.metric],
       scale: metricScale(state, spec, scenario.units),
@@ -98,11 +110,7 @@ export function buildKpiRows(scenario: ScenarioDefinition, state: GameState, mod
  * see the *number* fell. Choosing once from the peak means the same figure reads 3.20 → 0.85 → 0.09
  * 조원 — three points on one axis, which is the shape of the event.
  */
-export function metricScale(
-  state: GameState,
-  spec: KpiSpec,
-  units: Units,
-): CcyScale | undefined {
+export function metricScale(state: GameState, spec: KpiSpec, units: Units): CcyScale | undefined {
   if (spec.unit !== 'ccy') return undefined
   const seen = metricSeries(state, spec.metric, state.turnIndex)
   return scaleFor(seen, units)

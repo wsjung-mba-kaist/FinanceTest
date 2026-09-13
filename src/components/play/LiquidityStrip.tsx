@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isWindowMetric } from '../../lib/metricContext'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { useHelp } from '../help/helpContext'
 import { Icon } from '../ui/Icon'
@@ -67,7 +68,7 @@ function usePulse(value: number, direction: string, enabled: boolean): string {
 function Cell({ cell, mobile }: { cell: MetricCell; mobile?: boolean }) {
   const help = useHelp()
   const reduced = useReducedMotion()
-  const pulse = usePulse(cell.raw, cell.direction, !reduced)
+  const pulse = usePulse(cell.raw, cell.direction, !reduced && !isWindowMetric(cell.metric))
   return (
     <div
       className={`flex flex-1 flex-col justify-center gap-0.5 rounded-md py-1 ${

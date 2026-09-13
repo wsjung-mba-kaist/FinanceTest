@@ -51,7 +51,9 @@ export function KpiComparisonTable({
 
   const cell = (r: KpiComparisonRow, v: number | undefined, className: string) =>
     v === undefined ? (
-      <span className={computing ? 'text-muted' : 'num text-muted'}>{computing ? '계산 중…' : '—'}</span>
+      <span className={computing ? 'text-muted' : 'num text-muted'}>
+        {computing ? '계산 중…' : '—'}
+      </span>
     ) : (
       <span className={className}>
         <Num
@@ -78,9 +80,24 @@ export function KpiComparisonTable({
         </>
       ),
     },
-    { key: 'player', label: '귀하', align: 'right', render: (r) => cell(r, r.player, 'font-semibold') },
-    { key: 'historical', label: '역사', align: 'right', render: (r) => cell(r, r.historical, 'text-muted') },
-    { key: 'expert', label: '전문가', align: 'right', render: (r) => cell(r, r.expert, 'text-muted') },
+    {
+      key: 'player',
+      label: '귀하',
+      align: 'right',
+      render: (r) => cell(r, r.player, 'font-semibold'),
+    },
+    {
+      key: 'historical',
+      label: '역사',
+      align: 'right',
+      render: (r) => cell(r, r.historical, 'text-muted'),
+    },
+    {
+      key: 'expert',
+      label: '전문가',
+      align: 'right',
+      render: (r) => cell(r, r.expert, 'text-muted'),
+    },
     {
       key: 'trend',
       label: '귀하의 경로',
@@ -106,7 +123,7 @@ export function KpiComparisonTable({
       </h2>
       <div className="mt-2">
         <DataTable
-          caption="핵심 지표 최종값을 플레이어·역사 경로·전문가 경로로 비교"
+          caption="선택한 비교 시점의 핵심 지표를 플레이어·역사 경로·전문가 경로로 비교"
           columns={columns}
           rows={rows}
           rowKey={(r) => r.kpi.metric}
@@ -114,13 +131,18 @@ export function KpiComparisonTable({
       </div>
       {rest.length > 0 && (
         <div className="mt-2">
-          <Button size="sm" variant="ghost" aria-expanded={showRest} onClick={() => setShowRest((v) => !v)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-expanded={showRest}
+            onClick={() => setShowRest((v) => !v)}
+          >
             {showRest ? '접기' : `나머지 지표 ${rest.length}건 더 보기`}
           </Button>
           {showRest && (
             <div className="mt-1">
               <DataTable
-                caption="보조 지표 최종값 비교"
+                caption="선택한 비교 시점의 보조 지표"
                 columns={columns}
                 rows={rest}
                 rowKey={(r) => r.kpi.metric}

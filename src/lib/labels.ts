@@ -76,9 +76,10 @@ export const MODE_LABELS: Record<Mode, string> = {
 
 /** One-line pitch shown next to the mode radio on the briefing start card. */
 export const MODE_SUMMARY: Record<Mode, string> = {
-  guided: '힌트가 무료이고 타이머가 없습니다. 처음이라면 안내 모드를 권장합니다.',
-  standard: '힌트는 감점되고 타이머는 1.5배로 여유가 있습니다. 한 번 해 본 뒤 권장합니다.',
-  expert: '힌트 없음·엄격한 타이머·미확인 정보 포함. 실제 상황실에 가장 가깝습니다.',
+  guided: '힌트가 무료이고 응답 시간 제한이 없습니다. 처음이라면 안내 모드를 권장합니다.',
+  standard: '힌트는 감점되고 응답 시간은 1.5배로 여유가 있습니다. 한 번 해 본 뒤 권장합니다.',
+  expert:
+    '힌트와 영향 프리뷰 없이 당시의 판단을 훈련합니다. 응답 시간 제한은 설정에서 끌 수 있습니다.',
 }
 
 export const MODE_DESCRIPTIONS: Record<Mode, string[]> = {
@@ -87,7 +88,7 @@ export const MODE_DESCRIPTIONS: Record<Mode, string[]> = {
     '개념 카드 자동 펼침',
     '선택 근거 즉시 공개',
     '수치 영향 프리뷰',
-    '타이머 없음',
+    '결정·돌발 대응의 응답 시간 제한 없음',
   ],
   standard: [
     '힌트 사용 시 감점(−2/−4/−8점)',

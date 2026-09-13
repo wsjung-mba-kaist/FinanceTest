@@ -199,6 +199,24 @@ export function PathComparison({
                 ) : (
                   chosen.map((o) => <OptionCell key={o.id} option={o} scenario={scenario} />)
                 )}
+                {rec.reasoning && (
+                  <dl className="mt-2 space-y-1 text-sm">
+                    {(
+                      [
+                        ['evidence', '당시 확인한 근거'],
+                        ['assumption', '당시의 가정'],
+                        ['reconsiderWhen', '판단을 바꿀 조건'],
+                      ] as const
+                    ).map(([key, label]) =>
+                      rec.reasoning?.[key] ? (
+                        <div key={key}>
+                          <dt className="text-muted">{label}</dt>
+                          <dd className="m-0 whitespace-pre-wrap">{rec.reasoning[key]}</dd>
+                        </div>
+                      ) : null,
+                    )}
+                  </dl>
+                )}
                 {rec.memo && (
                   <p className="mt-2 rounded-sm border border-border bg-surface-2 p-2 text-sm">
                     <span className="text-muted">메모: </span>

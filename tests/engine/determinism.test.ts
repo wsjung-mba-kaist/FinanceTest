@@ -97,7 +97,9 @@ describe('determinism', () => {
     expect(ci.before).toBe(72)
     expect(ci.after).toBe(52)
     expect(ci.delta).toBe(-20)
-    expect(preview.delayed).toEqual([{ afterTurns: 2, description: '신용등급 검토 → 1노치 강등' }])
+    expect(preview.delayed).toEqual([
+      { afterTurns: 2, description: '신용등급 검토 → 1노치 강등', conditional: true },
+    ])
     expect(preview.feed.length).toBeGreaterThan(0)
     expect(preview.wouldEnd).toBeUndefined()
   })

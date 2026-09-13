@@ -1,3 +1,5 @@
+import { useContext } from 'react'
+import { RestrictedKnowledgeContext } from './knowledgeAccess'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { GFM_OPTIONS } from './remarkOptions'
@@ -14,6 +16,7 @@ import { GlossaryTerm } from './GlossaryTerm'
  * and 7 trap explanations across the shipped scenarios contain `**`.
  */
 export function InlineMarkdown({ children, className }: { children: string; className?: string }) {
+  const restricted = useContext(RestrictedKnowledgeContext)
   return (
     <span className={className}>
       <ReactMarkdown
@@ -25,6 +28,7 @@ export function InlineMarkdown({ children, className }: { children: string; clas
           ol: ({ children: c }) => <>{c}</>,
           li: ({ children: c }) => <>{c}</>,
           a: ({ href, children: c }) => {
+            if (restricted) return <>{c}</>
             if (href?.startsWith('term:'))
               return <GlossaryTerm id={href.slice(5)}>{c}</GlossaryTerm>
             return (

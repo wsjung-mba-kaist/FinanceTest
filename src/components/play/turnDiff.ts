@@ -1,5 +1,6 @@
 import type { GameState, MetricDelta, MetricStatus, ScenarioDefinition } from '../../engine'
 import { latestSnapshot } from '../../engine'
+import { isWindowMetric } from '../../lib/metricContext'
 
 const STATUS_RANK: Record<MetricStatus, number> = { na: 0, ok: 1, warn: 2, breach: 3 }
 
@@ -22,6 +23,7 @@ export function turnDiff(scenario: ScenarioDefinition, state: GameState): Metric
 
   const out: MetricDelta[] = []
   for (const [key, now] of Object.entries(current.metrics)) {
+    if (isWindowMetric(key)) continue
     const before = previous.metrics[key]
     if (!before || !Number.isFinite(now.value) || !Number.isFinite(before.value)) continue
     if (Math.abs(now.value - before.value) < 1e-9) continue
@@ -42,7 +44,8 @@ export function turnDiff(scenario: ScenarioDefinition, state: GameState): Metric
   // attention and the row that changed state is the one they must not miss.
   return out
     .sort((a, b) => {
-      const crossed = Number(b.statusBefore !== b.statusAfter) - Number(a.statusBefore !== a.statusAfter)
+      const crossed =
+        Number(b.statusBefore !== b.statusAfter) - Number(a.statusBefore !== a.statusAfter)
       if (crossed !== 0) return crossed
       const worst = STATUS_RANK[b.statusAfter] - STATUS_RANK[a.statusAfter]
       if (worst !== 0) return worst

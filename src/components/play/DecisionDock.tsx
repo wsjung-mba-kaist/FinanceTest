@@ -8,6 +8,7 @@ import {
   latestSnapshot,
   previewOption,
 } from '../../engine'
+import { useResponseCountdown } from '../../lib/useResponseCountdown'
 import { splitOptionLabel } from '../../lib/text'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { useGameStore } from '../../store/gameStore'
@@ -22,6 +23,7 @@ import { CountdownRing } from './CountdownRing'
 import { DialoguePanel } from './DialoguePanel'
 import { ImpactPreview } from './ImpactPreview'
 import { InlineCard } from './InlineCard'
+import { OptionComparison } from './OptionComparison'
 import { OptionRow } from './OptionRow'
 import { RationalePanel } from './RationalePanel'
 import type { ReelStep } from './reelSteps'
@@ -37,39 +39,6 @@ import {
   type RevealTiming,
 } from './playHelpers'
 import { InlineMarkdown } from '../knowledge/InlineMarkdown'
-
-function useCountdown(limitMs: number, enabled: boolean, onExpire: () => void) {
-  const [remainingMs, setRemaining] = useState(limitMs)
-  const [paused, setPaused] = useState(false)
-  const fired = useRef(false)
-  const onExpireRef = useRef(onExpire)
-  onExpireRef.current = onExpire
-  useEffect(() => {
-    if (!enabled || paused || remainingMs <= 0) return
-    let last = Date.now()
-    const id = window.setInterval(() => {
-      const now = Date.now()
-      const dt = now - last
-      last = now
-      setRemaining((prev) => Math.max(0, prev - dt))
-    }, 250)
-    return () => window.clearInterval(id)
-    // Restart the interval only when pause/enabled flips, not on every tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, paused])
-  useEffect(() => {
-    if (enabled && remainingMs <= 0 && !fired.current) {
-      fired.current = true
-      onExpireRef.current()
-    }
-  }, [enabled, remainingMs])
-  return {
-    remainingMs,
-    paused,
-    togglePause: () => setPaused((p) => !p),
-    expired: enabled && remainingMs <= 0,
-  }
-}
 
 /**
  * An unresolved decision. Ports the whole selection model of the old `DecisionCard`
@@ -118,6 +87,13 @@ function DecisionBlock({
 
   const [selected, setSelected] = useState<string[]>([])
   const [memo, setMemo] = useState('')
+  const [reasoning, setReasoning] = useState({ evidence: '', assumption: '', reconsiderWhen: '' })
+  const reasoningRef = useRef(reasoning)
+  reasoningRef.current = reasoning
+  const savedReasoning = () =>
+    Object.values(reasoningRef.current).some((v) => v.trim())
+      ? { ...reasoningRef.current }
+      : undefined
   const [memoOpen, setMemoOpen] = useState(false)
   const [contextOpen, setContextOpen] = useState(mode === 'guided')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -197,7 +173,7 @@ function DecisionBlock({
   )
   const memoRef = useRef(memo)
   memoRef.current = memo
-  const { remainingMs, paused, togglePause, expired } = useCountdown(
+  const { remainingMs, paused, stopped, togglePause, expired } = useResponseCountdown(
     timer?.limitMs ?? 0,
     Boolean(timer) && due,
     () => {
@@ -207,6 +183,7 @@ function DecisionBlock({
           timedOut: true,
           elapsedMs: timer.limitMs,
           memo: memoRef.current.trim() || undefined,
+          reasoning: savedReasoning(),
         })
         if (ok) onCommitted('시간이 만료되어 기본 선택지로 확정되었습니다')
         else setTimerMsg('시간이 만료되었습니다')
@@ -214,6 +191,7 @@ function DecisionBlock({
         setTimerMsg('시간이 만료되었습니다. 이 결정은 계속 확정하실 수 있습니다')
       }
     },
+    help.isOpen && mode !== 'expert',
   )
   const warned = useRef<{ 30?: boolean; 10?: boolean }>({})
   useEffect(() => {
@@ -238,6 +216,7 @@ function DecisionBlock({
     if (!canConfirm) return
     const ok = choose(decision.id, selected, {
       memo: memo.trim() || undefined,
+      reasoning: savedReasoning(),
       elapsedMs: Date.now() - startedAt.current,
     })
     setAttempted(true)
@@ -248,6 +227,7 @@ function DecisionBlock({
   const resolveDialogue = (optionId: string, path: string[]) => {
     const ok = choose(decision.id, [optionId], {
       memo: memo.trim() || undefined,
+      reasoning: savedReasoning(),
       elapsedMs: Date.now() - startedAt.current,
       path,
     })
@@ -343,7 +323,7 @@ function DecisionBlock({
         </div>
         {timer && due && (
           <div className="flex shrink-0 items-center gap-1">
-            <CountdownRing remainingMs={remainingMs} totalMs={timer.limitMs} paused={paused} />
+            <CountdownRing remainingMs={remainingMs} totalMs={timer.limitMs} paused={stopped} />
             {timer.pausable && !expired && (
               <Button size="sm" variant="ghost" aria-pressed={paused} onClick={togglePause}>
                 {paused ? '재개' : '일시정지'}
@@ -467,6 +447,7 @@ function DecisionBlock({
         </div>
       )}
 
+      {!dialogue && <OptionComparison dv={dv} />}
       <div className="px-3 pt-2">
         <button
           type="button"
@@ -478,16 +459,35 @@ function DecisionBlock({
           <Icon name={memoOpen ? 'chevron-down' : 'chevron-right'} size={14} />
         </button>
         {memoOpen && (
-          <label className="mt-1 block text-sm">
-            <span className="sr-only">근거 메모</span>
-            <textarea
-              className="w-full rounded-md border border-border-control bg-bg px-2 py-1.5 text-base"
-              rows={2}
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="이 선택을 한 이유를 짧게 적어 두면 디브리핑에서 다시 볼 수 있습니다"
-            />
-          </label>
+          <div className="space-y-2">
+            <label className="mt-1 block text-sm">
+              <span className="sr-only">근거 메모</span>
+              <textarea
+                className="w-full rounded-md border border-border-control bg-bg px-2 py-1.5 text-base"
+                rows={2}
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="이 선택을 한 이유를 짧게 적어 두면 디브리핑에서 다시 볼 수 있습니다"
+              />
+            </label>
+            {(
+              [
+                ['evidence', '확인한 근거'],
+                ['assumption', '아직 확인하지 못한 가정'],
+                ['reconsiderWhen', '판단을 바꿀 조건'],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="block text-sm">
+                <span>{label} (선택)</span>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-border-control bg-bg px-2 py-1.5 text-base"
+                  rows={2}
+                  value={reasoning[key]}
+                  onChange={(e) => setReasoning((v) => ({ ...v, [key]: e.target.value }))}
+                />
+              </label>
+            ))}
+          </div>
         )}
       </div>
 

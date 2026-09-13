@@ -1,4 +1,5 @@
-import { useId, useRef, type ReactNode } from 'react'
+import { RestrictedKnowledgeContext } from './knowledgeAccess'
+import { useContext, useId, useRef, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { GFM_OPTIONS } from './remarkOptions'
@@ -50,6 +51,7 @@ export function Markdown({
    */
   headingIds?: boolean
 }) {
+  const restricted = useContext(RestrictedKnowledgeContext)
   const scope = useGlossaryScope()
   const owner = useId()
   // 렌더마다 새로 만든다 — 다시 그려도 같은 위치에 같은 밑줄이 남는다(패널 범위는 owner로 유지).
@@ -74,6 +76,7 @@ export function Markdown({
         remarkPlugins={[[remarkGfm, GFM_OPTIONS], remarkCjkStrong]}
         components={{
           a: ({ href, children: c }) => {
+            if (restricted) return <>{c}</>
             if (href?.startsWith('term:'))
               return <GlossaryTerm id={href.slice(5)}>{c}</GlossaryTerm>
             return (

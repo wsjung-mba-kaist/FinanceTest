@@ -78,11 +78,17 @@ export function ThresholdBand({
     return `${status === 'warn' ? '위험' : '경고'}까지 ${fmt(Math.abs(value - next))}`
   })()
 
-  const caption = headroom ? `${headroom} · ${bands}` : bands
+  const basis =
+    threshold.basis === 'regulatory'
+      ? '규제 기준'
+      : threshold.basis === 'internal'
+        ? '내부 한도'
+        : '훈련 경고선'
+  const caption = `${basis} · ${headroom ? `${headroom} · ${bands}` : bands}`
   const statusWord =
     status === 'breach' ? '위험' : status === 'warn' ? '경고' : status === 'ok' ? '정상' : undefined
   const aria =
-    `${label} 기준 — 경고 ${fmt(warn)}, 위험 ${fmt(breach)}` +
+    `${label} 기준 — ${basis}. 경고 ${fmt(warn)}, 위험 ${fmt(breach)}` +
     (value !== undefined && Number.isFinite(value)
       ? `. 현재 ${fmt(value)}${statusWord ? ` (${statusWord})` : ''}`
       : '')

@@ -19,6 +19,10 @@ export interface MetricSnapshot {
 
 /** Threshold semantics: `direction: 'below'` means lower values are worse (breach when value < breach). */
 export interface Threshold {
+  /** Missing provenance is treated as a training band, never as a regulatory minimum. */
+  basis?: 'simulation' | 'regulatory' | 'internal'
+  asOf?: string
+  sourceRefs?: string[]
   warn: number
   breach: number
   direction: 'above' | 'below'

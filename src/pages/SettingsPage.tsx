@@ -292,7 +292,10 @@ export default function SettingsPage() {
             onChange={(v) => set('rationaleReveal', v)}
           />
         </Field>
-        <Field label="결정 타이머" hint="끄면 표준·전문가 모드에서도 시간 제한이 없습니다">
+        <Field
+          label="응답 시간 제한"
+          hint="끄면 모든 모드에서 결정·돌발 대응의 초 단위 제한이 사라집니다. 사건 진행 시계는 별도로 시작·정지합니다."
+        >
           <Toggle
             id={timerId}
             checked={s.timersEnabled}

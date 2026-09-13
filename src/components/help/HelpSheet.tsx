@@ -89,6 +89,15 @@ function HelpBody({
         ? context.state
         : undefined
 
+  const expertTraining =
+    (context.page === 'play' || context.page === 'briefing') && context.mode === 'expert'
+  if (expertTraining && tab !== 'kpis')
+    return (
+      <p className="text-sm text-muted">
+        전문가 모드에서는 사후 학습 자료와 선택 해설을 종료 후 공개합니다. 현재 수치의
+        단위·기간·기준은 지표 설명 탭에서 확인할 수 있습니다.
+      </p>
+    )
   if (tab === 'decision' && context.page === 'play')
     return (
       <DecisionHelp
@@ -99,7 +108,14 @@ function HelpBody({
       />
     )
   if (tab === 'kpis' && scenario)
-    return <KpiHelp scenario={scenario} state={state} anchor={target.anchor} />
+    return (
+      <KpiHelp
+        scenario={scenario}
+        state={state}
+        anchor={target.anchor}
+        expertTraining={expertTraining}
+      />
+    )
   if (tab === 'cards' && scenario)
     return (
       <CardsHelp

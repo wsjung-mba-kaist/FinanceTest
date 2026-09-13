@@ -10,6 +10,7 @@ import { LiquidityStrip } from '../components/play/LiquidityStrip'
 import { LogPanel } from '../components/play/LogPanel'
 import { PlayLayout, type InfoTab, type MobileTab } from '../components/play/PlayLayout'
 import { ShortcutsSheet } from '../components/play/ShortcutsSheet'
+import { FundingBrief } from '../components/play/FundingBrief'
 import { SituationPanel } from '../components/play/SituationPanel'
 import { StatusBar } from '../components/play/StatusBar'
 import { TerminalCard } from '../components/play/TerminalCard'
@@ -25,6 +26,7 @@ import {
 } from '../components/play/playHelpers'
 import { ConfirmDialog, LiveRegion } from '../components/ui'
 import { useHelp } from '../components/help/helpContext'
+import { RestrictedKnowledgeContext } from '../components/knowledge/knowledgeAccess'
 import { HelpProvider } from '../components/help'
 import { focusZone, useKeyboardShortcuts, type Zone } from '../lib/keyboard'
 import { useAnnouncer } from '../lib/useAnnouncer'
@@ -310,6 +312,9 @@ function PlayScreen({
                       <TurnIntroCard onStart={onStartTurn} />
                     </div>
                   )}
+                  <div className="p-3 pb-0">
+                    <FundingBrief />
+                  </div>
                   <SituationPanel
                     onOpenDashboard={() => goZone(3)}
                     onOpenFeed={(entryId) => {
@@ -335,12 +340,19 @@ function PlayScreen({
               ),
             }}
             dock={
-              <DecisionDock
-                sticky={mobile}
-                onPreview={setPreview}
-                onCommitted={onCommitted}
-                skipSignal={skipSignal}
-              />
+              <>
+                {mobile && (
+                  <div className="p-3 pb-0">
+                    <FundingBrief compact />
+                  </div>
+                )}
+                <DecisionDock
+                  sticky={mobile}
+                  onPreview={setPreview}
+                  onCommitted={onCommitted}
+                  skipSignal={skipSignal}
+                />
+              </>
             }
             // The primary action is a sibling of the scroll box, not a child of it.
             dockAction={<DockActionBar onNext={onNext} />}
@@ -422,11 +434,13 @@ function PlayView({
   }
 
   return (
-    <PlayContext.Provider value={ctx}>
-      <HelpProvider context={{ page: 'play', scenario, state, view }} shortcuts={false}>
-        <PlayScreen scenario={scenario} state={state} run={run} view={view} />
-      </HelpProvider>
-    </PlayContext.Provider>
+    <RestrictedKnowledgeContext.Provider value={mode === 'expert'}>
+      <PlayContext.Provider value={ctx}>
+        <HelpProvider context={{ page: 'play', scenario, state, view, mode }} shortcuts={false}>
+          <PlayScreen scenario={scenario} state={state} run={run} view={view} />
+        </HelpProvider>
+      </PlayContext.Provider>
+    </RestrictedKnowledgeContext.Provider>
   )
 }
 

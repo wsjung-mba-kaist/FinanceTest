@@ -12,7 +12,8 @@ function firstParagraph(md: string): string {
   return (
     md
       .trim()
-      .split(/\n\s*\n/)[0]
+      .split(/\n\s*\n/)
+      .find((block) => !/^\s*#{1,6}\s/.test(block) && !/^\s*>/.test(block))
       ?.trim() ?? ''
   )
 }
@@ -38,7 +39,7 @@ function ConceptItem({ cardId, onView }: { cardId: string; onView: (id: string) 
       <div className="mt-1">
         <Badge tone="neutral">{LEVEL_LABELS[card.level] ?? card.level}</Badge>
       </div>
-      {!open && <p className="mt-2 text-sm text-muted">{lead}</p>}
+      {!open && <Markdown className="md-compact mt-2 text-sm text-muted">{lead}</Markdown>}
       <div id={panelId} hidden={!open} className="mt-2">
         <Markdown className="md-compact text-sm">{card.body}</Markdown>
         <p className="mt-2 text-sm">

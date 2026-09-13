@@ -140,6 +140,22 @@ function StartCard({
         })}
       </div>
 
+      <label className="mt-3 flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={mode !== 'guided' && timersEnabled}
+          disabled={mode === 'guided'}
+          onChange={(e) => useSettingsStore.getState().update({ timersEnabled: e.target.checked })}
+        />
+        <span>
+          결정·돌발 대응의 응답 시간 제한{mode === 'guided' ? ' (안내 모드는 제한 없음)' : ''}
+        </span>
+      </label>
+      <p className="mt-1 text-xs text-muted">
+        사건 진행 시계는 시작 후 별도로 흐릅니다. 응답 제한을 끈 경우에도 다음 단계로 진행하면
+        마감된 결정이 기본 응답으로 확정될 수 있습니다. 다른 탭에서는 두 시계가 멈춥니다.
+      </p>
       <button
         type="button"
         aria-expanded={detail}
@@ -224,7 +240,9 @@ export function ExecutiveSummary({
             {/* The dossier carries the same ground in full. Saying so here is what lets the
                 summary stop at 220 characters instead of becoming a second copy of it. */}
             <p className="mt-1 text-sm">
-              <a href="#bf-dossier-h">전체 상황 개요 · 기관 현황 · 시장 배경 →</a>
+              {mode !== 'expert' && (
+                <a href="#bf-dossier-h">전체 상황 개요 · 기관 현황 · 시장 배경 →</a>
+              )}
             </p>
           </section>
 
@@ -251,7 +269,7 @@ export function ExecutiveSummary({
             )}
           </div>
 
-          <KeyDecisions scenario={scenario} />
+          {mode !== 'expert' && <KeyDecisions scenario={scenario} />}
         </div>
 
         {/* Only the start action belongs beside the prose. The baseline figures and the role frame
@@ -270,7 +288,7 @@ export function ExecutiveSummary({
         T0 value.
       */}
       <div className="mt-4">
-        <Watchpoints scenario={scenario} baseline={baseline} />
+        <Watchpoints scenario={scenario} baseline={baseline} learningLinks={mode !== 'expert'} />
       </div>
 
       {/* Mobile: the start action follows the reader down the page. */}

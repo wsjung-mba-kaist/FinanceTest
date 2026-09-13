@@ -96,7 +96,14 @@ describe('HelpSheet', () => {
     expect(within(dialog).getByRole('tab', { name: '지표 설명', selected: true })).toBeTruthy()
     for (const spec of scenario.kpis) {
       expect(
-        within(dialog).getAllByRole('heading', { name: spec.label }).length,
+        within(dialog).getAllByRole('heading', {
+          name:
+            spec.metric === 'dailyOutflowPct'
+              ? '현재 구간 유출률'
+              : spec.metric === 'dailyOutflow'
+                ? '현재 구간 예금 유출'
+                : spec.label,
+        }).length,
         `${spec.metric} (${spec.label}) 누락`,
       ).toBeGreaterThan(0)
     }

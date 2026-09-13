@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { RestrictedKnowledgeContext } from '../knowledge/knowledgeAccess'
+import { useContext, useEffect, useState } from 'react'
 import { getCard } from '../../content'
 import type { CardLevel } from '../../content/types'
 import { firstSentence } from '../../lib/text'
@@ -35,12 +36,13 @@ export function InlineCard({
   /** Shows a "열람" marker (progress). */
   viewed?: boolean
 }) {
+  const restricted = useContext(RestrictedKnowledgeContext)
   const card = getCard(cardId)
   const [open, setOpen] = useState(Boolean(defaultOpen) && !lead)
   useEffect(() => {
     if (open) onOpen?.(cardId)
   }, [open, cardId, onOpen])
-  if (!card) return null
+  if (!card || restricted) return null
   const head = lead && !open ? firstSentence(card.body, 110).head : ''
   return (
     <div className="rounded-md border border-border bg-surface-2">

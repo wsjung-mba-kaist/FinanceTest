@@ -65,6 +65,8 @@ function Zone({
   footer?: ReactNode
   children: ReactNode
 }) {
+  // Contain absolute sr-only annotations inside the scrolling zone; otherwise long comparisons
+  // can extend the document below the fixed-height situation room.
   const body = (
     <>
       {hideHeading ? (
@@ -85,7 +87,7 @@ function Zone({
         // `data-zone-scroll` marks whichever element actually scrolls — the section itself here,
         // the inner div when the zone has a footer. One selector either way.
         data-zone-scroll
-        className={`h-full min-h-0 overflow-y-auto ${ZONE_FOCUS} ${className}`}
+        className={`relative h-full min-h-0 overflow-y-auto ${ZONE_FOCUS} ${className}`}
       >
         {body}
       </section>
@@ -102,7 +104,7 @@ function Zone({
       <div
         ref={scrollRef as ((el: HTMLDivElement | null) => void) | undefined}
         data-zone-scroll
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="relative min-h-0 flex-1 overflow-y-auto"
       >
         {body}
       </div>

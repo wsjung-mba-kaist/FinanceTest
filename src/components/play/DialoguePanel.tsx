@@ -185,7 +185,12 @@ export function DialoguePanel({
               >
                 {replyKeyFor(i)}
               </span>
-              <span className="min-w-0 flex-1 text-base font-medium">{reply.label}</span>
+              <span className="min-w-0 flex-1 text-base font-medium">
+                {reply.label}
+                {reply.resolvesTo && (
+                  <span className="block text-xs text-muted">응답하고 결정 확정</span>
+                )}
+              </span>
             </button>
           ))}
           {view.replies.length === 0 && (

@@ -203,6 +203,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         turnIndex: saved.turnIndex,
         ...(saved.tick !== undefined ? { tick: saved.tick } : {}),
         variance: saved.variance ?? 0,
+        mode: saved.mode,
       })
       set({
         scenario,
@@ -240,7 +241,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const next = applyDecision(state, scenario, decisionId, optionIds, {
         ...meta,
         hintsUsed: pending || undefined,
-        hintPenalty: penalty || undefined,
+        hintPenalty: pending ? penalty : undefined,
       })
       // Expert mode commits for good; other modes keep a short window to take it back.
       const decision = scenario.turns[state.turnIndex]?.decisions.find((d) => d.id === decisionId)
@@ -412,7 +413,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!run) return
     const cur = run.hintsRevealed[decisionId] ?? 0
     if (level <= cur) return
-    const cost = run.mode === 'standard' ? HINT_COSTS[level] : 0
+    const cost =
+      run.mode === 'standard' ? ([0, 2, 6, 14][level] ?? 0) - ([0, 2, 6, 14][cur] ?? 0) : 0
     set({
       run: {
         ...run,
@@ -441,6 +443,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       grade: report.grade,
       dimensions: dims,
       endedReason: state.ended?.reason ?? 'completed',
+      endedTurnIndex: state.turnIndex,
+      endedTick: state.tick,
       failed: Boolean(state.ended?.failed),
       completedAt: nowIso(),
       durationSec: Math.round((Date.now() - new Date(run.startedAt).getTime()) / 1000),

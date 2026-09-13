@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { RestrictedKnowledgeContext } from './knowledgeAccess'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { getSource } from '../../content'
 import type { Source } from '../../engine/types/common'
 
@@ -12,6 +13,7 @@ import type { Source } from '../../engine/types/common'
  * closes it (which `onBlur` cannot do without eating the click on the link).
  */
 export function Citation({ ids, local }: { ids: string[]; local?: Source[] }) {
+  const restricted = useContext(RestrictedKnowledgeContext)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLSpanElement>(null)
   const panelId = useId()
@@ -35,6 +37,7 @@ export function Citation({ ids, local }: { ids: string[]; local?: Source[] }) {
     }
   }, [open])
 
+  if (restricted) return <span className="text-xs text-muted">사후 출처는 종료 후 공개</span>
   const sources = ids.map(
     (id) =>
       local?.find((s) => s.id === id) ??

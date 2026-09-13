@@ -7,7 +7,8 @@ import type {
   Units,
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
-import { formatAt, formatBp, formatDelta, formatNumber, scaleFor, type CcyScale } from '../../lib/format'
+import { formatAt, formatBp, formatDelta, formatNumber, type CcyScale } from '../../lib/format'
+import { isWindowMetric } from '../../lib/metricContext'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { directionOf, metricScale, type Direction } from '../dashboard/kpiRows'
 
@@ -91,7 +92,10 @@ function metricCell(
   const prev = ctx.previous?.[metric]
   const thresholds = mergeThresholds(ctx.scenario.thresholds)
   const delta =
-    prev && Number.isFinite(prev.value) && Math.abs(mv.value - prev.value) > 1e-9
+    !isWindowMetric(metric) &&
+    prev &&
+    Number.isFinite(prev.value) &&
+    Math.abs(mv.value - prev.value) > 1e-9
       ? mv.value - prev.value
       : undefined
   return {
@@ -111,33 +115,6 @@ function metricCell(
     sub: opts.sub,
     series: ctx.seriesFor(metric),
   }
-}
-
-/** Two related figures in one cell (누적 유출 / 예상 유출), so the strip keeps four columns. */
-function pairCell(ctx: Ctx, a: string, b: string, label: string): MetricCell | undefined {
-  const first = ctx.current[a]
-  const second = ctx.current[b]
-  const base = first ?? second
-  if (!base || !Number.isFinite(base.value)) return undefined
-  const cell = metricCell(ctx, base.key, { label })
-  if (!cell) return undefined
-  if (!first || !second) return cell
-  // One scale for both halves: `누적 / 예상` is a comparison, and two units make it a non-sequitur.
-  const shared = scaleFor([first.value, second.value], ctx.units)
-  const pairScale = first.unit === 'ccy' ? shared : undefined
-  return {
-    ...cell,
-    value: `${formatAt(first.value, first.unit, ctx.units, { scale: pairScale })} / ${formatAt(second.value, second.unit, ctx.units, { scale: pairScale })}`,
-    sub: '누적 / 예상',
-    status: worse(first.status, second.status),
-  }
-}
-
-function worse(a?: MetricStatus, b?: MetricStatus): MetricStatus {
-  const rank: Record<MetricStatus, number> = { na: 0, ok: 1, warn: 2, breach: 3 }
-  if (!a) return b ?? 'na'
-  if (!b) return a
-  return rank[a] >= rank[b] ? a : b
 }
 
 function legendCell(ctx: Ctx, state: GameState): LegendCell {
@@ -197,10 +174,13 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
         metricCell(ctx, 'facilityHeadroom', {
           sub:
             pending && Number.isFinite(pending.value) && pending.value > 0
-              ? `익일 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
+              ? `다음 구간 +${formatAt(pending.value, pending.unit, ctx.units, { scale: ctx.scaleFor('facilityHeadroom') })}`
               : undefined,
         }),
-        pairCell(ctx, 'cumulativeOutflow', 'projectedDailyOutflow', '오늘 유출 누적/예상'),
+        metricCell(ctx, 'dailyOutflow', {
+          label: '현재 구간 유출',
+          sub: '구간 시작부터 누적 · 구간마다 초기화',
+        }),
         metricCell(ctx, 'survivalDays'),
       )
       break

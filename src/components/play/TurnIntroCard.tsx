@@ -12,7 +12,7 @@ import { tickLabelOf } from './playHelpers'
  * Turns without sub-turn ticks never render it: those behave exactly as they did before L2.
  */
 export function TurnIntroCard({ onStart }: { onStart: () => void }) {
-  const { scenario, state, view } = usePlay()
+  const { scenario, state, view, mode } = usePlay()
   const startRef = useRef<HTMLButtonElement>(null)
   const turn = view.turn
 
@@ -24,10 +24,10 @@ export function TurnIntroCard({ onStart }: { onStart: () => void }) {
   const open = new Set(view.decisions.map((d) => d.decision.id))
   const shown: Decision[] = [
     ...view.decisions.map((d) => d.decision),
-    ...turn.decisions.filter((d) => !open.has(d.id)),
+    ...(mode === 'expert' ? [] : turn.decisions.filter((d) => !open.has(d.id))),
   ]
   const newsCount = view.events.length
-  const interrupts = turn.interrupts?.length ?? 0
+  const interrupts = mode === 'expert' ? 0 : (turn.interrupts?.length ?? 0)
 
   return (
     <section
@@ -88,7 +88,7 @@ export function TurnIntroCard({ onStart }: { onStart: () => void }) {
         <Button
           ref={startRef}
           variant="primary"
-          className=""
+          className="shrink-0 whitespace-nowrap"
           aria-keyshortcuts="Space"
           onClick={onStart}
         >

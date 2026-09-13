@@ -17,6 +17,7 @@ import { InfoTip } from '../components/ui/InfoTip'
 import { advanceTurn, autoplay, computeScore, decisionRegrets, findTurn, replay } from '../engine'
 import type { GameState, Mode, ScenarioDefinition } from '../engine/types'
 import type { AttemptSave } from '../persistence/schema'
+import { comparisonAt } from '../lib/comparisonPoint'
 import { decisionAnchorId } from '../lib/catalog'
 import { buildDebriefText, copyText } from '../lib/debriefText'
 import { MODE_LABELS, shortDate } from '../lib/labels'
@@ -67,13 +68,7 @@ const replayCache = new Map<string, DebriefData | undefined>()
 const REPLAY_CACHE_MAX = 12
 
 function attemptKey(scenario: ScenarioDefinition, attempt: AttemptSave): string {
-  return [
-    scenario.meta.id,
-    scenario.meta.version,
-    attempt.runId,
-    attempt.seed,
-    attempt.decisions.length,
-  ].join('|')
+  return [scenario.meta.id, scenario.meta.version, JSON.stringify(attempt)].join('|')
 }
 
 function rebuildFromAttempt(
@@ -93,11 +88,15 @@ function computeFromAttempt(
   scenario: ScenarioDefinition,
   attempt: AttemptSave,
 ): DebriefData | undefined {
+  if (attempt.scenarioVersion !== scenario.meta.version) return undefined
   try {
     const { state, history } = replay(scenario, {
       seed: attempt.seed,
       decisions: attempt.decisions,
-      turnIndex: scenario.turns.length - 1,
+      turnIndex: attempt.endedTurnIndex ?? scenario.turns.length - 1,
+      tick: attempt.endedTick,
+      variance: attempt.variance ?? 0,
+      mode: attempt.mode,
     })
     let s = state
     if (s.phase !== 'ended') {
@@ -250,6 +249,8 @@ export default function DebriefPage() {
     expert?: GameState
     done: boolean
   }>({ done: false })
+  const [comparisonFrame, setComparisonFrame] = useState<'same' | 'final'>('same')
+  const variance = data?.state.variance ?? 0
   const seed = data?.run.seed
   useEffect(() => {
     if (!scenario || seed === undefined) return
@@ -259,12 +260,12 @@ export default function DebriefPage() {
       let historical: GameState | undefined
       let expert: GameState | undefined
       try {
-        historical = autoplay(scenario, 'historical', { seed }).state
+        historical = autoplay(scenario, 'historical', { seed, variance }).state
       } catch {
         /* path not reproducible on this version */
       }
       try {
-        expert = autoplay(scenario, 'expert', { seed }).state
+        expert = autoplay(scenario, 'expert', { seed, variance }).state
       } catch {
         /* path not reproducible on this version */
       }
@@ -274,7 +275,14 @@ export default function DebriefPage() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [scenario, seed])
+  }, [scenario, seed, variance])
+  const compared = useMemo(() => {
+    if (comparisonFrame === 'final' || !scenario || !data) return paths
+    return {
+      historical: comparisonAt(scenario, paths.historical, data.state),
+      expert: comparisonAt(scenario, paths.expert, data.state),
+    }
+  }, [comparisonFrame, scenario, data, paths])
 
   const handleFork = useCallback(
     (turnIndex: number) => {
@@ -295,6 +303,7 @@ export default function DebriefPage() {
           seed: a.seed,
           mode: a.mode,
           scenarioVersion: a.scenarioVersion,
+          variance: a.variance ?? 0,
           decisions: a.decisions,
           turnIndex,
           rewinds: 0,
@@ -376,12 +385,14 @@ export default function DebriefPage() {
 
   const onCopy = () => {
     const text = buildDebriefText({
+      comparisonNote: `seed ${run.seed} · 변동성 ${variance} · ${comparisonFrame === 'same' ? `동일 시점 T+${state.turnIndex}/${state.tick}틱` : `각 경로 최종 시점 — 귀하 T+${state.turnIndex}/${state.tick}틱, 역사 T+${paths.historical?.turnIndex ?? '—'}/${paths.historical?.tick ?? '—'}틱, 전문가 T+${paths.expert?.turnIndex ?? '—'}/${paths.expert?.tick ?? '—'}틱`}`,
+
       scenario,
       state,
       report,
       mode: run.mode,
-      historical: paths.historical,
-      expert: paths.expert,
+      historical: compared.historical,
+      expert: compared.expert,
       regrets,
     })
     void copyText(text).then((ok) => {
@@ -399,13 +410,32 @@ export default function DebriefPage() {
           <span aria-hidden="true">›</span> 디브리핑
         </nav>
 
+        <Card as="section" aria-label="비교 조건" className="p-3 text-sm">
+          <label className="font-medium">
+            비교 기준{' '}
+            <select
+              className="ml-2 rounded-md border border-border-control bg-bg p-1"
+              value={comparisonFrame}
+              onChange={(e) => setComparisonFrame(e.target.value as 'same' | 'final')}
+            >
+              <option value="same">동일 시점 (기본)</option>
+              <option value="final">각 경로의 최종 결과</option>
+            </select>
+          </label>
+          <p className="mt-1 text-muted">
+            동일 seed {run.seed} · 변동성 {variance} · 귀하 {MODE_LABELS[run.mode]} ·{' '}
+            {comparisonFrame === 'same'
+              ? `비교 시점 T+${state.turnIndex}, ${state.tick}틱. 그 전에 종료된 경로는 —로 표시합니다.`
+              : `종료 시점: 귀하 T+${state.turnIndex}/${state.tick}틱 · 역사 T+${paths.historical?.turnIndex ?? '—'}/${paths.historical?.tick ?? '—'}틱 · 전문가 T+${paths.expert?.turnIndex ?? '—'}/${paths.expert?.tick ?? '—'}틱. 경과 시간이 다를 수 있습니다.`}
+          </p>
+        </Card>
         <OnePageSummary
           scenario={scenario}
           state={state}
           report={report}
           mode={run.mode}
-          historical={paths.historical}
-          expert={paths.expert}
+          historical={compared.historical}
+          expert={compared.expert}
           regrets={regrets}
           computing={!paths.done}
           onFork={handleFork}
@@ -464,8 +494,8 @@ export default function DebriefPage() {
             <KpiComparisonTable
               scenario={scenario}
               state={state}
-              historical={paths.historical}
-              expert={paths.expert}
+              historical={compared.historical}
+              expert={compared.expert}
               computing={!paths.done}
             />
 

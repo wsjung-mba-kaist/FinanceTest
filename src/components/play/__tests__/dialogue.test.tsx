@@ -88,7 +88,10 @@ describe('DialoguePanel in the decision dock', () => {
     expect(replyButton(p, 'r-defer')).toBeInTheDocument()
     // The bare option list and its 확정 bar are gone: you answer by talking.
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
-    expect(screen.queryByRole('button', { name: /결정 확정/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^결정 확정/ })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: /집계가 끝난 뒤.*응답하고 결정 확정/ }),
+    ).toBeInTheDocument()
   })
 
   it('grows the transcript with both sides as the conversation proceeds', async () => {

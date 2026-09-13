@@ -13,6 +13,11 @@ export const decisionRecordSchema = z.object({
   timedOut: z.boolean().optional(),
   memo: z.string().optional(),
   hintsUsed: z.number().optional(),
+  hintPenalty: z.number().nonnegative().optional(),
+  path: z.array(z.string()).optional(),
+  reasoning: z
+    .object({ evidence: z.string(), assumption: z.string(), reconsiderWhen: z.string() })
+    .optional(),
   /** Sub-turn tick the record was committed at (omitted when 0 — the legacy shape). */
   tick: z.number().int().nonnegative().optional(),
   /** Set when the record answers an `Interrupt`. */
@@ -53,6 +58,8 @@ export const attemptSchema = z.object({
   grade: z.string(),
   dimensions: z.record(z.string(), z.number()),
   endedReason: z.string(),
+  endedTurnIndex: z.number().int().nonnegative().optional(),
+  endedTick: z.number().int().nonnegative().optional(),
   failed: z.boolean(),
   completedAt: z.string(),
   durationSec: z.number(),

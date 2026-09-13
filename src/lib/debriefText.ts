@@ -13,6 +13,7 @@ export interface DebriefTextInput {
   expert?: GameState
   regrets?: Regret[]
   /** Omitted from the output when absent, so the text is reproducible in tests. */
+  comparisonNote?: string
   generatedAt?: string
 }
 
@@ -40,6 +41,7 @@ export function buildDebriefText(input: DebriefTextInput): string {
   out.push(`${scenario.meta.title} — 디브리핑`)
   if (scenario.meta.subtitle) out.push(scenario.meta.subtitle)
   out.push(`역할: ${scenario.meta.roleTitle} · ${MODE_LABELS[mode]} 모드`)
+  if (input.comparisonNote) out.push(`비교 조건: ${input.comparisonNote}`)
   if (generatedAt) out.push(`작성: ${generatedAt}`)
   out.push(RULE)
 
@@ -104,6 +106,15 @@ export function buildDebriefText(input: DebriefTextInput): string {
         `  ${turn?.label ?? `T${rec.turnIndex}`} ${rec.decisionId}: ${rec.optionIds.join(', ')}${rec.timedOut ? ' (시간 초과)' : ''}`,
       )
       if (rec.memo) out.push(`    메모: ${rec.memo}`)
+      if (rec.reasoning) {
+        for (const [key, label] of [
+          ['evidence', '확인한 근거'],
+          ['assumption', '미확인 가정'],
+          ['reconsiderWhen', '판단을 바꿀 조건'],
+        ] as const) {
+          if (rec.reasoning[key]) out.push(`    ${label}: ${rec.reasoning[key]}`)
+        }
+      }
     }
   }
   out.push('')

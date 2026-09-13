@@ -258,6 +258,9 @@ export interface DecisionRecord {
   timedOut?: boolean
   memo?: string
   hintsUsed?: number
+  /** Per-decision deduction, including an explicit zero for unpenalised hints. */
+  hintPenalty?: number
+  reasoning?: { evidence: string; assumption: string; reconsiderWhen: string }
   /** Sub-turn tick at which the decision was committed. Omitted when 0 (the legacy shape). */
   tick?: number
   /** Set when the record answers an `Interrupt` rather than a turn decision. */

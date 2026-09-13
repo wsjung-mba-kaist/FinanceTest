@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { GameState, ScenarioDefinition, TurnView } from '../../engine'
+import type { GameState, Mode, ScenarioDefinition, TurnView } from '../../engine'
 
 /** Tabs of the contextual help sheet. `decision` is only meaningful during play. */
 export type HelpTab = 'decision' | 'kpis' | 'cards' | 'glossary' | 'search' | 'sources'
@@ -15,8 +15,8 @@ export interface HelpTarget {
 /** What the sheet can see. Pages supply as much as they have. */
 export type HelpContextValue =
   | { page: 'catalog' | 'knowledge' | 'progress' | 'settings' | 'other' }
-  | { page: 'briefing' | 'debrief'; scenario: ScenarioDefinition; state?: GameState }
-  | { page: 'play'; scenario: ScenarioDefinition; state: GameState; view: TurnView }
+  | { page: 'briefing' | 'debrief'; scenario: ScenarioDefinition; state?: GameState; mode?: Mode }
+  | { page: 'play'; scenario: ScenarioDefinition; state: GameState; view: TurnView; mode?: Mode }
 
 export interface HelpApi {
   open: (target?: HelpTarget) => void

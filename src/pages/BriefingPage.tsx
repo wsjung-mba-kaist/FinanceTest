@@ -8,6 +8,7 @@ import { Icon } from '../components/ui/Icon'
 import { latestSnapshot } from '../engine'
 import type { Mode, ScenarioDefinition, ScenarioSummary } from '../engine/types'
 import { baselineGame, deriveBriefingSummary } from '../lib/briefingSummary'
+import { RestrictedKnowledgeContext } from '../components/knowledge/knowledgeAccess'
 import { HelpProvider } from '../components/help'
 import {
   DIFFICULTY_LABELS,
@@ -58,17 +59,27 @@ export default function BriefingPage() {
 }
 
 function BriefingBody({ scenario }: { scenario: ScenarioDefinition }) {
+  const defaultMode = useSettingsStore((s) => s.defaultMode)
+  const [mode, setMode] = useState<Mode>(defaultMode)
   return (
-    <HelpProvider context={{ page: 'briefing', scenario }}>
-      <BriefingBodyInner scenario={scenario} />
-    </HelpProvider>
+    <RestrictedKnowledgeContext.Provider value={mode === 'expert'}>
+      <HelpProvider context={{ page: 'briefing', scenario, mode }}>
+        <BriefingBodyInner scenario={scenario} mode={mode} setMode={setMode} />
+      </HelpProvider>
+    </RestrictedKnowledgeContext.Provider>
   )
 }
 
-function BriefingBodyInner({ scenario }: { scenario: ScenarioDefinition }) {
-  const defaultMode = useSettingsStore((s) => s.defaultMode)
+function BriefingBodyInner({
+  scenario,
+  mode,
+  setMode,
+}: {
+  scenario: ScenarioDefinition
+  mode: Mode
+  setMode: (m: Mode) => void
+}) {
   const markCardViewed = useProgressStore((s) => s.markCardViewed)
-  const [mode, setMode] = useState<Mode>(defaultMode)
   const [dossierOpen, setDossierOpen] = useState(false)
 
   const baselineState = useMemo(() => baselineGame(scenario), [scenario])
@@ -90,28 +101,37 @@ function BriefingBodyInner({ scenario }: { scenario: ScenarioDefinition }) {
 
       {/* Every card, not the first three: the dossier used to list the rest again in a
           different card shape, which was the same content twice with two looks. */}
-      <ConceptPreview cardIds={scenario.briefing.cardRefs} onView={markCardViewed} />
-
-      <section aria-labelledby="bf-dossier-h">
-        <h2 id="bf-dossier-h" className="m-0">
-          <Button
-            variant="secondary"
-            aria-expanded={dossierOpen}
-            aria-controls="bf-dossier-panel"
-            onClick={() => setDossierOpen((v) => !v)}
-          >
-            <Icon name={dossierOpen ? 'chevron-down' : 'chevron-right'} size={16} />
-            전체 도시에 {dossierOpen ? '접기' : '자세히'}
-          </Button>
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          기관 현황·시장 배경·이해관계자·규제·평가 기준·출처 8개 절. 플레이 중에도 도움 시트에서 볼
-          수 있습니다.
+      {mode === 'expert' ? (
+        <p className="rounded-md border border-border p-3 text-sm text-muted">
+          전문가 모드에서는 미래 사건을 포함할 수 있는 개념 카드·전체 도시에·선택 해설을 종료 후
+          공개합니다. 미리 공부하려면 안내 또는 표준 모드를 선택하세요.
         </p>
-        <div id="bf-dossier-panel" hidden={!dossierOpen} className="mt-3">
-          <Dossier scenario={scenario} />
-        </div>
-      </section>
+      ) : (
+        <ConceptPreview cardIds={scenario.briefing.cardRefs} onView={markCardViewed} />
+      )}
+
+      {mode !== 'expert' && (
+        <section aria-labelledby="bf-dossier-h">
+          <h2 id="bf-dossier-h" className="m-0">
+            <Button
+              variant="secondary"
+              aria-expanded={dossierOpen}
+              aria-controls="bf-dossier-panel"
+              onClick={() => setDossierOpen((v) => !v)}
+            >
+              <Icon name={dossierOpen ? 'chevron-down' : 'chevron-right'} size={16} />
+              전체 도시에 {dossierOpen ? '접기' : '자세히'}
+            </Button>
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            기관 현황·시장 배경·이해관계자·규제·평가 기준·출처 8개 절. 플레이 중에도 도움 시트에서
+            볼 수 있습니다.
+          </p>
+          <div id="bf-dossier-panel" hidden={!dossierOpen} className="mt-3">
+            <Dossier scenario={scenario} />
+          </div>
+        </section>
+      )}
     </div>
   )
 }

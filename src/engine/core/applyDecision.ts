@@ -23,6 +23,7 @@ export interface DecisionMeta {
   hintsUsed?: number
   /** Score penalty accrued from hints for this decision (mode-dependent, set by the store). */
   hintPenalty?: number
+  reasoning?: { evidence: string; assumption: string; reconsiderWhen: string }
   /**
    * Reply ids walked through the decision's dialogue, in order. Only meaningful for a decision
    * with `steps`; the path is re-verified here and stored on the `DecisionRecord`, which is what
@@ -194,6 +195,8 @@ export function applyDecision<S extends InstitutionState>(
       ...(meta.timedOut ? { timedOut: true } : {}),
       ...(meta.memo ? { memo: meta.memo } : {}),
       ...(meta.hintsUsed ? { hintsUsed: meta.hintsUsed } : {}),
+      ...(meta.hintPenalty !== undefined ? { hintPenalty: meta.hintPenalty } : {}),
+      ...(meta.reasoning ? { reasoning: { ...meta.reasoning } } : {}),
     })
     if (interrupt) d.openInterrupts = d.openInterrupts.filter((id) => id !== decisionId)
     if (meta.timedOut) d.counters.timeouts = (d.counters.timeouts ?? 0) + 1

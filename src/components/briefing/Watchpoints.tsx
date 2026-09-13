@@ -18,8 +18,10 @@ import { Card, StatusBadge } from '../ui'
 export function Watchpoints({
   scenario,
   baseline,
+  learningLinks = true,
 }: {
   scenario: ScenarioDefinition
+  learningLinks?: boolean
   baseline: MetricSnapshot | undefined
 }) {
   const items = watchpointsOf(scenario)
@@ -60,7 +62,7 @@ export function Watchpoints({
                   })}
                 </dl>
               )}
-              {(card || framework) && (
+              {learningLinks && (card || framework) && (
                 <span className="mt-2 flex flex-wrap gap-x-3 text-sm">
                   {card && <Link to={`/knowledge#card-${card.id}`}>{card.title}</Link>}
                   {framework && (

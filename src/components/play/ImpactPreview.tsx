@@ -79,7 +79,8 @@ export function ImpactPreview({
                   {/* Both halves on one scale: `before → after` is a comparison, and a row that
                       changes unit halfway across compares nothing. */}
                   {(() => {
-                    const scale = d.unit === 'ccy' ? scaleFor([d.before, d.after], units) : undefined
+                    const scale =
+                      d.unit === 'ccy' ? scaleFor([d.before, d.after], units) : undefined
                     return (
                       <>
                         {formatAt(d.before, d.unit, units, { scale, decimals })} →{' '}
@@ -117,7 +118,9 @@ export function ImpactPreview({
                     <span className="text-muted">
                       {kpiByMetric.get(h.metric)?.label ?? h.metric}
                     </span>
-                    <span className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}>
+                    <span
+                      className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}
+                    >
                       {arrows(sign, h.magnitude)}
                       {dir !== 'neutral' && <span className="text-xs">{DIR_TEXT[dir]}</span>}
                       <span className="sr-only"> (강도 {h.magnitude})</span>
@@ -133,7 +136,9 @@ export function ImpactPreview({
                 return (
                   <li key={d.key} className="flex items-center gap-x-2">
                     <span className="text-muted">{kpiByMetric.get(d.key)?.label ?? d.label}</span>
-                    <span className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}>
+                    <span
+                      className={`num ml-auto inline-flex items-center gap-1 ${dirClass(dir, false)}`}
+                    >
                       {arrows(sign, n)}
                       {dir !== 'neutral' && <span className="text-xs">{DIR_TEXT[dir]}</span>}
                       <span className="sr-only"> (강도 {n})</span>
@@ -150,7 +155,8 @@ export function ImpactPreview({
         <ul className="space-y-0.5 text-muted">
           {result.delayed.map((d, i) => (
             <li key={i}>
-              지연 효과 (T+{d.afterTurns}): {d.description}
+              {d.conditional ? '조건부 지연 효과' : '지연 효과'} ({d.afterTurns}구간 후):{' '}
+              {d.description}
             </li>
           ))}
         </ul>

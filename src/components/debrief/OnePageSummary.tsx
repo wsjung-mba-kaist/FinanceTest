@@ -193,14 +193,14 @@ export function OnePageSummary({
             {gap.direction !== 'neutral' && (
               <span className={gap.direction === 'better' ? 'text-positive' : 'text-critical'}>
                 {gap.direction === 'better'
-                  ? '귀하가 더 안전한 자리에서 끝났습니다. '
-                  : '전문가 경로가 더 안전한 자리에서 끝났습니다. '}
+                  ? '비교 시점의 귀하 지표가 경고선에서 더 여유가 있습니다. '
+                  : '비교 시점의 전문가 지표가 경고선에서 더 여유가 있습니다. '}
               </span>
             )}
             <Link to="#paths">경로 비교에서 나머지 지표 보기</Link>
           </>
         ) : (
-          <>핵심 지표는 전문가 경로와 사실상 같은 자리에서 끝났습니다.</>
+          <>비교 시점의 핵심 지표는 전문가 경로와 사실상 같습니다.</>
         )}
       </p>
 

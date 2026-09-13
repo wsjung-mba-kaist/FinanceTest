@@ -1,4 +1,5 @@
-import { useId, useState, type ReactNode } from 'react'
+import { RestrictedKnowledgeContext } from './knowledgeAccess'
+import { useContext, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { getTerm } from '../../content'
 import { useProgressStore } from '../../store/progressStore'
@@ -24,6 +25,7 @@ export function GlossaryTerm({
   children?: ReactNode
   form?: 'auto' | 'full' | 'short'
 }) {
+  const restricted = useContext(RestrictedKnowledgeContext)
   const term = getTerm(id)
   const termDisplay = useSettingsStore((s) => s.termDisplay)
   const markTermViewed = useProgressStore((s) => s.markTermViewed)
@@ -37,6 +39,7 @@ export function GlossaryTerm({
       : termDisplay === 'ko-en'
         ? `${term.term.ko}(${term.term.en})`
         : `${term.term.en}(${term.term.ko})`)
+  if (restricted) return <>{label}</>
   return (
     <span className="relative inline-block">
       <Link

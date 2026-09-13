@@ -7,6 +7,7 @@ import {
 } from '../../engine'
 import { getCard, getSource } from '../../content'
 import { KPI_EXPLAIN } from '../../content/kpiExplain'
+import { metricContext, metricLabel } from '../../lib/metricContext'
 import { formatMetric } from '../../lib/format'
 import { mergeThresholds } from '../../metrics/thresholds'
 import { ThresholdBand } from '../dashboard/ThresholdBand'
@@ -23,10 +24,12 @@ export function KpiHelp({
   scenario,
   state,
   anchor,
+  expertTraining = false,
 }: {
   scenario: ScenarioDefinition
   state?: GameState
   anchor?: string
+  expertTraining?: boolean
 }) {
   const thresholds = useMemo(() => mergeThresholds(scenario.thresholds), [scenario])
   const snap = state ? latestSnapshot(state) : undefined
@@ -46,7 +49,13 @@ export function KpiHelp({
       </p>
       {scenario.kpis.map((spec) => {
         const explain = KPI_EXPLAIN[spec.metric]
-        const value = snap?.metrics[spec.metric]
+        const shown =
+          expertTraining && spec.lagTurns && state
+            ? state.metricsHistory.find(
+                (m) => m.turnIndex === Math.max(0, state.turnIndex - spec.lagTurns!),
+              )
+            : snap
+        const value = shown?.metrics[spec.metric]
         const threshold = thresholds[spec.metric]
         const status: MetricStatus = value?.status ?? 'na'
         const highlighted = anchor === spec.metric
@@ -54,13 +63,13 @@ export function KpiHelp({
           <section
             key={spec.metric}
             id={kpiAnchorId(spec.metric)}
-            aria-label={spec.label}
+            aria-label={metricLabel(spec.metric, spec.label)}
             className={`scroll-mt-2 rounded-md border p-2 ${
               highlighted ? 'border-accent bg-accent-soft/40' : 'border-border bg-surface'
             }`}
           >
             <div className="flex flex-wrap items-baseline gap-x-2">
-              <h3 className="text-base font-semibold">{spec.label}</h3>
+              <h3 className="text-base font-semibold">{metricLabel(spec.metric, spec.label)}</h3>
               {spec.labelEn && <span className="text-xs text-muted">{spec.labelEn}</span>}
               {spec.primary && <Badge tone="info">핵심</Badge>}
               <span className="ml-auto flex items-center gap-1.5">
@@ -77,7 +86,13 @@ export function KpiHelp({
               </span>
             </div>
 
-            {(spec.description ?? explain?.why) && (
+            {metricContext(spec.metric) && (
+              <p className="mt-1 text-sm text-muted">{metricContext(spec.metric)}</p>
+            )}
+            {expertTraining && spec.lagTurns && shown && (
+              <p className="text-xs text-muted">T+{shown.turnIndex} 관측값</p>
+            )}
+            {!expertTraining && (spec.description ?? explain?.why) && (
               <p className="mt-1 text-base leading-relaxed">{spec.description ?? explain?.why}</p>
             )}
 
@@ -104,6 +119,8 @@ export function KpiHelp({
               </p>
             )}
 
+            {threshold?.asOf && <p className="text-xs text-muted">기준일: {threshold.asOf}</p>}
+            {!expertTraining && threshold?.sourceRefs && <Citation ids={threshold.sourceRefs} />}
             {value?.detail && Object.keys(value.detail).length > 0 && (
               <p className="num mt-1 text-xs text-muted">
                 {Object.entries(value.detail)
@@ -112,14 +129,14 @@ export function KpiHelp({
               </p>
             )}
 
-            {explain?.sourceRef && getSource(explain.sourceRef) && (
+            {!expertTraining && explain?.sourceRef && getSource(explain.sourceRef) && (
               <div className="mt-1 text-xs text-muted">
                 근거
                 <Citation ids={[explain.sourceRef]} />
               </div>
             )}
 
-            {(explain?.cards ?? []).filter((id) => getCard(id)).length > 0 && (
+            {!expertTraining && (explain?.cards ?? []).filter((id) => getCard(id)).length > 0 && (
               <div className="mt-1 space-y-1">
                 {(explain?.cards ?? [])
                   .filter((id) => getCard(id))

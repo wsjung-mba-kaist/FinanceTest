@@ -1,4 +1,10 @@
-import type { DecisionRecord, GameState, InstitutionState, ScenarioDefinition } from '../types'
+import type {
+  DecisionRecord,
+  GameState,
+  InstitutionState,
+  Mode,
+  ScenarioDefinition,
+} from '../types'
 import { advanceTurn } from './advanceTurn'
 import { applyDecision, isDecisionResolved } from './applyDecision'
 import { createGame } from './createGame'
@@ -13,6 +19,8 @@ export interface ReplayLog {
   tick?: number
   /** Volatility the run was played at (default 0 = canonical). */
   variance?: number
+  /** Used only to recover hint deductions in saves made before per-decision penalties existed. */
+  mode?: Mode
 }
 
 export interface ReplayResult<S extends InstitutionState> {
@@ -48,6 +56,10 @@ export function replay<S extends InstitutionState>(
       timedOut: rec.timedOut,
       memo: rec.memo,
       hintsUsed: rec.hintsUsed,
+      hintPenalty:
+        rec.hintPenalty ??
+        (log.mode === 'standard' && rec.hintsUsed ? [0, 2, 6, 14][rec.hintsUsed] : undefined),
+      reasoning: rec.reasoning,
       // The dialogue path is part of the log: it is re-walked and re-verified, never assumed.
       path: rec.path,
     })

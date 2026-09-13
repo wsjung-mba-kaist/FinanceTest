@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DecisionView, Interrupt } from '../../engine'
 import { hasDialogue, isInterrupt } from '../../engine'
 import { useGameStore } from '../../store/gameStore'
-import { Badge, LiveRegion } from '../ui'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useResponseCountdown } from '../../lib/useResponseCountdown'
+import { Badge, Button, LiveRegion } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Dialog } from '../ui/Dialog'
 import { CountdownRing } from './CountdownRing'
@@ -41,10 +43,11 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
 
   const decision = dv.decision
   const interrupt = isInterrupt(decision) ? decision : undefined
-  const totalMs = interrupt
-    ? Math.round(interrupt.timeoutSec * MODE_TIMEOUT_MULTIPLIER[mode] * 1000)
-    : 0
-  const [remainingMs, setRemaining] = useState(totalMs)
+  const timersEnabled = useSettingsStore((s) => s.timersEnabled)
+  const totalMs =
+    interrupt && timersEnabled && mode !== 'guided'
+      ? Math.round(interrupt.timeoutSec * MODE_TIMEOUT_MULTIPLIER[mode] * 1000)
+      : 0
 
   const answer = useCallback(
     (optionIds: string[], timedOut: boolean, path?: string[]) => {
@@ -65,18 +68,13 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
     [decision.id, respondInterrupt, onAnswered],
   )
 
-  // --------------------------------------------------------------- countdown
-  useEffect(() => {
-    if (!interrupt || totalMs <= 0 || typeof window === 'undefined') return
-    let last = Date.now()
-    const id = window.setInterval(() => {
-      const now = Date.now()
-      const dt = now - last
-      last = now
-      setRemaining((prev) => Math.max(0, prev - dt))
-    }, 250)
-    return () => window.clearInterval(id)
-  }, [interrupt, totalMs])
+  const { remainingMs, paused, stopped, togglePause } = useResponseCountdown(
+    totalMs,
+    totalMs > 0,
+    () => {
+      if (interrupt) answer([interrupt.defaultOptionId], true)
+    },
+  )
 
   const warned = useRef<{ 30?: boolean; 10?: boolean }>({})
   useEffect(() => {
@@ -89,11 +87,6 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
       setNotice('남은 시간 30초')
     }
   }, [remainingMs, totalMs])
-
-  useEffect(() => {
-    if (!interrupt || totalMs <= 0 || remainingMs > 0) return
-    answer([interrupt.defaultOptionId], true)
-  }, [interrupt, totalMs, remainingMs, answer])
 
   useEffect(() => {
     if (!interrupt) return
@@ -137,7 +130,18 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
             {decision.title}
           </h2>
         </div>
-        <CountdownRing remainingMs={remainingMs} totalMs={totalMs} size={56} />
+        {totalMs > 0 ? (
+          <div className="shrink-0 text-center">
+            <CountdownRing remainingMs={remainingMs} totalMs={totalMs} size={56} paused={stopped} />
+            {mode === 'standard' && (
+              <Button size="sm" variant="ghost" aria-pressed={paused} onClick={togglePause}>
+                {paused ? '응답 재개' : '응답 일시정지'}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Badge>응답 시간 제한 없음</Badge>
+        )}
       </div>
 
       <div id={descId} className="mt-2 space-y-1.5">
@@ -184,7 +188,9 @@ export function InterruptOverlay({ dv, onAnswered }: { dv: DecisionView; onAnswe
 
       <p className="mt-2 flex items-center gap-1 text-sm text-muted">
         <Icon name="clock" size={14} />
-        응답이 없으면 기본 응답으로 처리됩니다
+        {totalMs > 0
+          ? `사건 진행은 멈춰 있습니다. 응답 시간이 끝나면 ‘${decision.options.find((o) => o.id === interrupt.defaultOptionId)?.label ?? '기본 응답'}’으로 확정됩니다. 다른 탭에서는 응답 시간도 멈춥니다.`
+          : '사건 진행은 멈춰 있습니다. 내용을 검토한 뒤 응답하세요.'}
       </p>
     </Dialog>
   )

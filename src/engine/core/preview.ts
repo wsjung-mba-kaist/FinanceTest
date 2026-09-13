@@ -14,7 +14,7 @@ export { diffSnapshots } from './metrics'
 
 export interface PreviewResult {
   deltas: MetricDelta[]
-  delayed: { afterTurns: number; description: string }[]
+  delayed: { afterTurns: number; description: string; conditional?: boolean }[]
   feed: FeedItem[]
   wouldEnd?: { title: string; failed: boolean }
   error?: string
@@ -38,7 +38,11 @@ export function previewOption<S extends InstitutionState>(
     for (const id of optionIds) {
       const o = decision?.options.find((x) => x.id === id)
       o?.delayedEffects?.forEach((d) =>
-        delayed.push({ afterTurns: d.afterTurns, description: d.description }),
+        delayed.push({
+          afterTurns: d.afterTurns,
+          description: d.description,
+          ...(d.when ? { conditional: true } : {}),
+        }),
       )
     }
     return {

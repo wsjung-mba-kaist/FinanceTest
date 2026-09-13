@@ -1,6 +1,7 @@
 import type { MetricDelta, MetricStatus, Units } from '../../engine'
 import { KPI_EXPLAIN } from '../../content/kpiExplain'
 import { formatAt, formatDelta } from '../../lib/format'
+import { metricContext } from '../../lib/metricContext'
 import { useHelp } from '../help/helpContext'
 import type { PreviewFidelity } from '../play/playHelpers'
 import { Badge, Card, StatusBadge } from '../ui'
@@ -15,7 +16,6 @@ const STATUS_TEXT: Record<MetricStatus, string> = {
   breach: '위험',
   na: '기준 없음',
 }
-
 
 /**
  * 델타는 색만으로 말하지 않는다 — 화살표 + 개선/악화 단어를 함께 붙인다.
@@ -65,7 +65,9 @@ export function KpiTile({
   const status: MetricStatus = current?.status ?? 'na'
   // `scale` pins a currency metric to one unit for the whole run, so a falling figure stays on one
   // axis instead of stepping 3.2조원 → 8,500억원 → 920억원 while the reader tries to read a trend.
-  const value = current ? formatAt(current.value, spec.unit, units, { scale, decimals: spec.decimals }) : '—'
+  const value = current
+    ? formatAt(current.value, spec.unit, units, { scale, decimals: spec.decimals })
+    : '—'
   const deltaText = delta !== undefined ? formatDelta(delta, spec.unit, units) : undefined
   const dir = delta !== undefined ? directionOf(Math.sign(delta), threshold) : 'neutral'
   // A band was crossed when the status itself moved. That, not the sign of the change, is what the
@@ -167,6 +169,9 @@ export function KpiTile({
       )}
       {threshold && spec.referenceLabel && (
         <div className="text-xs text-muted">{spec.referenceLabel}</div>
+      )}
+      {metricContext(spec.metric) && (
+        <p className="mt-1 text-xs text-muted">{metricContext(spec.metric)}</p>
       )}
 
       {spec.sparkline && series.length >= 2 && (
