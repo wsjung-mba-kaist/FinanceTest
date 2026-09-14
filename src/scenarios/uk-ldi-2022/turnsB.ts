@@ -378,14 +378,15 @@ export const t4: T = {
         },
         {
           id: 't4-b',
-          label: '회사채 £400M 매각 지시(T+2 결제, 할인 3%) — 9/30 도착',
+          label: '회사채 £400M 매각 지시(할인 3%) — 모형 반영 10/11',
           description:
-            'IG 회사채를 매각한다. 스프레드 확대로 할인 3%. 대금은 금요일 결제 후 풀에 납입되어 다음 턴 전 반영된다. 오늘 오전에는 도움이 되지 않는다.',
+            'IG 회사채를 매각한다. 스프레드 확대로 할인 3%. 실무상 T+2 결제와 풀 납입은 별도 절차다. 이 모형은 중간 거래일을 생략해 10/11 구간 진입 시 자금을 반영한다. 9/28 오전에는 사용할 수 없다.',
           effects: [ldiFx.instructSale({ asset: 'corporateBonds', amount: 400, settleTurns: 2 })],
           delayedEffects: [
             {
               afterTurns: 2,
-              description: '회사채 £400M T+2(9/30) 결제 → 풀 재자본화',
+              description:
+                '회사채 £400M 매각·풀 납입을 10/11 구간 진입 시 일괄 반영(중간 결제일 생략)',
               effects: [ldiFx.settleSale({ asset: 'corporateBonds', amount: 400, discount: 0.03 })],
             },
           ],
@@ -395,7 +396,8 @@ export const t4: T = {
               '길트를 팔지 않고 담보를 만드는 정석이지만 결제 일수 때문에 오늘의 강제 축소는 막지 못한다. 버퍼 재건에는 필요하다.',
             sourceRefs: [S.tpr, S.qb],
           },
-          consequences: '회사채 매각이 체결되었습니다. 대금은 금요일 결제됩니다.',
+          consequences:
+            '회사채 매각 지시가 등록되었습니다. 모형 장부와 풀 담보에는 10/11 구간 진입 시 반영됩니다.',
           feasibility: { basis: 'IG 회사채 T+2 결제', sourceRefs: [S.cgfs] },
           calibrationNote:
             '회사채 매각 할인 3% [CAL calibration.md §4: IG 스프레드 +45bp × D7 + 호가]',
@@ -467,7 +469,7 @@ export const t4: T = {
       title: '스폰서 긴급 출연 협상',
       prompt: '스폰서 CFO와의 통화에서 무엇을 요청하시겠습니까?',
       context:
-        '대기성 약정이 없으므로 출연은 스폰서 이사회 승인을 거칩니다. 요청 규모가 커버넌트 한도(£300M)를 넘으면 이사회가 재심의하고 입금이 하루 더 늦어집니다. 늦게 도착한 현금은 오늘의 축소를 막지 못합니다.',
+        '대기성 약정이 없으므로 출연은 스폰서 이사회 승인을 거칩니다. 요청 규모가 커버넌트 한도(£300M)를 넘으면 이사회가 재심의하고 입금이 모형상 한 구간 늦어집니다(9/30 → 10/11). 늦게 도착한 현금은 오늘의 축소를 막지 못합니다.',
       // 대기성 약정이 있으면 협상 자체가 없다 — 서명된 약정을 집행할 뿐이므로 D1의 D 옵션이 처리한다.
       when: { notFlag: 'sponsor_standby' },
       required: false,
@@ -522,7 +524,7 @@ export const t4: T = {
               text: '숫자가 있어야 이사회를 소집합니다. 얼마입니까?',
             },
           ],
-          note: '약속한 규모는 이후 입금 시차로 평가됩니다. 커버넌트 한도(£300M)를 넘으면 재심의로 하루가 더 걸립니다.',
+          note: '약속한 규모는 이후 입금 시차로 평가됩니다. 커버넌트 한도(£300M)를 넘으면 재심의로 한 구간이 더 걸립니다.',
           replies: commitReplies<PensionState>('sponsorAskM', [150, 300, 500], {
             idPrefix: 't4-d2-ask',
             label: (v) => `£${v}M 출연을 요청`,
@@ -539,7 +541,7 @@ export const t4: T = {
             trap: (v) => v > 300,
             trapExplanation: (v) =>
               v > 300
-                ? '"많이 부르면 많이 온다"가 성립하지 않는 유일한 경우가 커버넌트다. 한도를 넘는 금액은 들어오지 않고, 재심의 때문에 한도 안의 금액마저 하루 늦게 들어온다.'
+                ? '"많이 부르면 많이 온다"가 성립하지 않는 이유는 이 모형의 커버넌트 한도다. 한도를 넘는 금액은 들어오지 않고, 재심의 때문에 한도 안의 금액마저 한 구간 늦게 들어온다.'
                 : undefined,
           }),
         },
@@ -609,7 +611,7 @@ export const t4: T = {
                 ],
               },
               description:
-                '커버넌트 한도 초과 요청으로 스폰서 이사회 재심의 — 출연금이 하루 늦게 도착',
+                '커버넌트 한도 초과 요청으로 스폰서 이사회 재심의 — 출연금이 한 구간 늦게 도착',
               effects: [ldiFx.settleSponsor()],
             },
           ],
@@ -657,7 +659,7 @@ export const t4: T = {
     {
       level: 2,
       decisionId: 't4-d2',
-      text: '스폰서 출연은 커버넌트 한도(£300M) 안에서만 한 번에 결의됩니다. 한도를 넘는 요청은 재심의로 하루가 더 걸립니다.',
+      text: '스폰서 출연은 커버넌트 한도(£300M) 안에서만 한 번에 결의됩니다. 한도를 넘는 요청은 재심의로 한 구간이 더 걸립니다.',
     },
     {
       level: 2,
@@ -971,14 +973,15 @@ export const t5: T = {
       options: [
         {
           id: 't5-a',
-          label: '주식·회사채 £500M 매각(T+2)해 운용사 요청 버퍼 200bp 재건',
+          label: '주식 £500M 매각 지시로 버퍼 재건 — 모형 반영 10/11',
           description:
-            '운용사의 상향된 요청대로 성장자산을 매각한다. 금요일(9/30) 결제 후 풀 납입. 할인 1.5%(시장 안정 후).',
-          effects: [ldiFx.instructSale({ asset: 'equities', amount: 500, settleTurns: 2 })],
+            '주식 £500M을 매각한다(할인 1.5%). 실제 결제·풀 납입 절차와 달리 모형은 중간 거래일을 생략해 10/11 구간 진입 시 일괄 반영한다. 버퍼 200bp 도달은 당시 익스포저와 잔여 콜에 달려 있다.',
+          effects: [ldiFx.instructSale({ asset: 'equities', amount: 500, settleTurns: 1 })],
           delayedEffects: [
             {
               afterTurns: 1,
-              description: '주식·크레딧 £500M T+2(9/30) 결제 → 풀 재자본화',
+              description:
+                '주식 £500M 매각·풀 납입을 10/11 구간 진입 시 일괄 반영(중간 결제일 생략)',
               effects: [ldiFx.settleSale({ asset: 'equities', amount: 500, discount: 0.015 })],
             },
           ],
@@ -989,7 +992,8 @@ export const t5: T = {
             historicalNote: '풀드펀드 운용사들은 9/28 이후 재자본화 요청을 유지·상향했다.',
             sourceRefs: [S.breeden, S.fsr],
           },
-          consequences: '매각이 체결되었습니다. 대금은 금요일 결제 후 풀에 납입됩니다.',
+          consequences:
+            '주식 매각 지시가 등록되었습니다. 모형 장부와 풀 담보에는 10/11 구간 진입 시 반영됩니다.',
           historical: true,
           feasibility: { basis: 'T+2 결제', sourceRefs: [S.wpc] },
         },
@@ -1212,13 +1216,14 @@ export const t6: T = {
       options: [
         {
           id: 't6-a',
-          label: '회사채 £400M 추가 매각(T+2)해 버퍼 재건',
-          description: 'IG 회사채를 추가로 판다. 대금은 목요일(10/13) 결제 후 풀 납입. 할인 2%.',
-          effects: [ldiFx.instructSale({ asset: 'corporateBonds', amount: 400, settleTurns: 2 })],
+          label: '회사채 £400M 추가 매각 지시 — 모형 반영 10/14',
+          description:
+            'IG 회사채를 추가로 판다(할인 2%). 모형은 체결·결제·풀 납입을 다음 구간인 10/14에 일괄 반영한다. 10/11 21:00 지시를 당일 체결로 간주해 10/13 입금을 보장하지 않는다.',
+          effects: [ldiFx.instructSale({ asset: 'corporateBonds', amount: 400, settleTurns: 1 })],
           delayedEffects: [
             {
               afterTurns: 1,
-              description: '회사채 £400M T+2(10/13) 결제 → 풀 재자본화',
+              description: '회사채 £400M 매각·풀 납입을 10/14 구간 진입 시 일괄 반영',
               effects: [ldiFx.settleSale({ asset: 'corporateBonds', amount: 400, discount: 0.02 })],
             },
           ],
@@ -1229,7 +1234,8 @@ export const t6: T = {
             historicalNote: 'FSR: LDI 펀드들은 10월 중 버퍼를 300~400bp로 올렸다.',
             sourceRefs: [S.fsr, S.breeden],
           },
-          consequences: '매각이 체결되었습니다. 대금은 목요일 결제됩니다.',
+          consequences:
+            '회사채 매각 지시가 등록되었습니다. 모형 장부와 풀 담보에는 10/14 구간 진입 시 반영됩니다.',
           historical: true,
           feasibility: { basis: 'T+2 결제', sourceRefs: [S.wpc] },
         },

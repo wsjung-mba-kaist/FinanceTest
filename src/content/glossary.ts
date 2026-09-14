@@ -43,7 +43,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: { ko: '유출률', en: 'Run-off rate' },
     aliases: ['런오프율', '예금 유출률'],
     definition: {
-      ko: 'LCR 계산에서 30일 안에 빠져나간다고 가정하는 부채 비율. 안정 소매예금 3%(예보 약할 시 5%), 비안정 소매 10% 이상, 운영성 예금 25%, 비금융기업·국가·공공기관 40%, 은행·증권·보험 등 기타 법인 100%다. 2023년 런은 이 30일 허용치를 하루 이틀 만에 소진했다.',
+      ko: 'LCR 계산에서 30일 안에 빠져나간다고 가정하는 부채 비율. 안정 소매예금 기본 5%(추가 예금보험 요건 충족·관할 승인 시 3%), 비안정 소매 10% 이상, 운영성 예금 25%, 비금융기업·국가·공공기관 40%, 은행·증권·보험 등 기타 법인 100%다. 2023년 런은 이 30일 허용치를 하루 이틀 만에 소진했다.',
       en: 'Share of a liability assumed to leave within 30 days in the LCR; the 2023 runs exhausted 30-day allowances in one or two days.',
     },
     cardRef: 'uninsured-deposits-and-run-speed',
@@ -149,13 +149,13 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     id: 'tce',
     term: {
-      ko: '경제적 자본(유형보통주자본)',
-      en: 'Tangible Common Equity (TCE) / economic capital',
+      ko: '유형보통주자본(TCE)과 경제적 조정',
+      en: 'Tangible Common Equity (TCE) and fair-value adjustment',
     },
     aliases: ['TCE', '경제적 TCE'],
     definition: {
-      ko: '보통주자본에서 무형자산을 빼고 AFS·HTM 미실현손실을 세후로 차감한, 시장이 보는 자본. SVB의 양식화 계산은 12.7 − (2.5 + 15.1) × (1 − 25%) ≈ 0($B)이며, 이 플랫폼은 TCE/총자산 ≤ 2%를 게임오버·R4 트리거로, > 3%를 인수자 게이트로 쓴다.',
-      en: 'Common equity net of intangibles and after-tax unrealized securities losses; the solvency figure markets actually price.',
+      ko: '회계상 TCE는 보통주자본에서 무형자산을 뺀 값이다. 경제적 조정 시에는 아직 반영되지 않은 HTM 평가손실 등을 차감하며, AFS 손실을 중복 차감하지 않는다. 게임 지표는 CET1 기반 세전 근사로 실제 TCE 비율과 다르고, 종료·인수 기준은 시나리오별 훈련 가정이다.',
+      en: 'Common equity less intangible assets. Fair-value adjustments must avoid deducting AFS losses already included in equity twice; the game uses a separate CET1-based proxy.',
     },
     cardRef: 'economic-vs-regulatory-capital',
   },
@@ -607,7 +607,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: { ko: '채권시장안정펀드', en: 'Bond Market Stabilization Fund' },
     aliases: ['채안펀드'],
     definition: {
-      ko: '금융회사들이 캐피탈콜 방식으로 출자해 회사채·CP를 매입하는 시장안정 기금으로 상설 기금이 아니다. 2008.12 5조 → 2020.3 20조(1차 콜 3조) → 2022.10 50조+α → 2024.5 약 94조 → 2025.12 "100조+α"로 확대됐고, 2022.10.24 CP 매입을 개시했다.',
+      ko: '금융회사들이 캐피탈콜 방식으로 출자해 회사채·CP를 매입하는 시장안정 기금으로 상설 기금이 아니다. 2022.10 대책상 펀드 규모는 20조원이며 미투자 여유재원 1.6조원을 우선 가동해 10.24 CP 매입을 시작했다. 50조원+α는 여러 지원 수단을 합친 전체 대책 규모다.',
       en: 'Capital-call fund of financial firms buying corporate bonds and CP in stress; not a standing fund.',
     },
     cardRef: 'korea-crisis-toolkit',

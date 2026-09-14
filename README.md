@@ -39,7 +39,7 @@ pnpm build        # dist/ (정적 배포; BASE_PATH=/repo/ 로 GitHub Pages 경�
 | 플레이 가능 | `uk-ldi-2022` | 길트 스파이럴: 13일 (2022 영국 LDI) | DB 연기금 CIO | 연기금 |
 | 플레이 가능 | `legoland-2022` | 차환의 벽: 레고랜드 이후 (2022 PF-ABCP) | 중형 증권사 CRO | 증권사 |
 | 플레이 가능 | `mg-run-2023` | 금고 앞의 줄 (2023 새마을금고 예금인출) | 범정부 대응단·중앙회 자금 | 상호금융 |
-| 계획(M3) | `covid-2020-fund`, `els-margin-2020`, `archegos-2021`, `korea-imf-1997`, `credit-suisse-2023`, `savings-bank-2011`, `ltcm-1998`, `taeyoung-pf-2024` | 조사 도시에 완비(`docs/research/`) | | |
+| 플레이 가능 | `covid-2020-fund`, `els-margin-2020`, `archegos-2021`, `korea-imf-1997`, `credit-suisse-2023`, `savings-bank-2011`, `ltcm-1998`, `taeyoung-pf-2024` | 각 시나리오 구현·조사 도시에 포함(`src/scenarios/`, `docs/research/`) | | |
 
 각 시나리오는 역사 경로(실제 선택 순서)가 체크포인트를 재현하고 전문가 경로가 이를 상회하는지 자동 테스트로 검증됩니다(`src/scenarios/<id>/*.test.ts`). 새 시나리오 저작 절차는 `docs/authoring-guide.md`를 따르며, `pnpm validate`(무결성 린트 + 역사 경로 재현 + 자동플레이)를 통과해야 합니다.
 
@@ -55,3 +55,5 @@ pnpm build        # dist/ (정적 배포; BASE_PATH=/repo/ 로 GitHub Pages 경�
 - 옵션 효과의 크기는 역사적 유사사례, 문서화된 규칙(Basel 유출률, PCA, 헤어컷, ASC 320) 또는 보정 노트로 정당화합니다.
 - 역사 경로는 체크포인트(예: SVB 3/9 유출 $42B ±15%, 마감 잔고 −$958M)를 자동 테스트로 재현합니다.
 - 조사 과정에서 확인되지 않은 수치는 `docs/research/*.md`에 [UNVERIFIED]로 남기고 구현 시 재검증합니다.
+
+금융 내용의 확인된 오류와 수정 근거·검증 범위는 [금융 내용 정확성 검토](docs/financial-content-audit.md)에 정리했습니다.

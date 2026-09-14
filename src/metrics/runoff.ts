@@ -80,7 +80,9 @@ export function lcrInputFromBank(bank: BankState): LcrInput {
   outflows.securedL2A = bank.wholesale.repoL2A
   outflows.securedOther = bank.wholesale.repoOther
   outflows.committedCredit = bank.committed.creditToCorporates
-  outflows.committedLiquidity = bank.committed.liquidityToFIs
+  // The state has no bank/non-bank split. Conservatively treat this aggregate as liquidity
+  // facilities to non-bank FIs (LCR40.64(6), 100%), not non-financial corporates (30%).
+  outflows.committedLiquidityToNonBankFIs = bank.committed.liquidityToFIs
   const inflows: LcrInput['inflows'] = {
     // stylised: 1/12 of performing loans mature within 30 days
     corporate: (bank.loans.corporate + bank.loans.sme) / 12,

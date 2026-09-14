@@ -6,6 +6,24 @@ import type { Source } from './types'
  * 날짜는 문서 발행일(YYYY-MM-DD; 월까지만 확인된 경우 YYYY-MM).
  */
 export const SOURCES: Source[] = [
+  {
+    id: 'fdic-fdia-section38',
+    title: 'Federal Deposit Insurance Act, Section 38 — Prompt Corrective Action',
+    date: '현행본 확인 2026-09-14',
+    publisher: 'FDIC',
+    url: 'https://www.fdic.gov/federal-deposit-insurance-act/section-38-prompt-corrective-action',
+    kind: 'regulatory',
+    note: '중대한 자본부족 후 원칙적으로 90일 이내 관재·관리인 지정 또는 법정 대체조치. 게임의 자동 종료 규칙과 구분한다.',
+  },
+  {
+    id: 'fed-pca-20843',
+    title: 'Regulation H, Section 208.43 — Capital Measures and Capital-Category Definitions',
+    date: '현행본 확인 2026-09-14',
+    publisher: 'Federal Reserve',
+    url: 'https://www.federalreserve.gov/frrs/regulations/section-20843-capital-measures-and-capital-category-definitions.htm',
+    kind: 'regulatory',
+    note: 'Critically undercapitalized는 규제상 tangible equity / total assets 2% 이하. CET1 기반 경제적 TCE나 게임 레버리지 비율과 동일하지 않다.',
+  },
   // ───────────────────────── 2023 미국 은행 위기 (svb-2023) ─────────────────────────
   {
     id: 'fed-svb-review-2023',
@@ -156,7 +174,7 @@ export const SOURCES: Source[] = [
     date: '2019-12',
     url: 'https://www.bis.org/basel_framework/chapter/LCR/40.htm',
     kind: 'regulatory',
-    note: '30일 유출률: 안정 소매 3%(5%), 비안정 소매 10%+, 운영성 25%, 비금융기업·국가·PSE 40%, 기타 법인 100%, 담보조달 0~100%',
+    note: '30일 유출률: 안정 소매 기본 5%(추가 요건·관할 승인 시 3%), 비안정 소매 10%+, 운영성 25%, 비금융기업·국가·PSE 40%, 기타 법인 100%, 담보조달 0~100%',
   },
   {
     id: 'bcbs-d295',
@@ -343,6 +361,15 @@ export const SOURCES: Source[] = [
   },
 
   // ───────────────────────── 한국: 금융위원회 보도자료 ─────────────────────────
+  {
+    id: 'fsc-2022-10-23',
+    title: '비상거시경제금융회의 개최 결과 — 50조원+α 유동성 공급 프로그램',
+    publisher: '기획재정부·관계기관 합동',
+    date: '2022-10-23',
+    url: 'https://www.korea.kr/briefing/pressReleaseView.do?newsId=156532094',
+    kind: 'regulatory',
+    note: '전체 대책과 채안펀드 20조원 규모를 구분. 펀드 미투자 여유재원 1.6조원 우선 가동.',
+  },
   {
     id: 'fsc-78804',
     title:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BCBS_LCR_PARAMS, KR_LCR_PARAMS, computeLcr } from './lcr'
+import { BCBS_LCR_PARAMS, BCBS_REDUCED_RUNOFF_PARAMS, KR_LCR_PARAMS, computeLcr } from './lcr'
 import type { LcrInput } from './types'
 
 const hqlaOnly = (l1: number, l2a: number, l2b: number): LcrInput => ({
@@ -81,24 +81,25 @@ describe('computeLcr', () => {
       Object.keys(BCBS_LCR_PARAMS.inflowRates).map((k) => [k, 100]),
     ) as LcrInput['inflows']
     const r = computeLcr({ hqla: { l1: 0, l2a: 0, l2b: 0 }, outflows, inflows })
-    expect(r.totalOutflows).toBeCloseTo(546, 10)
+    expect(r.totalOutflows).toBeCloseTo(690, 10)
     expect(r.totalInflows).toBeCloseTo(300, 10)
     expect(r.inflowsCapped).toBeCloseTo(300, 10)
     expect(computeLcr(hqlaOnly(1, 1, 1)).totalOutflows).toBe(0)
   })
 
-  it('KR params use 5% for stable retail / SME deposits and otherwise match BCBS', () => {
+  it('stable retail / SME use 5% by default; the conditional 3% regime is explicit', () => {
     const input: LcrInput = {
       hqla: { l1: 10, l2a: 0, l2b: 0 },
       outflows: { retailStable: 100, smeStable: 100, retailLessStable: 100 },
       inflows: {},
     }
-    expect(computeLcr(input).totalOutflows).toBeCloseTo(16, 10)
+    expect(computeLcr(input).totalOutflows).toBeCloseTo(20, 10)
+    expect(computeLcr(input, BCBS_REDUCED_RUNOFF_PARAMS).totalOutflows).toBeCloseTo(16, 10)
     expect(computeLcr(input, KR_LCR_PARAMS).totalOutflows).toBeCloseTo(20, 10)
     expect(KR_LCR_PARAMS.runoff.retailStable).toBe(0.05)
     expect(KR_LCR_PARAMS.runoff.smeStable).toBe(0.05)
     expect(KR_LCR_PARAMS.runoff.corporateUninsured).toBe(BCBS_LCR_PARAMS.runoff.corporateUninsured)
     expect(KR_LCR_PARAMS.haircuts).toEqual(BCBS_LCR_PARAMS.haircuts)
-    expect(BCBS_LCR_PARAMS.runoff.retailStable).toBe(0.03)
+    expect(BCBS_LCR_PARAMS.runoff.retailStable).toBe(0.05)
   })
 })

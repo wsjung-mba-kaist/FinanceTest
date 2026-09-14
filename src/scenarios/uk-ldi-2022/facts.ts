@@ -69,7 +69,7 @@ export const LDI_FACTS: FactRow[] = [
     asOf: '2022-09-22',
     sourceId: 'boe-yield-curves',
     tag: 'STYLIZED',
-    note: '8/1 이후 +135bp 반영 전 취득가 근사(D18 × 1.35% ≈ −12%)',
+    note: '별도로 설정한 원가 £680M과 시가 £600M(약 −11.8%). D18 × 1.35% = 24.3%이므로 이 가격 차이를 +135bp 충격에서 도출한 것으로 해석하지 않음',
   },
   {
     path: 'institution.assets.gilts.modDuration',

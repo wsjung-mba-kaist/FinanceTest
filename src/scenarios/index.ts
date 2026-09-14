@@ -242,7 +242,7 @@ const available: ScenarioRegistryEntry[] = [
   {
     summary: {
       id: 'els-margin-2020',
-      version: 1,
+      version: 2,
       title: '마진콜 5조',
       subtitle: '2020년 3월 증권사 ELS 헤지 위기',
       era: '2020-03',
@@ -312,7 +312,7 @@ const available: ScenarioRegistryEntry[] = [
   {
     summary: {
       id: 'taeyoung-pf-2024',
-      version: 1,
+      version: 2,
       title: '워크아웃 동의율 75%',
       subtitle: '2024년 부동산 PF 구조조정',
       era: '2023-12',

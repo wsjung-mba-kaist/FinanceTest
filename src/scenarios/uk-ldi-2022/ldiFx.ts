@@ -256,7 +256,7 @@ export const ldiFx = {
       (d, ctx) => {
         addCounter(d, `saleInstructed_${p.asset}`, p.amount)
         ctx.log(
-          `${assetLabel(p.asset)} ${f1(p.amount)} 매각 체결 — T+${p.settleTurns} 결제 후 풀 반영`,
+          `${assetLabel(p.asset)} ${f1(p.amount)} 매각 지시 — ${p.settleTurns}개 구간 후 모형 장부·풀 반영(영업일 결제일과 구분)`,
         )
       },
     )

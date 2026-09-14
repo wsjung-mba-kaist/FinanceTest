@@ -6,6 +6,7 @@ import { usePlay } from './playContext'
 /** Cash, collateral and commitments belong to different books; keep them separate at the decision. */
 export function FundingOperations({ compact = false }: { compact?: boolean }) {
   const { state, scenario } = usePlay()
+  const ownCp = scenario.meta.id === 'els-margin-2020'
   const position = fundingPosition(state)
   if (!position) return null
   const money = (value: number) => formatAt(value, 'ccy', scenario.units)
@@ -22,7 +23,7 @@ export function FundingOperations({ compact = false }: { compact?: boolean }) {
           ['미처리 첫 만기', position.maturity, '차환 처리 후 다음 만기로 이동'],
           ['미인출 은행 약정', position.undrawn, '인출·입금 확인 전 현금에 미포함'],
           [
-            '자체매입 필요액 · 추정',
+            ownCp ? 'CP·전단채 차환 부족분 · 추정' : '자체매입 필요액 · 추정',
             position.estimatedPurchase,
             '첫 만기 × (1 − 현재 차환 성공률)',
           ],
@@ -77,13 +78,33 @@ export function FundingOperations({ compact = false }: { compact?: boolean }) {
       ) : (
         <>
           <p className={`mt-2 ${position.purchaseCashGap > 0 ? 'text-critical' : 'text-muted'}`}>
-            첫 만기 자체매입 대비 현금 부족분 · 추정{' '}
+            {ownCp
+              ? '첫 만기 차환 부족분 대비 현금 부족분 · 추정'
+              : '첫 만기 자체매입 대비 현금 부족분 · 추정'}{' '}
             <span className="num font-medium">{money(position.purchaseCashGap)}</span>
           </p>
           <p className="mt-1 text-xs text-muted">
-            현재 차환 성공률 {(position.rollRate * 100).toFixed(0)}% 가정. CP·콜 상환, 마진콜, 추가
-            조달은 이 비교에 포함되지 않습니다.
+            현재 차환 성공률 {(position.rollRate * 100).toFixed(0)}% 가정.
+            {ownCp
+              ? ' 첫 CP·전단채 만기의 미차환분만 비교하며, 다른 만기·콜 상환·마진콜·추가 조달은 제외합니다.'
+              : ' CP·콜 상환, 마진콜, 추가 조달은 이 비교에 포함되지 않습니다.'}
           </p>
+          {ownCp && (
+            <details className="mt-2">
+              <summary className="cursor-pointer">정책자금 약정과 실행 잔액</summary>
+              <p className="mt-1">
+                RP 미입금 {money(state.counters.bokRpPending ?? 0)} · 거래은행 외화차입 미입금{' '}
+                {money(state.counters.bokSwapPending ?? 0)}
+              </p>
+              <p className="mt-1">
+                증권금융 대출 실행 {money(state.institution.custom.ksfLoanDrawn ?? 0)} · 거래은행
+                외화차입 실행 {money(state.counters.bokSwapDrawn ?? 0)}
+              </p>
+              <p className="text-xs text-muted">
+                미입금 약정은 현재 현금에 포함되지 않습니다. 실행 잔액은 상환해야 할 차입금입니다.
+              </p>
+            </details>
+          )}
           {!compact && (
             <details className="mt-2">
               <summary className="cursor-pointer">미처리 만기와 별도 지급 확인</summary>

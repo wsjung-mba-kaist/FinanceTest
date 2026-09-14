@@ -10,7 +10,7 @@ import { turnsB } from './turnsB'
 const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
   meta: {
     id: 'taeyoung-pf-2024',
-    version: 1,
+    version: 2,
     title: '워크아웃 동의율 75%',
     subtitle: '2024년 부동산 PF 구조조정',
     era: '2023-12',

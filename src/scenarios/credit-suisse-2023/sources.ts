@@ -9,6 +9,15 @@ import type { Source } from '../../engine/types'
  * 정책 수치의 근거로는 쓰지 않는다. 정책 수치는 전부 FINMA·SNB·연방정부 문서와 연방 관보(AS)에서 온다.
  */
 export const CS_SOURCES: Source[] = [
+  {
+    id: 'ubs-cs-completion-2023-06-12',
+    title: 'UBS completes acquisition of Credit Suisse',
+    publisher: 'UBS',
+    date: '2023-06-12',
+    url: 'https://www.ubs.com/global/en/investor-relations/press-releases/overview-news-display-ndp/en-20230612-ubs-credit-suisse-acquisition.html',
+    kind: 'primary',
+    note: '3월 19일 인수 합의 발표와 6월 12일 인수 완료를 구분한다. 인수 완료는 크레디트스위스 은행 법인 소멸과도 다른 사건이다.',
+  },
   // ───────── 1차 법령 (연방 관보) ─────────
   {
     id: 'plb-eo-2023-135',
@@ -159,7 +168,7 @@ export const CS_SOURCES: Source[] = [
       '자기자본 **45,129**(+비지배지분 202 = 총자본 45,331) · RWA **BIS 250,540 / 스위스 250,963**(Bank BIS 249,536) · ' +
       'CET1 비율 14.1% · 레버리지 익스포저 650,551 · 주석 25 Deposits "Total deposits 245,140 … of which ' +
       'customer deposits 233,235". 공시 지연·내부통제: 2023년 3월 14일 공시(당초 3월 9일 예정에서 미국 ' +
-      '증권거래위원회의 2019·2020년 현금흐름표 관련 질의로 일주일 연기), 2022·2021년 말 재무보고 ' +
+      '증권거래위원회의 2019·2020년 현금흐름표 관련 질의로 3/9 예정에서 3/14로 연기), 2022·2021년 말 재무보고 ' +
       '내부통제가 유효하지 않다고 결론(material weaknesses)했고 감사인 PwC는 내부통제에 부적정 의견을 냈다. ' +
       '**용어 주의**: CS는 4분기에 "Financial Report"를 내지 않는다 — 분기 Financial Report는 1~3분기뿐이고 ' +
       '4Q는 Earnings Release(`cs-4q22-earnings`)와 이 연차보고서다. 종전 note들이 가리키던 ' +

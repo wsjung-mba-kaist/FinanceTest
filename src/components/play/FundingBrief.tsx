@@ -89,9 +89,9 @@ export function FundingBrief({ compact = false }: { compact?: boolean }) {
       {!compact && (
         <details className="mt-2">
           <summary className="cursor-pointer">
-            후속 처리 대기 {state.pending.length}건 · 미결 요청 {unresolved.length}건
+            후속 처리 대기 {instructions.length}건 · 미결 요청 {unresolved.length}건
           </summary>
-          {state.pending.length === 0 ? (
+          {instructions.length === 0 ? (
             <p className="mt-1 text-muted">등록된 후속 처리 없음</p>
           ) : (
             <ul className="mt-1 space-y-1">

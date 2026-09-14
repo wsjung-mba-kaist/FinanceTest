@@ -321,11 +321,12 @@ const scenario: ScenarioDefinition<BankState> = defineScenario<BankState>({
       id: 'capital',
       when: { metric: 'leverageRatio', lt: 2 },
       reason: 'capital',
-      title: '자본 잠식 — 즉시시정조치',
+      title: '자본 여력 소진 — 훈련 종료',
       narrative:
-        '실현손실로 유형자기자본이 총자산의 2% 아래로 떨어졌습니다. PCA 규정상 "critically undercapitalized"로 관재 절차가 개시되었습니다.',
+        '모형의 레버리지비율(Tier 1/총익스포저)이 2% 아래로 떨어져 자본 여력 소진으로 훈련이 종료됐습니다. 실제 미국 PCA는 규제상 유형자본/총자산을 사용하고 법정 절차와 예외를 두므로 이 자동 종료와 동일하지 않습니다.',
       failed: true,
-      ruleText: '레버리지비율(Tier1/총노출)이 2% 미만이면 관재 절차가 개시됩니다.',
+      ruleText:
+        '훈련 규칙: 레버리지비율(Tier 1/총익스포저) 2% 미만에서 종료됩니다. 실제 PCA 기준·처분 시점과 구분하세요.',
     },
   ],
   endings: [

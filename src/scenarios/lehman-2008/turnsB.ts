@@ -435,7 +435,7 @@ export const t4: T = {
 export const t5: T = {
   id: 't5',
   label: 'T5',
-  timeLabel: '2008년 9월 14일 (일) 12:00 ET',
+  timeLabel: '2008년 9월 14일 (일) 21:00 ET',
   title: '결정의 일요일',
   time: '2008-09-14T21:00:00-04:00',
   entryEffects: [

@@ -7,7 +7,7 @@
  *   inflows, 75% cap), Annex 1 (formula for the 40% and 15% caps on Level 2 assets).
  * - Basel Framework LCR30 (HQLA) and LCR40 (cash inflows and outflows).
  * - 은행업감독업무시행세칙 (유동성커버리지비율 산출기준): 국내 안정적 소매·중소기업 예금에는
- *   BCBS 최저 3%가 아닌 5% 이탈률을 적용한다 → `KR_LCR_PARAMS`.
+ *   BCBS 기본값과 같은 5% 이탈률을 적용한다(조건부 3% 체계와 구분) → `KR_LCR_PARAMS`.
  *
  * HQLA after caps (BCBS 238 Annex 1). The ratios are expressed with the cap parameters and
  * reduce to the published 15/85, 15/60 and 2/3 when capL2b = 0.15 and capL2 = 0.40:
@@ -27,15 +27,15 @@
  */
 import type { LcrInflowCategory, LcrInput, LcrOutflowCategory, LcrParams, LcrResult } from './types'
 
-/** BCBS 238 standard run-off / inflow rates, haircuts and caps. */
+/** BCBS 238 baseline rates. The optional 3% stable-deposit rate requires national approval. */
 export const BCBS_LCR_PARAMS: LcrParams = {
   haircuts: { l2a: 0.15, l2b: 0.5 },
   capL2: 0.4,
   capL2b: 0.15,
   runoff: {
-    retailStable: 0.03,
+    retailStable: 0.05,
     retailLessStable: 0.1,
-    smeStable: 0.03,
+    smeStable: 0.05,
     smeLessStable: 0.1,
     operational: 0.25,
     operationalInsured: 0.05,
@@ -50,6 +50,8 @@ export const BCBS_LCR_PARAMS: LcrParams = {
     securedOther: 1,
     committedCredit: 0.1,
     committedLiquidity: 0.3,
+    committedFacilitiesToBanks: 0.4,
+    committedLiquidityToNonBankFIs: 1,
   },
   inflowRates: {
     retail: 0.5,
@@ -61,7 +63,13 @@ export const BCBS_LCR_PARAMS: LcrParams = {
   inflowCap: 0.75,
 }
 
-/** Korean supervisory parameters: stable retail / SME deposits run off at 5% (not 3%). */
+/** LCR40.11–12: use only where the jurisdiction permits 3% and deposit insurance meets the extra tests. */
+export const BCBS_REDUCED_RUNOFF_PARAMS: LcrParams = {
+  ...BCBS_LCR_PARAMS,
+  runoff: { ...BCBS_LCR_PARAMS.runoff, retailStable: 0.03, smeStable: 0.03 },
+}
+
+/** Korean supervisory parameters: stable retail / SME deposits run off at 5%. */
 export const KR_LCR_PARAMS: LcrParams = {
   ...BCBS_LCR_PARAMS,
   runoff: { ...BCBS_LCR_PARAMS.runoff, retailStable: 0.05, smeStable: 0.05 },

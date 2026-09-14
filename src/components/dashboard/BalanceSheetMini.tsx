@@ -90,7 +90,7 @@ function BankSheet({ bank, units }: { bank: BankState; units: Units }) {
     {
       label: 'AFS 증권(시가)',
       value: bank.securities.afs.marketValue,
-      note: `장부가 ${formatCurrency(bank.securities.afs.bookValue, units)}`,
+      note: `취득원가 ${formatCurrency(bank.securities.afs.bookValue, units)}`,
     },
     {
       label: 'HTM 증권(장부가)',
@@ -167,7 +167,15 @@ function PensionSheet({ p, units }: { p: PensionState; units: Units }) {
   )
 }
 
-function SecuritiesSheet({ s, units }: { s: SecuritiesState; units: Units }) {
+function SecuritiesSheet({
+  s,
+  units,
+  policyFxDrawn,
+}: {
+  s: SecuritiesState
+  units: Units
+  policyFxDrawn: number
+}) {
   const maturing30 = s.pf.abcpMaturing.slice(0, 4).reduce((a, b) => a + b, 0)
   const assets: Segment[] = [
     { label: '현금', value: Math.max(0, s.liquidity.cash) },
@@ -180,6 +188,13 @@ function SecuritiesSheet({ s, units }: { s: SecuritiesState; units: Units }) {
     { label: '콜차입', value: s.funding.call },
     { label: 'RP', value: s.funding.repo },
     { label: 'CP·전단채', value: s.funding.cp },
+    ...((s.custom.ksfLoanDrawn ?? 0) > 0
+      ? [{ label: '증권금융 대출', value: s.custom.ksfLoanDrawn! }]
+      : []),
+    ...(policyFxDrawn > 0 ? [{ label: '거래은행 정책 연계 외화차입', value: policyFxDrawn }] : []),
+    ...((s.custom.fxCreditLinesDrawn ?? 0) > 0
+      ? [{ label: '은행 외화 라인(인출)', value: s.custom.fxCreditLinesDrawn! }]
+      : []),
     {
       label: '은행 크레딧라인(인출)',
       value: s.liquidity.creditLinesDrawn,
@@ -192,7 +207,7 @@ function SecuritiesSheet({ s, units }: { s: SecuritiesState; units: Units }) {
       <StackedBar title="유동성 자산" segments={assets} units={units} />
       <StackedBar title="조달·자본" segments={liabilities} units={units} />
       <p className="text-xs text-muted">
-        PF 매입약정·보증 잔액 {formatCurrency(s.pf.abcpGuaranteed, units)} · 30일 차환 만기{' '}
+        PF 매입약정·보증 잔액 {formatCurrency(s.pf.abcpGuaranteed, units)} · 미처리 만기 4개 합계{' '}
         {formatCurrency(maturing30, units)} · 차환 성공률 {formatNumber(s.pf.rollRate * 100, 0)}% ·
         총위험액 {formatCurrency(s.risk.market + s.risk.credit + s.risk.operational, units)}
       </p>
@@ -264,7 +279,11 @@ export function BalanceSheetMini() {
         ) : inst.kind === 'pension' ? (
           <PensionSheet p={inst} units={scenario.units} />
         ) : inst.kind === 'securities' ? (
-          <SecuritiesSheet s={inst} units={scenario.units} />
+          <SecuritiesSheet
+            s={inst}
+            units={scenario.units}
+            policyFxDrawn={state.counters.bokSwapDrawn ?? 0}
+          />
         ) : (
           <KeyFigures institution={inst} />
         )}

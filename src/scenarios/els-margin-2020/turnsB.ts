@@ -4,6 +4,7 @@ import { confidence, flag, op, ownStockMove, regulator } from '../../engine/fx/c
 import {
   S,
   bokSwapBid,
+  settleAprilPolicyFunding,
   convertToBackToBack,
   cpRolloverStep,
   drawAllLines,
@@ -26,7 +27,7 @@ import {
 import { MARGIN, T4_PROFILE } from './turnsA'
 
 /**
- * T4~T7 (2020-03-23 ~ 03-31). 정책 대응이 차례로 도착하지만 **범위와 집행 시차**가 다르다:
+ * T4~T7 (2020-03-23 ~ 04-02). 정책 대응이 차례로 도착하지만 **범위와 집행 시차**가 다르다:
  * 3/19 밤 한미 통화스와프 600억달러(입찰은 3/31), 3/24 100조 패키지(채안펀드 매입은 4월 초),
  * 3/26 무제한 RP(첫 입찰 4/2, 증권사 11개사 대상 추가), 3/31 통화스와프 1차 입찰 87.2억달러 낙찰.
  */
@@ -552,8 +553,8 @@ export const t5: T = {
     },
     {
       id: 't5-policy',
-      description: '채권시장안정펀드·CP 매입 프로그램 창구 개설(집행은 4월 초)',
-      effects: [flag('bond_fund_open'), flag('cp_purchase_open')],
+      description: '채안펀드 상담과 증권금융 지원대출 창구 안내',
+      effects: [flag('bond_fund_open'), flag('ksf_loan_open')],
     },
     {
       id: 't5-ci',
@@ -600,7 +601,7 @@ export const t5: T = {
       agency: '대한민국 정부·금융위원회',
       time: '10:00',
       headline: '제2차 비상경제회의 — 100조원 기업구호 긴급자금',
-      body: '채권시장안정펀드 20조원(1차 캐피탈콜 3조원, 실제 매입은 4월 초 개시), 증권시장안정펀드 10.7조원, 회사채·CP 매입 7조원(증권사 발행분 5조원 포함) 등을 담은 100조원 규모 지원 방안이 발표됐다. 금융회사들이 출자하는 캐피탈콜 방식이므로 자금 집행에는 시차가 있다.',
+      body: '채권시장안정펀드 20조원(1차 캐피탈콜 3조원, 실제 매입은 4월 초 개시), 증권시장안정펀드 10.7조원, 단기자금시장 지원 7조원(증권사 유동성 지원 5조원과 기업 CP·전단채 지원 2조원) 등을 담은 100조원 규모 지원 방안이 발표됐다. 금융회사들이 출자하는 캐피탈콜 방식이므로 자금 집행에는 시차가 있다.',
       severity: 'positive',
       sourceRefs: [S.em2],
       cardRefs: ['korea-crisis-toolkit'],
@@ -627,7 +628,7 @@ export const t5: T = {
       to: '자금담당임원',
       subject: '발표된 프로그램의 범위와 집행 시차',
       body: `- 채권시장안정펀드 20조: 대상은 회사채와 우량 CP입니다. 캐피탈콜 방식이라 1차 3조원이 모이고 실제 매입은 **4월 초**부터입니다.
-- CP 매입 7조 중 증권사 발행분 5조: 우리에게 범위가 맞는 유일한 창구지만 역시 집행은 4월입니다.
+- 단기자금 지원 7조는 증권사 유동성 5조(증권금융 대출·한은 RP)와 기업 CP·전단채 2조입니다. 증권사 CP를 5조 매입하는 프로그램이 아닙니다.
 - 증권시장안정펀드 10.7조: 우리가 **출자하는** 쪽입니다. 현금이 나가고 출자금은 영업용순자본 차감항목이 됩니다.
 - 외화에 대한 조치는 없습니다. 통화스와프 자금의 배분 방식은 아직 공고되지 않았습니다.`,
       severity: 'warning',
@@ -649,39 +650,45 @@ export const t5: T = {
       options: [
         {
           id: 't5-d1-a',
-          label: 'CP 매입 프로그램에 5,000억 신청',
+          label: '증권금융 지원대출 5,000억 신청',
           description:
-            '증권사 발행 CP 매입 프로그램에 신청한다. 범위는 맞지만 집행이 4월이라 이번 달에는 절반만 소화된다.',
+            '증권금융 대출 창구에 신청한다. 이 모형은 사전 심사·담보 적격성이 확인된 한도 2,500억원을 이번 구간에 실행한다고 가정한다. 담보는 예약되고 대출 부채가 생기며, 남은 신청액은 확정 자금이 아니다.',
           effects: [
-            policyFunding({ programme: 'cppurchase', amount: 5000, scopeShare: 0.5, rateBp: 200 }),
+            policyFunding({ programme: 'ksfloan', amount: 5000, scopeShare: 0.5, rateBp: 200 }),
           ],
           expert: {
             rating: 80,
             rationale:
-              '범위가 일치하는 유일한 원화 창구다. 집행 시차가 있지만 신청 자체가 다음 달 조달 계획의 확정 항목이 된다 — 바젤 원칙 11의 "금액·리드타임이 확정된 조치"에 가장 가깝다.',
+              '증권금융 대출은 기업 CP 매입과 다른 경로다. 확약된 금액과 실행일, 담보 여력을 확인한 부분만 자금계획에 넣는다. 신청만으로 잔여 금액까지 확정되는 것은 아니다.',
             sourceRefs: [S.em2, S.bcbs144],
           },
-          consequences: '신청액의 절반이 이번 달에 소화되었습니다. 나머지는 4월입니다.',
+          consequences:
+            '모형의 심사·담보 한도 안에서 증권금융 대출이 실행됐습니다. 미실행 신청액은 현금에 포함하지 않습니다.',
           historical: true,
           feasibility: { basis: '3/24 발표된 프로그램 — 신청 접수 개시', sourceRefs: [S.em2] },
-          calibrationNote: '범위 일치 100%, 집행 시차로 이번 턴 소화율 50% [CAL, 가이드 6.7]',
+          calibrationNote:
+            '신청 5,000 중 한도 50%·금리 2%·담보 할인 5%·해당 구간 실행은 합성 기관 가정 [CAL]; 실제 회사의 대출 실적 아님',
         },
         {
           id: 't5-d1-b',
-          label: '채권시장안정펀드에 보유 회사채 매입 요청',
+          label: '채안펀드에 매입 적격성과 일정 확인 요청',
           description:
-            '채안펀드에 보유 회사채 매입을 요청한다. 대상은 우량 회사채·CP이며 1차 캐피탈콜 3조원이 모인 뒤 4월 초부터 매입한다.',
+            '4,000억원 규모의 매각 후보를 상담하되, 매입 적격성과 실행 확약이 확인되기 전에는 현금화하지 않는다. 채안펀드는 4월 초 매입을 준비 중이다.',
           effects: [
             policyFunding({ programme: 'bondfund', amount: 4000, scopeShare: 0.2, rateBp: 210 }),
           ],
           expert: {
             rating: 55,
             rationale:
-              '범위가 부분적으로만 맞고 집행이 가장 늦다. 발표 규모(20조)와 이번 달에 실제로 쓸 수 있는 금액(1차 캐피탈콜 3조의 일부)의 차이를 읽는 것이 이 옵션의 학습 지점이다.',
+              '매입 대상과 일정 확인은 필요하지만, 지금의 지급 재원을 대신하지 못한다. 이 모형에는 적격 회사채 매각 확약이 없어 해당 신청의 현금 유입을 0으로 처리한다.',
             sourceRefs: [S.em2],
           },
-          consequences: '신청액의 20%만 이번 달에 소화되었습니다.',
-          feasibility: { basis: '채안펀드 캐피탈콜 진행 중 — 부분 소화', sourceRefs: [S.em2] },
+          consequences:
+            '적격성·일정을 문의했습니다. 매입 확약이 없어 현금과 차입 잔액은 변하지 않습니다.',
+          feasibility: {
+            basis: '캐피탈콜 진행 중 — 상담 가능, 매입 확약 없음',
+            sourceRefs: [S.em2],
+          },
         },
         {
           id: 't5-d1-c',
@@ -774,7 +781,7 @@ export const t5: T = {
           expert: {
             rating: 30,
             rationale:
-              '현금을 지키는 대가로 이후 정책 창구에서의 위치를 잃는다. 3월 26일 한국은행 RP 대상기관 편입, 3월 31일 통화스와프자금 배분 모두 감독당국과의 관계 위에서 이루어진다.',
+              '출자 거절은 공동 시장안정 노력에 대한 평가에 영향을 줄 수 있다. 다만 증안펀드 출자를 한국은행 RP 대상기관 선정이나 외화대출 배정의 법정 조건으로 간주해서는 안 된다. 각 창구의 적격요건과 심사는 별도다.',
             sourceRefs: [S.bokRp, S.em2],
           },
           consequences: '불참을 통보했습니다. 감독당국의 태도가 달라졌습니다.',
@@ -904,26 +911,27 @@ export const t6: T = {
     {
       id: 't6-d1',
       title: '한국은행 RP 창구',
-      prompt: '대상기관 편입과 담보 구성을 어떻게 하시겠습니까? (최대 2개)',
+      prompt: '대상기관 편입과 담보 구성을 어떻게 하시겠습니까?',
       context:
         'RP 담보로는 국채·정부보증채가 인정됩니다. 미담보 국공채가 남아 있어야 쓸 수 있는 창구입니다.',
-      select: { min: 1, max: 2 },
+      select: { min: 1, max: 1 },
       requiredConcepts: ['korea-crisis-toolkit', 'hqla-and-haircuts'],
       dimensions: ['policy', 'liquidity'],
       options: [
         {
           id: 't6-d1-a',
-          label: '대상기관 편입 신청 후 국채 담보로 6,000억 조달',
+          label: '대상기관 편입 확인 후 국채 담보로 6,000억 신청',
           description:
-            '한국은행 공개시장운영 대상기관 편입을 신청하고 보유 국채를 담보로 91일물 RP를 최대한 조달한다. 금리는 0.85% 이하다.',
+            '추가 선정 대상에 해당한다는 모형 가정 아래, 4/2 첫 RP 입찰을 준비하고 보유 국채를 예약한다. 오늘 현금은 늘지 않는다. 금리 0.85%는 훈련용 상한 가정이다.',
           effects: [policyFunding({ programme: 'bokrp', amount: 6000, scopeShare: 1, rateBp: 85 })],
           expert: {
             rating: 88,
             rationale:
-              '범위가 100% 일치하고 금리가 가장 낮으며 만기가 가장 긴 창구다. 한국은행법 제68조 공개시장운영의 대상기관 확대는 2020년 3월 대응의 핵심이었고, 증권사가 처음으로 중앙은행 유동성에 직접 닿은 순간이다.',
+              '범위가 100% 일치하고 금리가 가장 낮으며 만기가 가장 긴 창구다. 한국은행법 제68조 공개시장운영의 대상기관 확대는 2020년 3월 대응의 핵심이었고, 기존에도 일부 증권사는 RP 대상기관이었다. 이번 조치는 대상기관을 추가 확대했으며, 이 프로그램의 첫 입찰은 4/2이다.',
             sourceRefs: [S.bokRp, S.bokAct],
           },
-          consequences: '대상기관 편입이 접수되고 RP 조달이 실행되었습니다.',
+          consequences:
+            'RP 신청과 담보 예약이 반영됐습니다. 실제 조달은 4/2 결제 구간에서 반영됩니다.',
           historical: true,
           feasibility: {
             basis: '3/26 발표로 증권사 11개사 대상기관 추가 — 담보 적격 시 이용 가능',
@@ -936,7 +944,7 @@ export const t6: T = {
           id: 't6-d1-b',
           label: '최소한만 조달하고 담보를 남겨 둔다',
           description:
-            '3,000억만 조달하고 나머지 국공채는 예비 담보로 남긴다. 추가 충격에 대비하지만 지금 비싼 CP를 계속 굴려야 한다.',
+            '3,000억원의 4/2 RP 조달을 준비하고 필요한 담보만 예약한다. 결제 전 자금 수요는 기존 현금과 확정 라인으로 충당해야 한다.',
           effects: [policyFunding({ programme: 'bokrp', amount: 3000, scopeShare: 1, rateBp: 85 })],
           expert: {
             rating: 66,
@@ -944,7 +952,7 @@ export const t6: T = {
               '예비 담보를 남기는 것은 합리적이지만, 0.85%로 조달할 수 있는 창구를 열어 두고 2%대 CP를 계속 굴리는 것은 비용이다. 담보는 남겨도 가격 차이는 남지 않는다.',
             sourceRefs: [S.bokRp],
           },
-          consequences: '일부만 조달했습니다. 담보 여력이 남아 있습니다.',
+          consequences: '일부 담보를 예약했습니다. 4/2 결제 전까지 현금에 포함되지 않습니다.',
           feasibility: { basis: '조달 규모는 자율', sourceRefs: [S.bokRp] },
         },
         {
@@ -956,7 +964,7 @@ export const t6: T = {
           expert: {
             rating: 22,
             rationale:
-              '이번 조치는 11개사를 일괄 대상기관으로 추가한 제도 변경이지 개별 구제가 아니다. 모두가 쓰는 창구에는 낙인이 없다 — 낙인은 혼자 쓰는 창구에 붙는다.',
+              '이번 조치는 11개사를 일괄 대상기관으로 추가한 제도 변경이지 개별 구제가 아니다. 광범위한 대상기관 확대는 개별 구제보다 낙인을 줄일 수 있지만, 시장이 어떻게 해석할지는 별도로 판단해야 한다.',
             sourceRefs: [S.bokRp, S.bokAct],
           },
           consequences: '신청하지 않았습니다. 조달은 계속 CP 시장에 의존합니다.',
@@ -980,20 +988,17 @@ export const t6: T = {
       options: [
         {
           id: 't6-d2-a',
-          label: '콜차입 전액 상환하고 CP 잔액 축소',
+          label: '4/2 입금 후 콜·CP 상환 예약',
           description:
-            '조달한 RP 자금으로 익일물 콜차입을 전액 갚고 CP 잔액을 3,000억 줄인다. 만기 불일치가 줄어든다.',
-          effects: [
-            securitiesFx.repay({ channel: 'call', amount: 4000 }),
-            securitiesFx.repay({ channel: 'cp', amount: 3000 }),
-          ],
+            '4/2 실제 입금 후 가용 현금 범위에서 콜차입 최대 4,000억과 CP 최대 3,000억을 상환하도록 예약한다. 결제 전에는 현금을 쓰지 않는다.',
+          effects: [flag('april_refinance_planned')],
           expert: {
             rating: 84,
             rationale:
               '위기의 교훈은 언제나 만기 구조다. 익일물과 1개월물을 3개월 담보부로 바꾸면 다음 충격에서 버틸 수 있는 날이 늘어난다.',
             sourceRefs: [S.bcbs144, S.lr2027],
           },
-          consequences: '콜차입이 정리되고 CP 잔액이 줄었습니다.',
+          consequences: '4/2 결제 후 상환을 예약했습니다. 현재 차입 잔액은 그대로입니다.',
           feasibility: { basis: '만기 도래분 미차환 + 조기 상환', sourceRefs: [S.bcbs144] },
         },
         {
@@ -1070,9 +1075,23 @@ export const t6: T = {
 export const t7: T = {
   id: 't7',
   label: 'T7',
-  timeLabel: '2020년 3월 31일 (화) KST',
-  title: '통화스와프 1차 입찰: 87.2억달러',
-  time: '2020-03-31T09:00:00+09:00',
+  timeLabel: '2020년 3월 31일~4월 2일 KST',
+  title: '통화스와프 입찰과 결제: 발표된 달러가 현금이 되기까지',
+  time: '2020-03-31T17:00:00+09:00',
+  ticks: 2,
+  tickLabels: ['3/31 17:00 거래은행 차입 약정', '4/2 정책자금 결제'],
+  tickEffects: [
+    { id: 't7-policy-cash', atTick: 1, effects: [settleAprilPolicyFunding(), settlementCheck()] },
+    {
+      id: 't7-refinance',
+      atTick: 1,
+      when: { flag: 'april_refinance_planned' },
+      effects: [
+        securitiesFx.repay({ channel: 'call', amount: 4000 }),
+        securitiesFx.repay({ channel: 'cp', amount: 3000 }),
+      ],
+    },
+  ],
   entryEffects: [
     { id: 't7-pay-residual', effects: [payMarginFx({ label: '3/26 잔여 증거금 납입' })] },
     { id: 't7-cutoff', effects: [marginCutoffCheck()] },
@@ -1116,8 +1135,8 @@ export const t7: T = {
     },
     {
       id: 't7-ci',
-      description: '통화스와프자금 공급 개시 — 신뢰지수 +5',
-      effects: [confidence(5, '통화스와프자금 공급 개시'), ownStockMove(0.05, '증권주 회복')],
+      description: '통화스와프자금 입찰 실시 — 신뢰지수 +5',
+      effects: [confidence(5, '통화스와프자금 입찰 실시'), ownStockMove(0.05, '증권주 회복')],
     },
     { id: 't7-settle', effects: [settlementCheck()] },
   ],
@@ -1126,11 +1145,11 @@ export const t7: T = {
       id: 't7-swap-auction',
       kind: 'regulator',
       agency: '한국은행',
-      time: '10:00',
+      time: '3/31 입찰 결과',
       headline: '통화스왑자금 대출 1차 입찰 — 공급 예정 120억달러, 낙찰 87.2억달러',
-      body: '한국은행은 연준과의 통화스왑 자금을 이용한 외화대출 1차 입찰을 실시했다. 공급 예정 금액 120억달러 중 87.2억달러가 낙찰됐다. 3월 19일 계약 체결로부터 12일, 증권사들의 증거금 납입이 정점을 지난 뒤다.',
+      body: '한국은행은 연준과의 통화스왑 자금을 이용한 외화대출 1차 입찰을 실시했다. 공급 예정 금액 120억달러 중 87.2억달러가 낙찰됐다. 3월 19일 계약 체결로부터 12일 뒤의 입찰이며, 은행에 대한 실제 결제는 4월 2일이다. 증권사는 직접 입찰 대상이 아니므로 거래은행의 별도 외화대출 심사·약정이 필요하다.',
       severity: 'positive',
-      sourceRefs: [S.swapAuction, S.swap],
+      sourceRefs: [S.swapAuction, S.swapTerms, S.swap],
       cardRefs: ['korea-crisis-toolkit'],
     },
     {
@@ -1156,9 +1175,9 @@ export const t7: T = {
       from: '리스크관리본부장',
       to: '자금담당임원',
       subject: '3월 결산 전 점검 — 무엇이 구속조건이었나',
-      body: `- 3월 중 누적 증거금 통지액은 {{metric:marginCallPending}} 기준으로 대시보드에 남아 있습니다. 자본은 한 번도 문제가 되지 않았고, 매일 문제가 된 것은 **19시까지의 달러**였습니다.
+      body: `- 현재 미납 증거금은 {{metric:marginCallPending}}입니다. 이는 누적 통지액이 아닙니다. 매일 확인할 핵심은 **19시까지 납입 가능한 달러**와 손실 발생 후의 자본입니다.
 - 원화 유동성은 넉넉했습니다. 기준금리는 내려갔고 CD는 1.10%입니다. 그런데 CP(91일)는 2.20%로 계속 오르고 있습니다 — 원화 시장 안에서도 조달 주체에 따라 값이 다릅니다.
-- 통화스와프 자금은 계약 체결 12일 뒤에야 입찰로 시장에 나왔습니다. 그 12일 동안 컷오프는 여덟 번 돌아왔습니다.
+- 통화스와프는 3/19 계약 → 3/31 은행 입찰 → 4/2 결제입니다. 증권사에 전달되는 금액과 시점은 거래은행 약정에 달려 있습니다. 약정 잔액은 입금 전까지 결제 재원이 아닙니다.
 - 다음 분기 리스크위원회에 올릴 안건: 자체헤지 비중, 외화 유동자산 상시 보유 비율, 만기 구조.`,
       severity: 'info',
       sourceRefs: [S.swapAuction, S.ecosRate, S.dlsPlan],
@@ -1169,35 +1188,42 @@ export const t7: T = {
   decisions: [
     {
       id: 't7-d1',
-      title: '통화스와프자금 입찰',
-      prompt: '1차 입찰에 어떻게 응찰하시겠습니까?',
+      deadlineTick: 0,
+      defaultOptionId: 't7-d1-c',
+      title: '거래은행을 통한 외화 버퍼 확충',
+      prompt: '4월 2일 입금을 전제로 거래은행과 외화차입을 약정하시겠습니까?',
       context:
-        '공급 예정 120억달러에 낙찰은 87.2억달러였습니다 — 수요가 공급에 미치지 못했습니다. 금리는 시장 스왑보다 싸고 만기는 84일입니다.',
+        '3/31 은행 입찰 결과는 87.2억달러입니다. 증권사는 직접 응찰 대상이 아닙니다. 이 모형에서는 거래은행이 4/2 입금, 한도 3,000억원 상당, 연 0.9%의 별도 외화차입을 제안합니다. 이는 실제 한국은행 낙찰금리나 증권사별 배정 실적이 아닙니다.',
       select: { min: 1, max: 1 },
       requiredConcepts: ['korea-crisis-toolkit', 'ldi-collateral-waterfall'],
       dimensions: ['policy', 'liquidity'],
       options: [
         {
           id: 't7-d1-a',
-          label: '필요액 전액 응찰해 외화 버퍼를 다시 채운다',
+          label: '거래은행에 4,000억 상당의 외화차입을 신청한다',
           description:
-            '4,000억원 상당을 응찰한다. 배정 한도 내에서 낙찰되며 금리는 연 0.9% 수준으로 시장 스왑보다 훨씬 싸다.',
+            '요청 4,000억원 상당 중 모형 한도 3,000억원을 약정한다. 4/2 입금 전에는 외화 유동자산에 더하지 않는다. 연 0.9%는 거래은행 대출의 훈련 가정이다.',
           effects: [bokSwapBid({ amount: 4000, allocationCap: 3000, rateBp: 90 })],
           expert: {
             rating: 86,
             rationale:
-              '1차 입찰이 미달(120억달러 공급 예정, 87.2억달러 낙찰)이었다는 사실 자체가 당시 증권사들이 이미 비싼 값에 조달을 마쳤음을 보여 준다. 싼 자금으로 비싼 자금을 대체하고 버퍼를 복원하는 것이 정석이다.',
+              '입찰 미달만으로 증권사의 조달 완료를 추론할 수는 없다. 거래은행의 확약, 입금일, 총비용과 만기를 확인한 뒤 필요한 외화 버퍼를 확보한다. 이 선택은 3/31의 미납을 소급해서 해결하지 않는다.',
             sourceRefs: [S.swapAuction],
           },
-          consequences: '낙찰되었습니다. 외화 유동자산이 복원되었습니다.',
+          consequences:
+            '거래은행 차입이 약정되었습니다. 4/2 결제 구간에서 외화 유동자산에 반영됩니다.',
           historical: true,
-          feasibility: { basis: '3/31 1차 입찰 — 대상기관 응찰 가능', sourceRefs: [S.swapAuction] },
+          feasibility: {
+            basis: '은행만 직접 입찰 가능; 증권사 연계 차입은 거래은행 확약을 가정',
+            sourceRefs: [S.swapTerms],
+          },
           preview: [{ metric: 'fxLiquid', direction: 'up', magnitude: 3 }],
         },
         {
           id: 't7-d1-b',
-          label: '최소한만 응찰(1,000억 상당)',
-          description: '당장의 소요만큼만 응찰한다. 조달비용이 줄지만 버퍼는 얇게 남는다.',
+          label: '거래은행 차입을 1,000억 상당만 약정한다',
+          description:
+            '1,000억원 상당을 약정하며 4/2에 입금된다. 차입 비용은 작지만 이후 외화 수요에 대비한 버퍼도 작다.',
           effects: [bokSwapBid({ amount: 1000, allocationCap: 3000, rateBp: 90 })],
           expert: {
             rating: 60,
@@ -1205,14 +1231,17 @@ export const t7: T = {
               '이자 비용은 줄지만, 넉 달 뒤 금융위가 자체헤지 잔액의 10~20% 외화 보유를 의무화한다는 점을 생각하면 버퍼를 얇게 두는 것은 곧 되돌릴 결정이다.',
             sourceRefs: [S.swapAuction, S.dlsPlan],
           },
-          consequences: '소량만 낙찰되었습니다.',
-          feasibility: { basis: '응찰 규모는 자율', sourceRefs: [S.swapAuction] },
+          consequences: '1,000억원 상당을 약정했습니다. 4/2 입금 전에는 사용할 수 없습니다.',
+          feasibility: {
+            basis: '거래은행 한도 내 차입 규모 선택이라는 모형 가정',
+            sourceRefs: [S.swapTerms],
+          },
         },
         {
           id: 't7-d1-c',
-          label: '응찰하지 않는다 — 시장 스왑이 정상화되고 있다',
+          label: '거래은행 차입을 신청하지 않는다',
           description:
-            '스왑 베이시스가 −40bp까지 좁혀졌으므로 시장에서 조달하면 된다고 보고 응찰하지 않는다.',
+            '스왑 베이시스가 −40bp까지 좁혀졌으므로 시장에서 조달하면 된다고 보고 추가 차입을 신청하지 않는다.',
           effects: [{ kind: 'counter', key: 'swapAuctionSkipped', add: 1 }],
           expert: {
             rating: 34,
@@ -1220,7 +1249,7 @@ export const t7: T = {
               '베이시스는 좁아졌지만 4월 CP 금리는 2.24%까지 더 올랐고 외화 조달 여건이 완전히 정상화된 것은 6월 이후다. 정책 자금은 열려 있을 때 확보하는 것이지, 필요할 때 열려 있지 않다.',
             sourceRefs: [S.swapAuction, S.ecosRate],
           },
-          consequences: '응찰하지 않았습니다. 외화 버퍼는 그대로입니다.',
+          consequences: '거래은행 차입을 신청하지 않았습니다. 외화 버퍼는 그대로입니다.',
           trap: true,
           trapExplanation:
             '베이시스가 −40bp까지 좁혀진 것을 보면 "시장에서 사면 된다"는 판단이 자연스럽다. 그러나 1차 입찰이 미달(120억달러 공급 예정, 87.2억달러 낙찰)이었다는 사실은 싼 자금이 남아 있었다는 뜻이다 — 정책 자금은 열려 있을 때 받는 것이지 필요할 때 열려 있는 것이 아니다. CP 금리는 이 입찰 이후에도 4월 2일까지 더 올랐다.',
@@ -1231,6 +1260,7 @@ export const t7: T = {
     },
     {
       id: 't7-d2',
+      availableFrom: 1,
       title: '헤지 북의 미래',
       prompt:
         '리스크위원회에 올릴 자체헤지 북 방침을 정하십시오. 이 결정이 다음 위기의 출발점이 됩니다. (최대 2개)',

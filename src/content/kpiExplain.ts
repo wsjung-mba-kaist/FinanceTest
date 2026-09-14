@@ -34,15 +34,16 @@ export interface KpiExplain {
 export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   // ─────────────────────────── 공통 ───────────────────────────
   confidence: {
-    why: '런 상태(S0~S3)와 유출 계수를 구동하는 선행 변수다. 60 아래로 내려가면 유출률이 계단식으로 뛰므로, 지표가 아직 멀쩡해도 커뮤니케이션·감독 접촉 순서를 앞당겨야 한다.',
+    why: '런 상태(S0~S3)와 유출 계수를 구동하는 선행 변수다. 70·50·30의 경계를 내려갈 때 유출률이 계단식으로 뛰도록 설계되어 있으므로, 지표가 아직 멀쩡해도 커뮤니케이션·감독 접촉 순서를 앞당겨야 한다.',
     caveat: '시뮬레이션 신뢰지수 · 실제 관측 통계 아님',
-    formula: '예금자·거래상대·투자자·이사회 신뢰의 가중 합(0~100), 사건별 ΔCI 누적',
+    formula:
+      '초기 신뢰지수에 사건·선택의 ΔCI를 반영한 모형 값(0~100). 이해관계자별 신뢰의 가중 평균이 아님',
     cards: ['bank-run-dynamics', 'crisis-communication'],
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
   runState: {
     why: '유출 속도의 레짐을 알려 준다. S2 이상이면 "며칠 안에"가 아니라 "오늘 안에" 담보를 현금으로 바꿀 수 있는지가 유일한 질문이 된다.',
-    formula: 'CI ≥ 70 → S0, ≥ 55 → S1, ≥ 40 → S2, 그 아래 S3',
+    formula: 'CI ≥ 70 → S0, ≥ 50 → S1, ≥ 30 → S2, 그 아래 S3',
     cards: ['bank-run-dynamics', 'uninsured-deposits-and-run-speed'],
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
@@ -60,8 +61,8 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
 
   // ─────────────────────────── 은행 · 유동성 ───────────────────────────
   cash: {
-    why: '오늘 결제할 수 있는 유일한 자산이다. 마감 시 중앙은행 계좌가 음수로 예상되면 다른 지표가 아무리 좋아도 폐쇄 사유가 된다.',
-    formula: '중앙은행 지준 + 즉시 인출 가능한 현금성 잔액',
+    why: '현재 장부의 현금 잔액이다. 필요한 통화·계좌·결제 마감에 실제로 사용할 수 있는지 확인하고, 인출 전 약정과 구분한다.',
+    formula: '해당 기관의 현금 장부 잔액(은행은 현금·지준)',
     cards: ['contingency-funding-plan', 'discount-window-fhlb-btfp'],
     sourceRef: 'dfpi-svb-order-2023',
   },
@@ -98,22 +99,24 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'fed-sr-10-6',
   },
   lcr: {
-    why: '규제 최저선이자 감독 개입(R1)의 트리거다. 다만 30일 전제이므로 하루 25%가 빠지는 런에서는 충족 여부와 생존이 별개라는 점을 함께 보고해야 한다.',
+    why: '30일 스트레스 유출에 대한 방어력을 본다. 실제 규제 적용 대상·당시 기준과 게임 경고선을 구분한다. SVB와 리먼 등에서 표시하는 LCR은 비교용 모형 지표이며 당시 법정 의무를 뜻하지 않는다.',
     caveat: '30일 스트레스 기준 · 당일 결제 여력은 별도 확인',
     formula: 'HQLA(헤어컷·상한 적용) ÷ 30일 순현금유출 × 100, 유입 인정 상한 75%',
     cards: ['lcr-basics', 'hqla-and-haircuts'],
     sourceRef: 'bcbs-238',
   },
   hqla: {
-    why: 'LCR의 분자이지만 "당일 현금화 가능액"과 다르다. 리엔이 걸렸거나 미예치인 자산은 여기 잡혀도 오늘 쓸 수 없으므로 담보차입 여력과 반드시 나란히 본다.',
-    formula: 'Level 1 × 100% + Level 2A × 85% + Level 2B × 50~75% (L2 ≤ 40%, 2B ≤ 15%)',
+    why: 'LCR의 분자이지만 "당일 현금화 가능액"과 다르다. 이미 차입에 묶인 담보는 원칙적으로 제외한다. 미인출 중앙은행 사전 예치 담보는 요건 충족 시 인정될 수 있으나 당일 인출 가능 여부는 별도 확인한다.',
+    formula:
+      '미담보 Level 1 × 100% + Level 2A × 85% + Level 2B × 50%, 이후 L2 40%·2B 15% 상한 적용(모형은 2B를 일괄 50% 인정)',
     cards: ['hqla-and-haircuts', 'lcr-basics'],
     sourceRef: 'basel-lcr30',
   },
   projectedDailyOutflow: {
     why: '생존 일수의 분모다. 런 상태·증폭·완화 계수가 반영되므로, 커뮤니케이션이나 백스톱이 이 숫자를 얼마나 줄이는지가 그 조치의 실질 가치다.',
     caveat: '현재 조건에 따른 향후 1일 추정 · 확정 지급액 아님',
-    formula: 'Σ(세그먼트 잔액 × 런 상태별 유출률) × 증폭계수 ÷ 완화계수',
+    formula:
+      'Σ[세그먼트 잔액 × min(상한, 런 상태별 유출률 × 증폭계수 × 네트워크계수 × 완화계수)]. 완화계수는 1 이하이며 곱한다',
     cards: ['bank-run-dynamics', 'uninsured-deposits-and-run-speed'],
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
@@ -132,21 +135,21 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   dailyOutflow: {
     why: '이번 구간의 실제 유출액이다. 예상 유출과의 괴리가 커지면 유출 모형이 아니라 관측치로 생존 일수를 다시 계산하고 감독당국에 보고 주기를 올린다.',
     caveat: '현재 구간 누적 · 구간 시작 때 집계 초기화',
-    formula: '당일 예금 순유출(인출 − 유입)',
+    formula: '현재 구간에 누적된 모형 예금 유출액(구간 진입 시 초기화)',
     cards: ['bank-run-dynamics', 'contingency-funding-plan'],
     sourceRef: 'dfpi-svb-order-2023',
   },
   dailyOutflowPct: {
-    why: '감독 반응의 임계 축이다. 3%/일에서 경고, 20%/일을 넘으면 감독당국은 정리 준비(R3)로 넘어간다고 가정해야 한다.',
+    why: '구간의 유출 규모를 시나리오 시작 예금과 비교한다. 구간 길이가 서로 다르므로 일일 유출률로 읽지 않으며, 감독 반응은 해당 시나리오 조건을 확인한다.',
     caveat: '현재 구간 누적 · 구간 시작 때 집계 초기화',
-    formula: '당일 순유출 ÷ 턴 시작 예금 잔액 × 100',
+    formula: '현재 구간 유출액 ÷ 시나리오 시작 예금 잔액 × 100',
     cards: ['uninsured-deposits-and-run-speed', 'regulator-escalation-ladder'],
     sourceRef: 'fsb-depositor-behaviour-2024',
   },
   cumulativeOutflow: {
     why: '위기 시작 이후 빠져나간 총액으로, 백스톱 규모와 매각 협상의 기준선이 된다. 임계 구간이 정의돼 있지 않으므로 "정상"이 아니라 절대액과 속도로 판단한다.',
     caveat: '시나리오 시작 이후 누적',
-    formula: 'Σ 일별 순유출',
+    formula: 'Σ 시나리오 구간별 모형 예금 유출액',
     cards: ['bank-run-dynamics', 'fdic-resolution-weekend'],
     sourceRef: 'dfpi-svb-order-2023',
   },
@@ -172,14 +175,17 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'bcbs-189',
   },
   economicTce: {
+    caveat: 'CET1 기반 세전 근사 · 회계상 TCE와 다름',
     why: '시장과 무보험 예금자가 실제로 보는 자본이다. 규제 CET1이 12%여도 이 숫자가 0 근처면 증자·매각 조건이 결정되므로, 공시 전에 반드시 먼저 계산한다.',
-    formula: '(유형보통주자본 − (AFS + HTM 미실현손실) × (1 − 세율)) ÷ 총자산 × 100',
+    formula:
+      '(CET1 − CET1에 미반영된 AFS 손실 − HTM 손실) ÷ 레버리지 익스포저 × 100 (모형: 세효과 미반영)',
     cards: ['economic-vs-regulatory-capital', 'afs-htm-aoci'],
     sourceRef: 'fed-svb-review-2023',
   },
   unrealizedLoss: {
-    why: '아직 자본에 반영되지 않은 손실의 총량이다. 매각하는 순간 실현되고 HTM은 테인팅으로 잔여분까지 재분류되므로, 매각 결정 전에 이 숫자의 어디까지가 HTM인지 확인한다.',
-    formula: '(AFS 장부가 − 시가) + (HTM 장부가 − 시가)',
+    why: '증권의 원가 대비 평가손실 합계다. AFS 손실은 회계자본에 이미 반영될 수 있고 CET1 반영 여부는 AOCI 처리에 달려 있다. HTM 매각은 예외 요건과 잔여 보유 의도를 검토해야 한다.',
+    formula:
+      'max(0, AFS 원가 − 시가) + max(0, HTM 상각원가 − 시가). 모형 bookValue는 AFS에도 원가 기준을 저장',
     cards: ['afs-htm-aoci', 'htm-tainting'],
     sourceRef: 'fasb-asc-320',
   },
@@ -204,27 +210,29 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'fsc-86917',
   },
   liquidityRatio: {
-    why: '1·3개월 기준 100%가 감독 기준선이다. 2027.1.1 개편은 유동자산에 헤어컷을, 유동부채에 우발채무를 넣으므로 현행 수치가 여유 있어도 개편 기준으로 다시 계산해야 한다.',
+    why: '게임의 자금 압박 지표다. 만기 4개 합계와 단순화한 지급액을 쓰므로 법정 1·3개월 유동성비율과 일치하지 않는다. 2026.5 발표된 개편안은 2027.1.1 시행을 목표로 하며, 당시 규정과 별도 비교한다.',
     formula: '유동자산 ÷ 유동부채 × 100 (게임 단순화: 차환 실패분 + 콜 + CP 50% + 마진콜 대기)',
     cards: ['pf-abcp-commitment-ncr', 'hqla-and-haircuts'],
     sourceRef: 'fsc-86917',
   },
   liquidAssets: {
-    why: '오늘 동원 가능한 자산의 총량이다. 매각 가능 증권은 헤어컷을 적용한 값으로만 세고, 미인출 약정은 취소 가능 조항을 확인한 뒤에 센다.',
-    formula: '현금 + 미인출 약정 + 매각가능증권 × (1 − 헤어컷)',
+    why: '현금·미인출 약정·증권 할인평가액을 더한 모형 값이다. 약정은 인출 조건을, 증권은 매각·담보화와 결제 시점을 확인해야 하므로 합계를 즉시 사용 가능한 현금으로 읽지 않는다.',
+    formula:
+      '현금 + 미인출 은행 약정(약정 − 기인출액) + 매각가능증권 × 90% (모형의 고정 할인율 10%)',
     cards: ['hqla-and-haircuts', 'contingency-funding-plan'],
     sourceRef: 'cgfs-36',
   },
   abcpMaturingNext: {
+    caveat: '만기 배열의 상품 구성은 시나리오별로 다름',
     why: '처리하지 않은 첫 만기 금액이다. 차환이 실패할 부분과 전액 상환 시 필요한 현금을 나눠 확인한다. 처리 후에는 다음 만기로 이동한다.',
-    formula: '현재 미처리 만기 배열[0]의 PF-ABCP 잔액',
+    formula: '현재 미처리 만기 배열[0]의 잔액',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-23-10',
   },
   abcpMaturing30: {
     why: '미처리 만기 4개를 합한 금액이다. 구간 간격이 서로 달라 달력상 30일 합계로 해석할 수 없다. 실제 날짜별 만기표는 별도 확인한다.',
     caveat: '달력상 30일 합계 아님',
-    formula: 'Σ 현재 미처리 만기 배열[0..3] PF-ABCP 잔액',
+    formula: 'Σ 현재 미처리 만기 배열[0..3]의 잔액',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-lee-2022-18',
   },
@@ -242,7 +250,7 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'fsc-80034',
   },
   abcpGuaranteed: {
-    why: '매입확약·신용공여 잔액은 아직 대차대조표 밖이지만 차환이 막히면 전액 내 부채가 된다. 우발채무가 아니라 조건부 만기로 관리한다.',
+    why: '매입확약·신용공여는 조건부 자금 수요다. 이행하면 현금 지급과 ABCP 등 자산 인수가 발생하며, 별도 차입을 할 때 조달 부채가 늘어난다. 보증 잔액 전부가 자동으로 차입 부채가 되는 것은 아니다.',
     cards: ['pf-abcp-commitment-ncr'],
     sourceRef: 'kcmi-23-10',
   },
@@ -276,13 +284,13 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'tpr-ldi-guidance-2023',
   },
   ldiLeverage: {
-    why: '같은 금리 상승에 몇 배의 담보가 필요한지를 결정한다. 3배를 넘으면 250bp 버퍼로도 5일 안에 담보를 대기 어려워진다.',
+    why: '익스포저 대비 자기자본의 얇기를 보여 준다. 같은 NAV에서 익스포저가 커지면 금리 충격 손실이 커진다. 담보 부족은 레버리지 배수만으로 단정하지 않고 PV01·가용 담보·보충 소요일로 계산한다.',
     formula: 'LDI 익스포저 ÷ LDI 자기자본',
     cards: ['ldi-leverage-buffer-250bp'],
     sourceRef: 'boe-ldi-staff-paper-2023',
   },
   collateralHeadroomBp: {
-    why: '금리가 몇 bp 더 올라도 버티는지를 직접 말해 준다. 영란은행 권고 250bp 아래면 담보 보충(5일 가정)이 시장 속도를 따라가지 못한다고 보고 지금 현금화를 시작한다.',
+    why: '현재 담보를 금리 충격 bp로 환산한 모형 값이다. 미충당 콜과 별도로 보며, 250bp는 2023년 사후 최소 회복력 기준으로 2022년 당시 의무가 아니다. 보충 소요일과 운영 버퍼를 함께 판단한다.',
     formula: '가용 담보 ÷ PV01, PV01 = 익스포저 × 수정듀레이션 ÷ 10,000',
     cards: ['ldi-leverage-buffer-250bp', 'ldi-collateral-waterfall'],
     sourceRef: 'boe-ldi-staff-paper-2023',
@@ -308,13 +316,13 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
   // ─────────────────────────── 프라임브로커 ───────────────────────────
   grossExposure: {
     why: '총액 기준 노출이다. 순액이 작아도 청산은 총액으로 일어나므로, 집중도·청산 일수와 묶어서 한도를 건다.',
-    formula: 'Σ 고객 포지션 명목금액',
+    formula: 'Σ |고객 포지션 명목금액| (롱·숏 절댓값 합계)',
     cards: ['tri-party-repo-run'],
     sourceRef: 'paul-weiss-cs-archegos-2021',
   },
   liquidationVaR: {
     why: '청산에 걸리는 기간 동안 벌어질 수 있는 손실이다. 마진이 이 값을 덮지 못하면 담보가 아니라 신용으로 빌려준 것이다.',
-    formula: '99% 일측(z = 2.33) × 변동성 × √청산일수 × 포지션',
+    formula: 'Σ[2.33 × 일일 변동성 × √청산일수 × |포지션|] (99% 일측 정규 근사, 분산효과 미반영)',
     cards: ['tri-party-repo-run'],
     sourceRef: 'cgfs-36',
   },
@@ -325,15 +333,15 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'paul-weiss-cs-archegos-2021',
   },
   concentrationDays: {
-    why: '가장 큰 포지션을 빼는 데 걸리는 일수다. 10일을 넘으면 정적 마진은 의미가 없고 집중도 가산 마진으로 전환해야 한다.',
-    formula: '포지션 ÷ (일평균거래량 × 참여율 20%)',
+    why: '각 포지션 중 청산에 가장 오래 걸리는 일수다. 명목금액이 가장 큰 포지션과 다를 수 있다. 유동성이 낮은 종목은 참여율·집중도 가산을 함께 검토한다.',
+    formula: 'max[|포지션| ÷ (일평균거래대금 × 참여율 20%)]',
     cards: ['tri-party-repo-run'],
     sourceRef: 'sec-pr-2022-70',
   },
 
   // ─────────────────────────── 중앙은행 · 외환 ───────────────────────────
   usableReserves: {
-    why: '헤드라인 보유액이 아니라 실제로 쓸 수 있는 달러다. 이 숫자가 시장에 알려지는 시점이 롤오버 거부의 시작점이므로 방어 소진 속도를 일 단위로 관리한다.',
+    why: '헤드라인 보유액이 아니라 실제로 쓸 수 있는 달러다. 가용액 공개와 신뢰 변화가 차환에 미치는 영향을 살피고, 방어에 따른 소진 속도를 일 단위로 관리한다.',
     cards: ['korea-crisis-toolkit'],
     sourceRef: 'audit-fx-crisis-1998',
   },
@@ -350,25 +358,25 @@ export const KPI_EXPLAIN: Record<string, KpiExplain> = {
     sourceRef: 'audit-fx-crisis-1998',
   },
   sovereignSpreadBp: {
-    why: '국가 신용에 매겨진 가격이다. 300bp를 넘으면 민간의 외화 조달이 사실상 닫히므로 양자·지역 자금과 스와프 경로를 동시에 연다.',
+    why: '국가 신용에 매겨진 가격이다. 스프레드 상승 시 민간 외화 조달의 비용·물량을 점검한다. 300bp는 모형 경고 기준이며 실제 조달 중단을 결정하는 보편적 문턱은 아니다.',
     cards: ['korea-crisis-toolkit', 'crisis-communication'],
     sourceRef: 'audit-fx-crisis-1998',
   },
   distressedBanks: {
-    why: '개별 기관 문제가 시스템 문제로 넘어갔는지를 보는 지표다. 4곳을 넘으면 개별 정리가 아니라 일괄 조치(전액 보장·백스톱)를 검토할 시점이다.',
+    why: '개별 기관 문제가 시스템 문제로 넘어갔는지를 보는 지표다. 기관 수와 함께 규모·상호연계·지급능력을 확인한다. 4곳이라는 모형 경고 기준만으로 전액 보장이나 일괄 정리를 결정하지 않는다.',
     cards: ['fdic-resolution-weekend', 'korea-crisis-toolkit'],
     sourceRef: 'fsc-71188',
   },
 
   // ─────────────────────────── 자산운용 ───────────────────────────
   redemptionsPendingPct: {
-    why: '오늘 현금으로 내줘야 할 NAV 비중이다. 현금 버퍼를 넘으면 매각이 시작되고, 그 매각이 다음 날 환매를 부른다.',
+    why: '현재 처리 대기 중인 환매 요청 비중이다. 요청과 실제 지급 시점을 구별하고 펀드 규약의 결제일·유동성 관리 수단을 확인한다.',
     formula: '당일 환매 요청액 ÷ NAV × 100',
     cards: ['bank-run-dynamics'],
     sourceRef: 'sec-mmf-reforms-2023',
   },
   cashBufferPct: {
-    why: '선착순 인출 유인을 억제하는 유일한 방어선이다. 버퍼가 얇으면 남은 투자자에게 비용이 전가되므로 스윙프라이싱·수수료 발동을 먼저 검토한다.',
+    why: '현금과 1일 내 유동화 가능한 자산의 비중이다. 모두 이미 입금된 현금은 아니다. 유동성 버퍼와 함께 규약·관할 규정상 허용된 비용배분 수단을 검토한다.',
     formula: '일일 유동자산 ÷ NAV × 100',
     cards: ['bank-run-dynamics'],
     sourceRef: 'sec-mmf-reforms-2023',

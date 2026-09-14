@@ -1,3 +1,4 @@
+import { pendingFundingInstructions } from '../../lib/fundingOperations'
 import { describe, expect, it } from 'vitest'
 import {
   advanceTick,
@@ -26,7 +27,7 @@ import { cardIds, sourceIds } from '../../content'
 import scenario from './scenario'
 import { ELS_FACTS } from './facts'
 import { elsInitialConfidence, elsInitialMarket, elsInitialSecurities } from './initialState'
-import { marginCallStep } from './fx'
+import { marginCallStep, settleAprilPolicyFunding } from './fx'
 import { MARGIN, T1_PROFILE } from './turnsA'
 
 type State = GameState<SecuritiesState>
@@ -439,6 +440,108 @@ describe('els-margin-2020 scenario', () => {
     console.log('[insolvent] ended', s.ended?.reason, 'T', s.ended?.turnIndex)
     expect(s.ended?.reason).toBe('insolvent')
     expect(s.flags.insolvent).toBe(true)
+  })
+
+  it('a securities-finance loan creates secured loan debt while a bond-fund inquiry creates no cash', () => {
+    const hist = autoplay(scenario, 'historical', { seed: 1, variance: 0 })
+    const before = replay(scenario, {
+      seed: 1,
+      variance: 0,
+      decisions: hist.decisions.filter((d) => d.turnIndex < 5),
+      turnIndex: 5,
+      tick: 0,
+    }).state
+    const loan = applyDecision(before, scenario, 't5-d1', ['t5-d1-a'])
+    expect(loan.institution.liquidity.cash - before.institution.liquidity.cash).toBeCloseTo(2500)
+    expect(loan.institution.custom.ksfLoanDrawn).toBe(2500)
+    expect(loan.institution.funding.cp).toBe(before.institution.funding.cp)
+    expect(
+      before.institution.liquidity.sellableSecurities -
+        loan.institution.liquidity.sellableSecurities,
+    ).toBeCloseTo(2500 / 0.95)
+    const inquiry = applyDecision(before, scenario, 't5-d1', ['t5-d1-b'])
+    expect(inquiry.institution).toEqual(before.institution)
+    expect(inquiry.counters.bondFundRequested).toBe(4000)
+  })
+
+  it('policy funding reserves collateral and stays unavailable until the April 2 settlement', () => {
+    const genericScenario = scenario as unknown as ScenarioDefinition
+    const hist = autoplay(scenario, 'historical', { seed: 1, variance: 0 })
+    const prior = hist.decisions.filter((d) => d.turnIndex < 6)
+    const beforeRp = replay(scenario, {
+      seed: 1,
+      variance: 0,
+      decisions: prior,
+      turnIndex: 6,
+      tick: 0,
+    }).state
+    const rp = applyDecision(beforeRp, scenario, 't6-d1', ['t6-d1-a'])
+    expect(rp.institution.liquidity.cash).toBe(beforeRp.institution.liquidity.cash)
+    expect(rp.institution.funding.repo).toBe(beforeRp.institution.funding.repo)
+    expect(rp.counters.bokRpPending).toBe(6000)
+    expect(
+      beforeRp.institution.liquidity.sellableSecurities -
+        rp.institution.liquidity.sellableSecurities,
+    ).toBeCloseTo(6000 / 0.95)
+
+    const beforeFx = replay(scenario, {
+      seed: 1,
+      variance: 0,
+      decisions: hist.decisions.filter((d) => d.turnIndex < 7),
+      turnIndex: 7,
+      tick: 0,
+    }).state
+    const promised = applyDecision(beforeFx, scenario, 't7-d1', ['t7-d1-a'])
+    expect(pendingFundingInstructions(promised, genericScenario).map((p) => p.id)).toContain(
+      'els-policy-fx',
+    )
+    expect(promised.counters.bokSwapPending).toBe(3000)
+    expect(promised.counters.bokSwapDrawn ?? 0).toBe(0)
+    expect(promised.institution.liquidity.fxLiquid).toBe(beforeFx.institution.liquidity.fxLiquid)
+    const settled = advanceTick(promised, scenario)
+    expect(
+      settled.institution.liquidity.fxLiquid - promised.institution.liquidity.fxLiquid,
+    ).toBeCloseTo(3000)
+    expect(settled.institution.liquidity.cash - promised.institution.liquidity.cash).toBeCloseTo(
+      6000,
+    )
+    expect(settled.institution.funding.repo - promised.institution.funding.repo).toBeCloseTo(6000)
+    expect(settled.counters.bokSwapPending).toBe(0)
+    expect(settled.counters.bokRpPending).toBe(0)
+    expect(pendingFundingInstructions(settled, genericScenario).map((p) => p.id)).not.toContain(
+      'els-policy-fx',
+    )
+    expect(pendingFundingInstructions(settled, genericScenario).map((p) => p.id)).not.toContain(
+      'els-policy-rp',
+    )
+    const restored = replay(scenario, {
+      seed: 1,
+      variance: 0,
+      decisions: promised.decisions,
+      turnIndex: 7,
+      tick: 1,
+    }).state
+    expect(restored.institution).toEqual(settled.institution)
+    expect(restored.counters).toEqual(settled.counters)
+    // Re-running the settlement effect must not create a second cash receipt.
+    const repeated = {
+      ...scenario,
+      turns: scenario.turns.map((t, i) =>
+        i !== 7
+          ? t
+          : {
+              ...t,
+              ticks: 3,
+              tickEffects: [
+                ...(t.tickEffects ?? []),
+                { id: 'settle-again', atTick: 2, effects: [settleAprilPolicyFunding()] },
+              ],
+            },
+      ),
+    }
+    const twice = advanceTick(settled, repeated)
+    expect(twice.institution).toEqual(settled.institution)
+    expect(twice.counters).toEqual(settled.counters)
   })
 
   it('policy windows are gated by their announcement date', () => {

@@ -317,7 +317,7 @@ export const t1: T = {
   label: 'T1',
   timeLabel: '2020년 3월 9일 (월) 16:00 ET',
   title: '첫 서킷브레이커',
-  time: '2020-03-09T16:00:00-05:00',
+  time: '2020-03-09T16:00:00-04:00',
   entryEffects: [
     {
       id: 't1-open',

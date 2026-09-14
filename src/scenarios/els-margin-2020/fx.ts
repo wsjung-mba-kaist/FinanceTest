@@ -20,6 +20,7 @@ export const S = {
   swap: 'bok-swap-2020-03-19',
   bokRp: 'bok-rp-2020-03-26',
   swapAuction: 'bok-swap-auction-2020-03-31',
+  swapTerms: 'bok-swap-terms-2020-03-29',
   fsr: 'bok-fsr-2020-06',
   bokAct: 'bok-act',
   em1: 'govt-emergency-1-2020-03-19',
@@ -286,32 +287,50 @@ export function drawFxLine(p: {
   )
 }
 
-/** 한국은행 통화스와프자금 대출 입찰. `bok_swap_open` 플래그(3/31 1차 입찰) 이후에만 열린다. */
+/** 거래은행을 통한 외화차입 약정. 직접 입찰 대상은 은행이며, 현금은 4/2 결제 때 들어온다. */
 export function bokSwapBid(p: {
   amount: number
   allocationCap: number
   rateBp: number
 }): Effect<SecuritiesState> {
-  return fnEffect<SecuritiesState>(
-    'bokSwapBid',
-    { amount: p.amount, allocationCap: p.allocationCap, rateBp: p.rateBp },
-    (d, ctx) => {
-      if (!d.flags.bok_swap_open) {
-        ctx.log('통화스와프자금 대출 입찰이 아직 열리지 않았습니다')
-        return
-      }
-      const s = sec(d)
-      const got = Math.min(p.amount, p.allocationCap)
-      s.liquidity.fxLiquid += got
-      d.counters.bokSwapDrawn = (d.counters.bokSwapDrawn ?? 0) + got
-      d.counters.fundingCostBp = Math.max(d.counters.fundingCostBp ?? 0, p.rateBp)
-      d.flags.bok_swap_used = true
-      d.flagTurns.bok_swap_used ??= d.turnIndex
-      ctx.log(
-        `통화스와프자금 낙찰 ${got.toFixed(0)} (응찰 ${p.amount}, 배정 한도 ${p.allocationCap})`,
+  return fnEffect<SecuritiesState>('bokSwapBid', { ...p }, (d, ctx) => {
+    if (!d.flags.bok_swap_open || d.flags.bok_swap_used) {
+      ctx.log('거래은행 연계 외화차입 신청이 열리지 않았거나 이미 약정되었습니다')
+      return
+    }
+    const got = Math.max(0, Math.min(p.amount, p.allocationCap))
+    d.counters.bokSwapPending = got
+    d.counters.bokSwapRateBp = p.rateBp
+    d.flags.bok_swap_used = true
+    d.flagTurns.bok_swap_used ??= d.turnIndex
+    ctx.log(
+      `거래은행 외화차입 ${got.toFixed(0)} 약정 (신청 ${p.amount}, 모형 한도 ${p.allocationCap}); 4/2 입금 전 사용 불가`,
+    )
+  })
+}
+
+/** 4/2 정책자금 결제: 약정·예약 잔액을 한 번만 현금과 실제 차입 잔액으로 전환한다. */
+export function settleAprilPolicyFunding(): Effect<SecuritiesState> {
+  return fnEffect<SecuritiesState>('settleAprilPolicyFunding', {}, (d, ctx) => {
+    const s = sec(d)
+    const fx = Math.max(0, d.counters.bokSwapPending ?? 0)
+    const rp = Math.max(0, d.counters.bokRpPending ?? 0)
+    s.liquidity.fxLiquid += fx
+    s.liquidity.cash += rp
+    s.funding.repo += rp
+    d.counters.bokSwapDrawn = (d.counters.bokSwapDrawn ?? 0) + fx
+    d.counters.policyFunding = (d.counters.policyFunding ?? 0) + rp
+    if (fx > 0 || rp > 0) {
+      d.counters.fundingCostBp = Math.max(
+        d.counters.fundingCostBp ?? 0,
+        fx > 0 ? (d.counters.bokSwapRateBp ?? 0) : 0,
+        rp > 0 ? (d.counters.bokRpRateBp ?? 0) : 0,
       )
-    },
-  )
+      ctx.log(`4/2 결제: 거래은행 외화차입 ${fx.toFixed(0)}, 한국은행 RP ${rp.toFixed(0)} 입금`)
+    }
+    d.counters.bokSwapPending = 0
+    d.counters.bokRpPending = 0
+  })
 }
 
 /**
@@ -498,17 +517,17 @@ export function setFxLiquidityPolicy(p: { targetShare: number }): Effect<Securit
 
 /**
  * 정책 창구 조달. 범위 일치(`scopeShare`)만큼만 소화되고, 플래그가 없으면 창구 자체가 닫혀 있다.
- * 채안펀드·CP 매입 프로그램은 원화, 한은 RP는 원화 담보부다.
+ * 채안펀드는 상담만, 증권금융은 모형의 확정 대출, 한은 RP는 4/2 결제 전 담보 예약만 반영한다.
  */
 export function policyFunding(p: {
-  programme: 'bondfund' | 'cppurchase' | 'bokrp'
+  programme: 'bondfund' | 'ksfloan' | 'bokrp'
   amount: number
   scopeShare: number
   rateBp: number
 }): Effect<SecuritiesState> {
   const flagOf = {
     bondfund: 'bond_fund_open',
-    cppurchase: 'cp_purchase_open',
+    ksfloan: 'ksf_loan_open',
     bokrp: 'bok_rp_open',
   } as const
   return fnEffect<SecuritiesState>(
@@ -520,13 +539,32 @@ export function policyFunding(p: {
         return
       }
       const s = sec(d)
+      if (p.programme === 'bondfund') {
+        // Neither eligibility nor an executable purchase is established by an application.
+        d.counters.bondFundRequested = (d.counters.bondFundRequested ?? 0) + p.amount
+        ctx.log('채안펀드 적격성·매입 일정 확인 요청: 확정 매입이 없어 현금·차입에 미반영')
+        return
+      }
       let got = p.amount * clamp(p.scopeShare, 0, 1)
       if (p.programme === 'bokrp') {
-        const room = Math.max(0, s.liquidity.sellableSecurities * 0.95 - s.funding.repo * 0.01)
-        got = Math.min(got, room)
-        s.funding.repo += got
+        // Reserve unencumbered collateral now; cash and repo debt arise at the 4/2 settlement.
+        const room = Math.max(0, s.liquidity.sellableSecurities * 0.95)
+        got = Math.max(0, Math.min(got, room))
+        s.liquidity.sellableSecurities -= got / 0.95
+        d.counters.bokRpPending = (d.counters.bokRpPending ?? 0) + got
+        d.counters.bokRpRateBp = p.rateBp
+        d.flags.policy_window_used = true
+        d.flagTurns.policy_window_used ??= d.turnIndex
+        ctx.log(
+          `한국은행 RP ${got.toFixed(0)} 신청·담보 예약; 첫 입찰·입금은 4/2, 오늘 현금에 미포함`,
+        )
+        return
       } else {
-        s.funding.cp += got
+        // Securities-finance loan, not issuance of our own CP. Individual terms are calibrated.
+        const collateral = Math.max(0, s.liquidity.sellableSecurities)
+        got = Math.min(got, collateral * 0.95)
+        s.liquidity.sellableSecurities -= got / 0.95
+        s.custom.ksfLoanDrawn = (s.custom.ksfLoanDrawn ?? 0) + got
       }
       s.liquidity.cash += got
       d.counters.policyFunding = (d.counters.policyFunding ?? 0) + got

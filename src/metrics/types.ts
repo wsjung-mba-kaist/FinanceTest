@@ -23,6 +23,8 @@ export type LcrOutflowCategory =
   | 'securedOther'
   | 'committedCredit'
   | 'committedLiquidity'
+  | 'committedFacilitiesToBanks'
+  | 'committedLiquidityToNonBankFIs'
 
 export type LcrInflowCategory =
   'retail' | 'corporate' | 'financialInstitution' | 'securedL1' | 'other'

@@ -18,7 +18,8 @@ sources: [fed-svb-review-2023, svb-8k-2023, fasb-asc-320, bcbs-d555, dfpi-svb-or
 AFS 장부가 = 공정가치;  ΔAFS 공정가치 → AOCI(자본), 손익 미반영
 HTM 장부가 = 상각원가;  미실현손실은 주석 공시만
 규제 CET1(AOCI 옵트아웃) = CET1 − 0 × AOCI
-경제적 TCE = 유형보통주자본 − (AFS + HTM 미실현손실) × (1 − 세율)
+경제적 TCE 근사 = 회계상 유형보통주자본 − HTM 미실현손실의 세후 금액
+AFS 평가손실은 회계자본에 이미 반영되므로 중복 차감하지 않음
 ```
 
 ## 위기에서 왜 중요한가
