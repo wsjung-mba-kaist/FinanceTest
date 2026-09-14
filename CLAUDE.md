@@ -42,7 +42,9 @@ pnpm vitest run tests/ui/contrast.test.ts -t "print"
 accuracy guarantees live, so a UI change that moves those numbers is a bug.
 
 > `pnpm format` rewrites ~80 markdown files that predate Prettier. Run
-> `npx prettier --write <file>` on the files you actually changed instead.
+> `npx prettier --write <file>` on the files you actually changed instead — and note that on a
+> content `.md` it reflows tables and wraps the `sources:` array (22 of 30 exceed printWidth 100).
+> The frontmatter parser now reads wrapped arrays, so citations survive it; the churn does not.
 
 ## Architecture
 

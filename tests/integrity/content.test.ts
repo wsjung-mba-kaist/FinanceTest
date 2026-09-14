@@ -23,6 +23,10 @@ describe('knowledge content integrity', () => {
         if (!card.id) problems.push('card without id')
         if (!card.body || card.body.trim().length === 0) problems.push(`${card.id}: empty body`)
         if (!card.title) problems.push(`${card.id}: empty title`)
+        // 「실재하는 출처」만 보면 **출처가 하나도 없는** 카드는 0회 순회로 통과한다. 실제로
+        // frontmatter 파서가 줄바꿈된 배열을 빈 배열로 읽던 시절, 카드 인용이 통째로 사라져도
+        // 이 테스트는 초록이었다. 근거가 핵심인 콘텐츠에서 「0개」는 통과가 아니다.
+        if (card.sources.length === 0) problems.push(`${card.id}: 출처가 하나도 없습니다`)
         for (const s of card.sources)
           if (!sourceIds.has(s)) problems.push(`${card.id}: unknown source ${s}`)
       }
