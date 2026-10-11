@@ -71,6 +71,7 @@ export {
   allDecisions,
 } from './core/lookup'
 export { applyEffects, makeEffectContext, setFlag } from './core/effects'
+export { COUNTER, FLAG, type KnownCounter, type KnownFlag } from './keys'
 export { DEFAULT_SCORING_RULES, DEFAULT_WEIGHTS } from './scoring/defaults'
 export {
   validateScenario,
