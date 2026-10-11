@@ -1,6 +1,7 @@
 import { InformationBasis } from './InformationBasis'
 import { useEffect, useMemo, useState } from 'react'
 import type { FeedItem, GameEvent, Severity } from '../../engine'
+import { eventTitle } from '../../lib/eventTitle'
 import { firstSentence } from '../../lib/text'
 import { fillMetricTemplates } from '../../lib/template'
 import { latestSnapshot } from '../../engine'
@@ -27,19 +28,7 @@ const TAG: Record<GameEvent['kind'], { label: string; tone: 'info' | 'warning' |
   dialogue: { label: '대화', tone: 'neutral' },
 }
 
-function headlineOf(e: GameEvent): string {
-  switch (e.kind) {
-    case 'memo':
-      return e.subject
-    case 'call':
-      return `${e.caller}과(와)의 통화`
-    case 'data':
-    case 'dialogue':
-      return e.title
-    default:
-      return e.headline
-  }
-}
+const headlineOf = eventTitle
 
 function bodyOf(e: GameEvent): string {
   switch (e.kind) {

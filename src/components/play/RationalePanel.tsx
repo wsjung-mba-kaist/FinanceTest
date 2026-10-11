@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { DecisionView, FeedItem, MetricDelta } from '../../engine'
 import { formatDelta, formatMetric } from '../../lib/format'
+import { ratingTone } from '../../lib/ratingTone'
 import { useProgressStore } from '../../store/progressStore'
 import { Badge, StatusBadge } from '../ui'
 import { Citation } from '../knowledge/Citation'
@@ -131,17 +132,7 @@ export function RationalePanel({
             <div className="flex items-center gap-1.5">
               <span className="num font-semibold">{letterOf(o.id)}</span>
               <span className="font-medium">{o.label}</span>
-              <Badge
-                tone={
-                  o.expert.rating >= 70
-                    ? 'positive'
-                    : o.expert.rating >= 40
-                      ? 'warning'
-                      : 'critical'
-                }
-              >
-                전문가 평점 {o.expert.rating}/100
-              </Badge>
+              <Badge tone={ratingTone(o.expert.rating)}>전문가 평점 {o.expert.rating}/100</Badge>
               {o.expert.sourceRefs && o.expert.sourceRefs.length > 0 && (
                 <Citation ids={o.expert.sourceRefs} local={scenario.meta.sources} />
               )}

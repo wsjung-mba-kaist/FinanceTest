@@ -21,6 +21,7 @@ import { Badge, Button, Card, Chip, StatusBadge } from '../components/ui'
 import { buttonClass } from '../components/ui/buttonStyles'
 import { chipClass } from '../components/ui/chipStyles'
 import { Icon } from '../components/ui/Icon'
+import { eventTitle } from '../lib/eventTitle'
 import { formatDelta, formatMetric } from '../lib/format'
 import { gridClass } from '../lib/grid'
 
@@ -54,7 +55,7 @@ function headlineOf(
   if (e.kind === 'call' || e.kind === 'dialogue') {
     const first = e.lines[0]
     return {
-      title: e.kind === 'call' ? `${e.caller} 통화` : e.title,
+      title: eventTitle(e),
       body: first ? `${first.speaker}: ${first.text}` : '',
       time,
     }

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { eventTitle } from '../../lib/eventTitle'
 import { Button, LiveRegion } from '../ui'
 import { usePlay } from './playContext'
 import {
@@ -236,17 +237,5 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
 }
 
 function titleOf(e: WireEntry): string {
-  const ev = e.event
-  if (!ev) return ''
-  switch (ev.kind) {
-    case 'memo':
-      return ev.subject
-    case 'call':
-      return `${ev.caller} 통화`
-    case 'data':
-    case 'dialogue':
-      return ev.title
-    default:
-      return ev.headline
-  }
+  return e.event ? eventTitle(e.event) : ''
 }

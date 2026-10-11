@@ -1,5 +1,6 @@
 import { RestrictedKnowledgeContext } from './knowledgeAccess'
-import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useContext, useId, useRef, useState } from 'react'
+import { useDismissable, type DismissReason } from '../ui/useDismissable'
 import { getSource } from '../../content'
 import type { Source } from '../../engine/types/common'
 
@@ -18,24 +19,12 @@ export function Citation({ ids, local }: { ids: string[]; local?: Source[] }) {
   const wrapRef = useRef<HTMLSpanElement>(null)
   const panelId = useId()
 
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      setOpen(false)
-      // Focus goes back to the chip, not to the top of the document.
-      wrapRef.current?.querySelector<HTMLElement>('button')?.focus()
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  const dismiss = useCallback((reason: DismissReason) => {
+    setOpen(false)
+    // Focus goes back to the chip, not to the top of the document.
+    if (reason === 'escape') wrapRef.current?.querySelector<HTMLElement>('button')?.focus()
+  }, [])
+  useDismissable(wrapRef, open, dismiss)
 
   if (restricted) return <span className="text-xs text-muted">사후 출처는 종료 후 공개</span>
   const sources = ids.map(

@@ -8,6 +8,7 @@ import type {
   ScenarioDefinition,
 } from '../../engine/types'
 import { decisionAnchorId } from '../../lib/catalog'
+import { ratingTone } from '../../lib/ratingTone'
 import { Badge, Button, Card } from '../ui'
 import { Icon } from '../ui/Icon'
 import { Citation } from '../knowledge/Citation'
@@ -40,16 +41,7 @@ function OptionCell({
     <div className="text-sm">
       <div className="flex items-start gap-2">
         <span className="font-medium">{option.label}</span>
-        <Badge
-          tone={
-            option.expert.rating >= 70
-              ? 'positive'
-              : option.expert.rating >= 40
-                ? 'warning'
-                : 'critical'
-          }
-          className="shrink-0 num"
-        >
+        <Badge tone={ratingTone(option.expert.rating)} className="shrink-0 num">
           {option.expert.rating}점
         </Badge>
       </div>

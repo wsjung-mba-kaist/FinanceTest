@@ -6,6 +6,7 @@ import { Markdown } from '../knowledge/Markdown'
 import { Citation } from '../knowledge/Citation'
 import type { WireEntry } from './playHelpers'
 import { PlayContext } from './playContext'
+import { eventTitle } from '../../lib/eventTitle'
 import { fillMetricTemplates } from '../../lib/template'
 
 const FEED_SUBLABEL: Record<FeedItem['kind'], string | undefined> = {
@@ -72,20 +73,6 @@ function eventHeader(e: GameEvent): Header {
       return { tag: '[미확인]', meta: e.source }
     case 'dialogue':
       return { tag: '[대화]' }
-  }
-}
-
-function eventTitle(e: GameEvent): string {
-  switch (e.kind) {
-    case 'memo':
-      return e.subject
-    case 'call':
-      return `${e.caller}과(와)의 통화`
-    case 'data':
-    case 'dialogue':
-      return e.title
-    default:
-      return e.headline
   }
 }
 

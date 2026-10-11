@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { useTickProgress, type ProgressStore } from '../../store/hooks/useSimulationClock'
 import { Icon } from '../ui/Icon'
+import { useDismissable } from '../ui/useDismissable'
 import { useMenuKeys } from '../ui/useMenuKeys'
 import { ScenarioClock } from './ScenarioClock'
 
@@ -83,22 +84,9 @@ function SpeedMenu({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const menuKeys = useMenuKeys(ref, open, () => setOpen(false))
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  const close = useCallback(() => setOpen(false), [])
+  const menuKeys = useMenuKeys(ref, open, close)
+  useDismissable(ref, open, close)
 
   const label = running ? `×${speed}` : '수동'
   return (

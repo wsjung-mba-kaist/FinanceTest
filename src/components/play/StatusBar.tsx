@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RUN_STATE_LABELS, runStateFromCi } from '../../metrics/runoff'
 import { useHelp } from '../help/helpContext'
 import { Badge, Button, CountPill, type Tone } from '../ui'
 import { Icon } from '../ui/Icon'
+import { useDismissable } from '../ui/useDismissable'
 import { useMenuKeys } from '../ui/useMenuKeys'
 import { ClockControl, type ClockState } from './ClockControl'
 import { usePlay } from './playContext'
@@ -56,23 +57,10 @@ export function StatusBar({
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  useDismissable(menuRef, menuOpen, closeMenu)
 
-  const menuKeys = useMenuKeys(menuRef, menuOpen, () => setMenuOpen(false))
+  const menuKeys = useMenuKeys(menuRef, menuOpen, closeMenu)
   const ended = state.phase === 'ended'
   // A save that fails mid-run used to surface only on the progress page — forty minutes later.
   const saveResult = useProgressStore((p) => p.lastSaveResult)
