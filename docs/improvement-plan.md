@@ -414,6 +414,18 @@ import이고, 그 아래 `gameStore`(→ 엔진 전체), `content/index.ts`(`loa
 
 ### Phase 1 — 정확성 보증 확장 (1주)
 
+> **진행 상황(2026-10-11)**: 1.1~1.9 모두 반영됨. 전표 테스트가 두 번째 산술 오류
+> (`pensionFx.meetMarginCall`의 NAV 이중 계상)를 드러내 함께 고쳤고, 린트 규칙 7개
+> (`deadline-select`·`components-empty`·`scoring-metric`·`scoring-threshold`·`checkpoint-*`·
+> `initial-finite`·`threshold-ccy-default`)는 각각 네거티브 테스트를 갖는다. `metricKeys`는
+> 린터가 T0 스냅샷에서 스스로 읽는다(스위트 어디서도 넘긴 적이 없어 `kpi-metric`이 한 번도 돌지
+> 않았다). 원장 양방향 검사·VERIFY(47)·누락 리프(88)·경고(19)는 시나리오별 ratchet 상한으로
+> 잡혔다. 1.2의 `ldiFx.postCollateral`은 틱 턴 전용 변형이라 그대로 두었다.
+>
+> **주의**: 1.8의 jitter 대칭화와 0.1의 HTM 수정은 엔진 동작을 바꾼다. variance 0.5로 저장된
+> 진행 중 런과 HTM 매각 경로를 지난 기록은 재생 결과가 달라진다(시나리오 `version`은 올리지
+> 않았다 — 엔진 버전을 저장분에 기록하는 일은 2.2 영속성 작업에서 다룬다).
+
 목표: "정확성 최우선"이 테스트로 성립하는 범위를 T0에서 전체 런으로 넓힌다.
 
 | #   | 작업                                                                                                                                                                                                                                                     | 원리                                                                                                                |
