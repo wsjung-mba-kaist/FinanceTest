@@ -44,6 +44,8 @@ export interface ScoringSpec {
   /** Max total if the run ended in failure (default 40); orderly failures use failureCapOrderly (default 60). */
   failureCap?: number
   failureCapOrderly?: number
+  /** Points taken off `timeliness` per timed-out decision (default 10). */
+  timeoutPenalty?: number
 }
 
 export interface DimensionScore {

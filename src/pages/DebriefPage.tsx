@@ -268,7 +268,7 @@ export default function DebriefPage() {
     [data, scenario],
   )
   const regrets = useMemo(
-    () => (data && scenario ? decisionRegrets(data.state, scenario) : []),
+    () => (data && scenario ? decisionRegrets(data.state, scenario, data.history) : []),
     [data, scenario],
   )
 

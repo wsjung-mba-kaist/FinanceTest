@@ -10,6 +10,7 @@ import type {
 } from '../types'
 import { SCORE_DIMENSIONS } from '../types/common'
 import { DEFAULT_SCORING_RULES } from '../scoring/defaults'
+import { buildConditionContext, evaluate } from './conditions'
 import { allDecisions, findOption } from './lookup'
 import { clamp } from './paths'
 
@@ -192,8 +193,9 @@ export function computeScore<S extends InstitutionState>(
     let score = wsum > 0 ? evaluated.reduce((a, x) => a + x.c.weight * x.r.score, 0) / wsum : 50
     const explanation = evaluated.map((x) => x.r.text)
     if (dim === 'timeliness' && timeouts > 0) {
-      score = clamp(score - 10 * timeouts, 0, 100)
-      explanation.push(`시간 초과 ${timeouts}회: −${10 * timeouts}점`)
+      const perTimeout = sc.scoring.timeoutPenalty ?? 10
+      score = clamp(score - perTimeout * timeouts, 0, 100)
+      explanation.push(`시간 초과 ${timeouts}회: −${perTimeout * timeouts}점`)
     }
     const weight = sc.scoring.weights[dim] ?? 0
     dims[dim] = { score, weight, explanation }
@@ -207,9 +209,11 @@ export function computeScore<S extends InstitutionState>(
       : (sc.scoring.failureCap ?? 40)
     total = Math.min(total, cap)
   }
-  const expertAlignment = chosen.length
-    ? chosen.reduce((a, o) => a + o.rating, 0) / chosen.length
-    : 0
+  // Weighted exactly like the `expert` component: an interrupt authored at scoreWeight 0.5 must
+  // not count as much as the day's key decision here either, or the headline figure and the
+  // dimension that explains it disagree on the same run.
+  const wsum = chosen.reduce((a, o) => a + o.weight, 0)
+  const expertAlignment = wsum > 0 ? chosen.reduce((a, o) => a + o.weight * o.rating, 0) / wsum : 0
   const roundedTotal = Math.round(total * 10) / 10
   return {
     total: roundedTotal,
@@ -224,10 +228,20 @@ export function computeScore<S extends InstitutionState>(
   }
 }
 
-/** Regret per decision = best available expert rating − chosen rating (for "Top mistakes"). */
+/**
+ * Regret per decision = best *available* expert rating − chosen rating (for "Top mistakes").
+ *
+ * `history` (state at the start of each turn, as `replay()` returns it) lets an option's `when` /
+ * `requires` be evaluated as of the turn the decision was made: without it, a backstopped raise
+ * that needed a flag the player never had is named the "best" option they failed to take, and the
+ * debrief headlines a mistake that was not available to make. Turn-start state is an
+ * approximation (effects earlier in the same turn are not seen); it errs toward *including* an
+ * option, never toward inventing one.
+ */
 export function decisionRegrets(
   state: GameState,
   scenario: ScenarioDefinition,
+  history?: GameState[],
 ): { decisionId: string; turnIndex: number; chosen: string[]; best: string; regret: number }[] {
   const out: {
     decisionId: string
@@ -240,7 +254,12 @@ export function decisionRegrets(
   for (const rec of state.decisions) {
     const found = decisions.find((d) => d.decision.id === rec.decisionId)
     if (!found) continue
-    const best = [...found.decision.options].sort((a, b) => b.expert.rating - a.expert.rating)[0]
+    const at = history?.[rec.turnIndex]
+    const ctx = at ? buildConditionContext(at) : undefined
+    const available = found.decision.options.filter(
+      (o) => !ctx || (evaluate(o.when, ctx) && evaluate(o.requires, ctx)),
+    )
+    const best = [...available].sort((a, b) => b.expert.rating - a.expert.rating)[0]
     if (!best) continue
     const chosenRatings = rec.optionIds.map(
       (id) => findOption(found.decision, id)?.expert.rating ?? 0,

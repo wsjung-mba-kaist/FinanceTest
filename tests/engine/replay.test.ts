@@ -11,8 +11,11 @@ import {
   SCORE_DIMENSIONS,
   type Curve,
   type Policy,
+  type GameState,
+  allDecisions,
 } from '@/engine'
 import { miniBank } from '../fixtures/miniBank'
+import { miniTicks } from '../fixtures/miniTicks'
 import { findNonFinite } from '../helpers/scan'
 import { asGeneric, drive, type Step } from '../helpers/scenario'
 
@@ -307,5 +310,52 @@ describe('decisionRegrets', () => {
     expect(expert.map((r) => r.decisionId)).toEqual(['d1_funding', 'd0_disclosure', 'd3_weekend'])
     expect(expert.map((r) => r.regret)).toEqual([2.5, 0, 0])
     expect(decisionRegrets(createGame(miniBank, 1), asGeneric(miniBank))).toEqual([])
+  })
+})
+
+describe('decisionRegrets with history', () => {
+  it('names only an option that was available when the decision was made as "best"', () => {
+    // d0_disclosure's backstopped raise is gated on `requires: { confidence: { gte: 40 } }`. Push
+    // that turn's start below the bar and the gated option must not be the regret target.
+    const run = autoplay(miniBank, 'historical')
+    const gated = miniBank.turns
+      .flatMap((t) => t.decisions)
+      .find((d) => d.options.some((o) => o.requires))!
+    const gatedOption = gated.options.find((o) => o.requires)!
+    const turnIndex = miniBank.turns.findIndex((t) => t.decisions.some((d) => d.id === gated.id))
+    const lowCi = run.history.map((h, i) =>
+      i === turnIndex ? { ...h, confidence: { ...h.confidence, index: 10 } } : h,
+    )
+    const without = decisionRegrets(run.state, asGeneric(miniBank))
+    const withHistory = decisionRegrets(run.state, asGeneric(miniBank), lowCi as GameState[])
+    const w = without.find((r) => r.decisionId === gated.id)!
+    const h = withHistory.find((r) => r.decisionId === gated.id)!
+    // The gated option is the top-rated one, so the two calls must disagree on "best".
+    expect(w.best).toBe(gatedOption.id)
+    expect(h.best).not.toBe(gatedOption.id)
+    expect(h.regret).toBeLessThanOrEqual(w.regret)
+  })
+})
+
+describe('expertAlignment', () => {
+  it('weights decisions by scoreWeight, like the expert component does', () => {
+    const run = autoplay(miniTicks, 'historical', { variance: 0 })
+    const report = computeScore(run.state, asGeneric(miniTicks))
+    let w = 0
+    let sum = 0
+    for (const rec of run.state.decisions) {
+      const found = allDecisions(asGeneric(miniTicks)).find(
+        (d) => d.decision.id === rec.decisionId,
+      )!
+      const weight = found.decision.scoreWeight ?? 1
+      for (const id of rec.optionIds) {
+        const o = found.decision.options.find((x) => x.id === id)!
+        w += weight
+        sum += weight * o.expert.rating
+      }
+    }
+    expect(report.expertAlignment).toBeCloseTo(Math.round((sum / w) * 10) / 10, 9)
+    // The interrupt is authored at 0.5, so a plain average would differ.
+    expect(run.state.decisions.some((d) => d.interrupt)).toBe(true)
   })
 })
