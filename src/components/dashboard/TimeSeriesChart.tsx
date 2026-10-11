@@ -13,6 +13,7 @@ import type { KpiSpec, MetricSnapshot, ThresholdMap, Units } from '../../engine'
 import { formatMetric } from '../../lib/format'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { PlayContext } from '../play/playContext'
+import { useGameStore } from '../../store/gameStore'
 import { Button, Card, StatusBadge } from '../ui'
 import { useChartType } from './useChartType'
 
@@ -41,6 +42,10 @@ export function TimeSeriesChart({
   const [table, setTable] = useState(false)
   const [intraday, setIntraday] = useState(false)
   const reduced = useReducedMotion()
+  // While the simulation clock runs the line gains a point every tick; animating each arrival
+  // redrew the whole series from the origin at ×4 (every two seconds) for the length of a run.
+  // The chart animates on a turn change and on open, not on the clock.
+  const running = useGameStore((s) => s.clock.running)
   const spec = kpis.find((k) => k.metric === metric) ?? kpis[0]
   const tickHistory = play?.state.tickHistory ?? []
   const hasIntraday = tickHistory.some((s) => s.tick > 0)
@@ -216,7 +221,7 @@ export function TimeSeriesChart({
                 strokeWidth={2}
                 dot={{ r: 2, fill: 'var(--accent)', strokeWidth: 0 }}
                 activeDot={{ r: 4 }}
-                isAnimationActive={!reduced}
+                isAnimationActive={!reduced && !running}
                 connectNulls
               />
             </LineChart>

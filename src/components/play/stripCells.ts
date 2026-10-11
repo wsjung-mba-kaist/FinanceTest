@@ -4,6 +4,7 @@ import type {
   MetricStatus,
   MetricValue,
   ScenarioDefinition,
+  ThresholdMap,
   Units,
 } from '../../engine'
 import { latestSnapshot } from '../../engine'
@@ -67,6 +68,8 @@ export function unitsLegend(units: Units): string {
 
 interface Ctx {
   scenario: ScenarioDefinition
+  /** Merged once per build, not once per cell. */
+  thresholds: ThresholdMap
   current: Record<string, MetricValue>
   previous?: Record<string, MetricValue>
   units: Units
@@ -90,7 +93,7 @@ function metricCell(
   const spec = ctx.scenario.kpis.find((k) => k.metric === metric)
   const scale = ctx.scaleFor(metric)
   const prev = ctx.previous?.[metric]
-  const thresholds = mergeThresholds(ctx.scenario.thresholds)
+  const thresholds = ctx.thresholds
   const delta =
     !isWindowMetric(metric) &&
     prev &&
@@ -148,6 +151,7 @@ export function buildStripCells(scenario: ScenarioDefinition, state: GameState):
   const intraday = state.tickHistory.filter((t) => t.turnIndex === state.turnIndex)
   const ctx: Ctx = {
     scenario,
+    thresholds: mergeThresholds(scenario.thresholds),
     current: snap.metrics,
     previous: prevSnap?.metrics,
     units: scenario.units,

@@ -85,9 +85,17 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
       (a, b) => tickOfEntry(a, state, view.turn) - tickOfEntry(b, state, view.turn),
     )
   }, [view, state])
+  // Earlier turns are finished: their entries change when a turn ends (history, turnIndex) or when
+  // a feed item lands in an earlier turn's slot — never on a tick. Keying on `state` re-ran a
+  // `getTurnView` per past turn on every tick while the feed tab was open.
+  const previousFeedCount = state.feed.reduce(
+    (n, f) => n + (f.turnIndex < state.turnIndex ? 1 : 0),
+    0,
+  )
   const previous = useMemo(
     () => previousTurnEntries(history, state, scenario, mode),
-    [history, state, scenario, mode],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history, state.turnIndex, previousFeedCount, scenario, mode],
   )
   const previousCount = previous.reduce((a, t) => a + t.entries.length, 0)
 
