@@ -1,26 +1,39 @@
 import { create } from 'zustand'
-import { DEFAULT_SETTINGS, settingsSchema, type SettingsState } from '../persistence/schema'
-import { KEYS, loadValidated, save } from '../persistence/storage'
+import { runMigrations, SETTINGS_MIGRATIONS } from '../persistence/migrate'
+import {
+  DEFAULT_SETTINGS,
+  settingsSchema,
+  STORAGE_VERSION,
+  type SettingsState,
+} from '../persistence/schema'
+import { KEYS, loadValidated, save, type SaveResult } from '../persistence/storage'
 
 interface SettingsStore extends SettingsState {
   corruptOnLoad: boolean
+  /** Outcome of the last write. `update` used to drop it, so a failed save was invisible. */
+  lastSaveResult: SaveResult
   update: (patch: Partial<Omit<SettingsState, 'version'>>) => void
   reset: () => void
 }
 
-const loaded = loadValidated(KEYS.settings, settingsSchema)
+const loaded = loadValidated(KEYS.settings, settingsSchema, (raw) =>
+  runMigrations(raw, SETTINGS_MIGRATIONS, STORAGE_VERSION),
+)
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   ...(loaded.value ?? DEFAULT_SETTINGS),
   corruptOnLoad: loaded.corrupt,
+  lastSaveResult: 'ok',
   update: (patch) => {
     set(patch)
-    const { corruptOnLoad: _c, update: _u, reset: _r, ...rest } = get()
-    save(KEYS.settings, rest)
+    const { corruptOnLoad: _c, lastSaveResult: _l, update: _u, reset: _r, ...rest } = get()
+    const r = save(KEYS.settings, rest)
+    if (r !== get().lastSaveResult) set({ lastSaveResult: r })
   },
   reset: () => {
     set({ ...DEFAULT_SETTINGS })
-    save(KEYS.settings, DEFAULT_SETTINGS)
+    const r = save(KEYS.settings, DEFAULT_SETTINGS)
+    if (r !== get().lastSaveResult) set({ lastSaveResult: r })
   },
 }))
 

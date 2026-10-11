@@ -9,7 +9,8 @@ import {
   shortDate,
   turnProgressLabel,
 } from '../../lib/labels'
-import type { InProgressSave } from '../../persistence/schema'
+import { ENGINE_VERSION } from '../../engine'
+import { saveIsStale, type InProgressSave } from '../../persistence/schema'
 import { useGameStore } from '../../store/gameStore'
 import { useProgressStore } from '../../store/progressStore'
 import { useSettingsStore } from '../../store/settingsStore'
@@ -38,7 +39,9 @@ function useStartActions(scenario: ScenarioDefinition, mode: Mode): StartActions
   const inProgress = useProgressStore((s) => s.scenarios[id]?.inProgress)
   const [confirmNew, setConfirmNew] = useState(false)
   const [restoreError, setRestoreError] = useState<string | undefined>()
-  const stale = Boolean(inProgress && inProgress.scenarioVersion !== scenario.meta.version)
+  const stale = Boolean(
+    inProgress && saveIsStale(inProgress, scenario.meta.version, ENGINE_VERSION),
+  )
 
   return {
     inProgress,

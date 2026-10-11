@@ -14,7 +14,15 @@ import { Markdown } from '../components/knowledge/Markdown'
 import { Badge, Button, Card, EmptyState, Tabs } from '../components/ui'
 import { Icon } from '../components/ui/Icon'
 import { InfoTip } from '../components/ui/InfoTip'
-import { advanceTurn, autoplay, computeScore, decisionRegrets, findTurn, replay } from '../engine'
+import {
+  advanceTurn,
+  autoplay,
+  computeScore,
+  decisionRegrets,
+  ENGINE_VERSION,
+  findTurn,
+  replay,
+} from '../engine'
 import type { GameState, Mode, ScenarioDefinition } from '../engine/types'
 import type { AttemptSave } from '../persistence/schema'
 import { comparisonAt } from '../lib/comparisonPoint'
@@ -476,6 +484,14 @@ export default function DebriefPage() {
               {data.source === 'attempt' && data.attempt && (
                 <Badge tone="neutral">{shortDate(data.attempt.completedAt)} 기록에서 재구성</Badge>
               )}
+              {data.source === 'attempt' &&
+                data.attempt &&
+                (data.attempt.engineVersion ?? 1) !== ENGINE_VERSION && (
+                  <Badge tone="warning">
+                    엔진 v{data.attempt.engineVersion ?? 1} 기록 — 재구성 수치가 당시와 다를 수
+                    있습니다
+                  </Badge>
+                )}
             </>
           }
         />

@@ -4,11 +4,13 @@ import { Button, Card, ConfirmDialog } from '../components/ui'
 import { downloadJson, stampedFilename } from '../lib/download'
 import { MODE_DESCRIPTIONS, MODE_LABELS, shortDate } from '../lib/labels'
 import {
+  BACKUP_FILE_KIND,
   DEFAULT_CLOCK_TICK_SEC,
-  progressStateSchema,
-  type ProgressState,
+  parseBackupFile,
+  type BackupFile,
   type SettingsState,
 } from '../persistence/schema'
+import { KEYS, listCorruptBackups, removeCorruptBackups } from '../persistence/storage'
 import { SCENARIOS } from '../scenarios'
 import { useProgressStore } from '../store/progressStore'
 import { useSettingsStore } from '../store/settingsStore'
@@ -100,7 +102,11 @@ export default function SettingsPage() {
   const scenarioProgress = useProgressStore((p) => p.scenarios)
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetDone, setResetDone] = useState(false)
-  const [pendingImport, setPendingImport] = useState<ProgressState | undefined>()
+  const [pendingImport, setPendingImport] = useState<BackupFile | undefined>()
+  const [corruptBackups, setCorruptBackups] = useState(() => [
+    ...listCorruptBackups(KEYS.progress).map((b) => ({ ...b, key: KEYS.progress })),
+    ...listCorruptBackups(KEYS.settings).map((b) => ({ ...b, key: KEYS.settings })),
+  ])
   const [importError, setImportError] = useState<string | undefined>()
   const [importOk, setImportOk] = useState(false)
   const [clearId, setClearId] = useState<string | undefined>()
@@ -120,7 +126,18 @@ export default function SettingsPage() {
     [scenarioProgress],
   )
 
-  const onExport = () => downloadJson(stampedFilename('fcs-progress'), exportState())
+  /** Progress and settings together; the importer still accepts the older progress-only file. */
+  const backup = (): BackupFile => {
+    const { corruptOnLoad: _c, lastSaveResult: _l, update: _u, reset: _r, ...settings } = s
+    return {
+      kind: BACKUP_FILE_KIND,
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      progress: exportState(),
+      settings,
+    }
+  }
+  const onExport = () => downloadJson(stampedFilename('fcs-backup'), backup())
 
   const onFile = (file: File | undefined) => {
     setImportError(undefined)
@@ -129,14 +146,12 @@ export default function SettingsPage() {
     file
       .text()
       .then((text) => {
-        const parsed = progressStateSchema.safeParse(JSON.parse(text))
-        if (!parsed.success) {
-          setImportError(
-            `형식이 올바르지 않습니다: ${parsed.error.issues[0]?.path.join('.') ?? ''} ${parsed.error.issues[0]?.message ?? ''}`,
-          )
+        const parsed = parseBackupFile(JSON.parse(text))
+        if (!parsed.ok) {
+          setImportError(`형식이 올바르지 않습니다: ${parsed.error}`)
           return
         }
-        setPendingImport(parsed.data)
+        setPendingImport(parsed.value)
       })
       .catch((e: unknown) =>
         setImportError(`파일을 읽을 수 없습니다: ${e instanceof Error ? e.message : String(e)}`),
@@ -167,8 +182,8 @@ export default function SettingsPage() {
             : progressCorrupt
               ? '진행 데이터'
               : '설정'}
-          이(가) 손상되어 기본값으로 시작했습니다. 손상된 원본은{' '}
-          <code className="font-mono">fcs:*.corrupt.*</code> 키로 백업되어 있습니다.
+          이(가) 손상되어 기본값으로 시작했습니다. 손상된 원본은 아래 «손상된 저장본»에서 내려받을
+          수 있습니다.
         </p>
       )}
       {lastSaveResult !== 'ok' && (
@@ -394,6 +409,48 @@ export default function SettingsPage() {
             />
           </div>
         </Field>
+        {corruptBackups.length > 0 && (
+          <Field
+            label="손상된 저장본"
+            hint="읽을 수 없어 기본값으로 대체된 원본. 내려받아 두면 나중 버전에서 복구를 시도할 수 있습니다"
+          >
+            <ul className="m-0 list-none space-y-1.5 p-0">
+              {corruptBackups.map((b) => (
+                <li key={`${b.key}-${b.at}`} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="num text-muted">
+                    {b.key === KEYS.progress ? '진행 데이터' : '설정'} ·{' '}
+                    {shortDate(new Date(b.at).toISOString())}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      let body: unknown = b.raw
+                      try {
+                        body = JSON.parse(b.raw)
+                      } catch {
+                        /* keep the raw text */
+                      }
+                      downloadJson(stampedFilename('fcs-corrupt'), body)
+                    }}
+                  >
+                    내려받기
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      removeCorruptBackups(b.key)
+                      setCorruptBackups((list) => list.filter((x) => x.key !== b.key))
+                    }}
+                  >
+                    삭제
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Field>
+        )}
         <Field label="시나리오별 기록 삭제" hint="최고 점수·시도·진행 중 플레이·퀴즈 결과">
           {recorded.length === 0 ? (
             <p className="text-muted">아직 기록이 없습니다.</p>
@@ -453,7 +510,7 @@ export default function SettingsPage() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => downloadJson(stampedFilename('fcs-progress'), exportState())}
+              onClick={() => downloadJson(stampedFilename('fcs-backup'), backup())}
             >
               먼저 내보내기 (JSON)
             </Button>
@@ -476,8 +533,9 @@ export default function SettingsPage() {
           pendingImport ? (
             <>
               현재 브라우저의 진행 데이터가 파일 내용으로 <b>대체</b>됩니다. 파일: 시나리오{' '}
-              {Object.keys(pendingImport.scenarios).length}개, 생성일{' '}
-              {shortDate(pendingImport.meta.createdAt)}. 먼저 현재 데이터를 내보내 두는 것을
+              {Object.keys(pendingImport.progress.scenarios).length}개, 생성일{' '}
+              {shortDate(pendingImport.progress.meta.createdAt)}
+              {pendingImport.settings ? ', 설정 포함' : ''}. 먼저 현재 데이터를 내보내 두는 것을
               권장합니다.
             </>
           ) : null
@@ -487,7 +545,11 @@ export default function SettingsPage() {
         onCancel={() => setPendingImport(undefined)}
         onConfirm={() => {
           if (pendingImport) {
-            importState(pendingImport)
+            importState(pendingImport.progress)
+            if (pendingImport.settings) {
+              const { version: _v, ...rest } = pendingImport.settings
+              update(rest)
+            }
             setImportOk(true)
           }
           setPendingImport(undefined)

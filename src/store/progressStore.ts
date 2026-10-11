@@ -7,7 +7,9 @@ import {
   type ProgressState,
   type ScenarioProgress,
 } from '../persistence/schema'
+import { PROGRESS_MIGRATIONS, runMigrations } from '../persistence/migrate'
 import { KEYS, loadValidated, save, type SaveResult } from '../persistence/storage'
+import { STORAGE_VERSION } from '../persistence/schema'
 
 const MAX_ATTEMPTS = 10
 
@@ -28,7 +30,9 @@ interface ProgressStore extends ProgressState {
 }
 
 const now = () => new Date().toISOString()
-const loaded = loadValidated(KEYS.progress, progressStateSchema)
+const loaded = loadValidated(KEYS.progress, progressStateSchema, (raw) =>
+  runMigrations(raw, PROGRESS_MIGRATIONS, STORAGE_VERSION),
+)
 const initial: ProgressState = loaded.value ?? emptyProgress(now())
 initial.meta.lastOpenedAt = now()
 

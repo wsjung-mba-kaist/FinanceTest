@@ -30,6 +30,8 @@ export const inProgressSchema = z.object({
   seed: z.number(),
   mode: z.enum(['guided', 'standard', 'expert']),
   scenarioVersion: z.number(),
+  /** Engine replay-semantics version the run was played on (absent ⇒ 1, before it was recorded). */
+  engineVersion: z.number().int().positive().optional(),
   decisions: z.array(decisionRecordSchema),
   turnIndex: z.number().int().nonnegative(),
   /** Sub-turn tick the run had reached inside `turnIndex` (absent ⇒ the turn's last tick). */
@@ -50,6 +52,8 @@ export const attemptSchema = z.object({
   seed: z.number(),
   mode: z.enum(['guided', 'standard', 'expert']),
   scenarioVersion: z.number(),
+  /** Engine replay-semantics version the run was played on (absent ⇒ 1). */
+  engineVersion: z.number().int().positive().optional(),
   decisions: z.array(decisionRecordSchema),
   /** Volatility the attempt was played at (absent ⇒ 0). */
   variance: z.number().min(0).max(1).optional(),
@@ -148,6 +152,49 @@ export const DEFAULT_SETTINGS: SettingsState = {
   defaultMode: 'guided',
   clockTickSec: DEFAULT_CLOCK_TICK_SEC,
   variance: 1,
+}
+
+/**
+ * A backup file: progress and settings together. Older exports were a bare `ProgressState`; the
+ * importer accepts both (see `parseBackupFile`).
+ */
+export const BACKUP_FILE_KIND = 'fcs-backup'
+export const backupFileSchema = z.object({
+  kind: z.literal(BACKUP_FILE_KIND),
+  version: z.literal(1),
+  exportedAt: z.string(),
+  progress: progressStateSchema,
+  settings: settingsSchema.optional(),
+})
+export type BackupFile = z.infer<typeof backupFileSchema>
+
+export function parseBackupFile(
+  raw: unknown,
+): { ok: true; value: BackupFile } | { ok: false; error: string } {
+  const wrapped = backupFileSchema.safeParse(raw)
+  if (wrapped.success) return { ok: true, value: wrapped.data }
+  const bare = progressStateSchema.safeParse(raw)
+  if (bare.success)
+    return {
+      ok: true,
+      value: { kind: BACKUP_FILE_KIND, version: 1, exportedAt: '', progress: bare.data },
+    }
+  const issue = wrapped.error.issues[0]
+  return { ok: false, error: `${issue?.path.join('.') ?? ''} ${issue?.message ?? ''}`.trim() }
+}
+
+/**
+ * Whether a save can still be resumed or rebuilt by this build: the scenario it was authored
+ * against has not changed, and neither has the engine it ran on. One predicate, used by the
+ * catalog, the briefing, the store and the debrief — three of them used to compare
+ * `scenarioVersion` by hand and none knew about the engine.
+ */
+export function saveIsStale(
+  save: { scenarioVersion: number; engineVersion?: number },
+  scenarioVersion: number,
+  engineVersion: number,
+): boolean {
+  return save.scenarioVersion !== scenarioVersion || (save.engineVersion ?? 1) !== engineVersion
 }
 
 export function emptyProgress(now: string): ProgressState {

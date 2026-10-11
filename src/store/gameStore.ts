@@ -6,6 +6,7 @@ import {
   canAdvanceTick,
   computeScore,
   createGame,
+  ENGINE_VERSION,
   hintCostBetween,
   replay,
   type DecisionMeta,
@@ -14,7 +15,7 @@ import {
   type ScenarioDefinition,
   type ScoreReport,
 } from '../engine'
-import type { InProgressSave, RunInfo } from '../persistence/schema'
+import { saveIsStale, type InProgressSave, type RunInfo } from '../persistence/schema'
 
 /** Re-exported for callers that reach the run through the store. */
 export type { RunInfo }
@@ -144,6 +145,7 @@ function persistInProgress(store: GameStore): void {
     seed: run.seed,
     mode: run.mode,
     scenarioVersion: scenario.meta.version,
+    engineVersion: ENGINE_VERSION,
     decisions: state.decisions,
     turnIndex: state.turnIndex,
     tick: state.tick,
@@ -189,7 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     persistInProgress(get())
   },
   restore: (scenario, saved) => {
-    if (saved.scenarioVersion !== scenario.meta.version) return false
+    if (saveIsStale(saved, scenario.meta.version, ENGINE_VERSION)) return false
     try {
       const { state, history } = replay(scenario, {
         seed: saved.seed,
@@ -436,6 +438,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       seed: run.seed,
       mode: run.mode,
       scenarioVersion: scenario.meta.version,
+      engineVersion: ENGINE_VERSION,
       decisions: state.decisions,
       variance: run.variance,
       rewinds: run.rewinds,

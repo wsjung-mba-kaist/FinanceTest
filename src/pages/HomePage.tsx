@@ -9,7 +9,8 @@ import { buttonClass } from '../components/ui/buttonStyles'
 import { gridPlan } from '../lib/grid'
 import { roleFamilyOf, type RoleFamily } from '../content/roleFrames'
 import type { Competency, Difficulty, Region, ScenarioSummary } from '../engine/types'
-import type { InProgressSave } from '../persistence/schema'
+import { ENGINE_VERSION } from '../engine'
+import { saveIsStale, type InProgressSave } from '../persistence/schema'
 import {
   CATALOG_STATUS_LABELS,
   catalogStatusOf,
@@ -129,7 +130,7 @@ export default function HomePage() {
     const out: { summary: ScenarioSummary; run: InProgressSave; stale: boolean }[] = []
     for (const s of all) {
       const run = scenarios[s.id]?.inProgress
-      if (run) out.push({ summary: s, run, stale: run.scenarioVersion !== s.version })
+      if (run) out.push({ summary: s, run, stale: saveIsStale(run, s.version, ENGINE_VERSION) })
     }
     return out.sort((a, b) => b.run.updatedAt.localeCompare(a.run.updatedAt))
   }, [all, scenarios])

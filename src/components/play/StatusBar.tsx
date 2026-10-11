@@ -6,6 +6,7 @@ import { Badge, Button, CountPill, type Tone } from '../ui'
 import { Icon } from '../ui/Icon'
 import { ClockControl, type ClockState } from './ClockControl'
 import { usePlay } from './playContext'
+import { useProgressStore } from '../../store/progressStore'
 import { MODE_LABELS } from '../../lib/labels'
 import { REGULATOR_LABELS } from './playHelpers'
 
@@ -71,6 +72,8 @@ export function StatusBar({
   }, [menuOpen])
 
   const ended = state.phase === 'ended'
+  // A save that fails mid-run used to surface only on the progress page — forty minutes later.
+  const saveResult = useProgressStore((p) => p.lastSaveResult)
   const canRewind = !ended && mode !== 'expert' && state.turnIndex > 0
   const turn = scenario.turns[state.turnIndex]
 
@@ -104,6 +107,18 @@ export function StatusBar({
           />
         )}
         <RunStateChip ci={state.confidence.index} compact={compact} />
+        {saveResult !== 'ok' && (
+          <Badge
+            tone="critical"
+            title={
+              saveResult === 'quota'
+                ? '브라우저 저장 공간이 가득 차 진행이 저장되지 않습니다'
+                : '브라우저 저장소를 사용할 수 없어 진행이 저장되지 않습니다'
+            }
+          >
+            저장 안 됨
+          </Badge>
+        )}
         <RegulatorChip level={state.regulator.level} compact={compact} />
         <Button
           size="sm"
