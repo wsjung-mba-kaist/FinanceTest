@@ -34,7 +34,7 @@ export const fundScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'cashBufferPct',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [1, 25],
@@ -48,7 +48,7 @@ export const fundScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'weeklyLiquidityPct',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [5, 30],
@@ -67,7 +67,7 @@ export const fundScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'illiquidSharePct',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [30, 100],
             [35, 92],
@@ -119,7 +119,7 @@ export const fundScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -138,7 +138,7 @@ export const fundScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 85],

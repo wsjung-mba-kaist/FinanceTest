@@ -13,6 +13,8 @@
  * - 1: everything before this constant existed.
  * - 2: HTM reclassification moves carrying amounts (not market values); `jitterTick` rounds the
  *   scaled offset symmetrically; `pensionFx.meetMarginCall` no longer counts pool collateral as NAV;
- *   `autoplay` random policy uses Fisher–Yates.
+ *   `autoplay` random policy uses Fisher–Yates; scoring reads intra-turn extrema (`intraMin` /
+ *   `intraMax`) and weights the expert-alignment headline by `scoreWeight`, so a stored `total`
+ *   can differ from the one the debrief recomputes.
  */
 export const ENGINE_VERSION = 2

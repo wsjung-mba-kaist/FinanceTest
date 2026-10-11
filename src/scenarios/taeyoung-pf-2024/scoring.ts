@@ -24,7 +24,7 @@ export const pfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'cet1Ratio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [6, 0],
             [8, 45],
@@ -56,7 +56,7 @@ export const pfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 85],
@@ -96,7 +96,7 @@ export const pfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 25],
@@ -123,7 +123,7 @@ export const pfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'lcr',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [80, 0],
             [100, 60],

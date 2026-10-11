@@ -28,7 +28,7 @@ export const svbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'survivalDays',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [1, 40],
@@ -59,7 +59,7 @@ export const svbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'cet1Ratio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [2, 0],
             [4.5, 30],
@@ -89,7 +89,7 @@ export const svbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -116,7 +116,7 @@ export const svbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

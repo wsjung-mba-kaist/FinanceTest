@@ -37,7 +37,7 @@ export const lehmanScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'survivalDays',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [0.5, 30],
@@ -69,7 +69,7 @@ export const lehmanScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'leverageRatio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [1.5, 0],
             [2, 30],
@@ -99,7 +99,7 @@ export const lehmanScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'repoRollRate',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [50, 0],
             [70, 40],
@@ -117,7 +117,7 @@ export const lehmanScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [20, 30],
@@ -152,7 +152,7 @@ export const lehmanScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

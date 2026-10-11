@@ -27,7 +27,7 @@ export const archegosScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'concentrationDays',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [4, 100],
             [10, 75],
@@ -41,7 +41,7 @@ export const archegosScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'marginCoverage',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [10, 0],
             [25, 40],
@@ -78,7 +78,7 @@ export const archegosScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 85],
@@ -136,7 +136,7 @@ export const archegosScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -155,7 +155,7 @@ export const archegosScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'marginShortfall',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 75],

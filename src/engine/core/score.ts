@@ -43,19 +43,40 @@ function metricSeries(state: GameState, key: string): number[] {
     .map((m) => m.value)
 }
 
+/** How each aggregate reads in the score explanation — the reader must know what «최저» measures. */
+const AGGREGATE_LABELS: Record<Extract<ScoreComponent, { kind: 'metric' }>['aggregate'], string> = {
+  final: '최종',
+  min: '턴말 최저',
+  max: '턴말 최고',
+  avg: '평균',
+  turnsBelow: '기준 미달 턴 수',
+  turnsAbove: '기준 초과 턴 수',
+  intraMin: '최저',
+  intraMax: '최고',
+}
+
+/** Per-turn intra-turn extrema, falling back to the turn-end value for snapshots without them. */
+function extremaSeries(state: GameState, key: string, side: 'min' | 'max'): number[] {
+  return state.metricsHistory
+    .map((s) => s.extrema?.[key]?.[side] ?? s.metrics[key]?.value)
+    .filter((v): v is number => v !== undefined && Number.isFinite(v))
+}
+
 function aggregate(
   series: number[],
-  how: 'final' | 'min' | 'max' | 'avg' | 'turnsBelow' | 'turnsAbove',
+  how: Extract<ScoreComponent, { kind: 'metric' }>['aggregate'],
   threshold?: number,
 ): number | undefined {
   if (series.length === 0) return undefined
   switch (how) {
-    case 'final':
-      return series[series.length - 1]
+    case 'intraMin':
     case 'min':
       return Math.min(...series)
+    case 'intraMax':
     case 'max':
       return Math.max(...series)
+    case 'final':
+      return series[series.length - 1]
     case 'avg':
       return series.reduce((a, b) => a + b, 0) / series.length
     case 'turnsBelow':
@@ -108,12 +129,18 @@ function evalComponent(
 ): { score: number; text: string } | undefined {
   switch (c.kind) {
     case 'metric': {
-      const v = aggregate(metricSeries(state, c.metric), c.aggregate, c.threshold)
+      const series =
+        c.aggregate === 'intraMin'
+          ? extremaSeries(state, c.metric, 'min')
+          : c.aggregate === 'intraMax'
+            ? extremaSeries(state, c.metric, 'max')
+            : metricSeries(state, c.metric)
+      const v = aggregate(series, c.aggregate, c.threshold)
       if (v === undefined) return undefined
       const score = evalCurve(c.curve, v)
       return {
         score,
-        text: `${c.label ?? c.metric}(${c.aggregate}) = ${fmt(v)} → ${score.toFixed(0)}점`,
+        text: `${c.label ?? c.metric}(${AGGREGATE_LABELS[c.aggregate]}) = ${fmt(v)} → ${score.toFixed(0)}점`,
       }
     }
     case 'counter': {

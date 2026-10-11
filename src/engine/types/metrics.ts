@@ -15,6 +15,14 @@ export interface MetricValue {
 export interface MetricSnapshot {
   turnIndex: number
   metrics: Record<string, MetricValue>
+  /**
+   * Lowest and highest value each metric reached *within* this turn — across its ticks and the
+   * decisions applied in it. `metrics` holds the turn's last value (one snapshot per turn is the
+   * contract scoring, conditions and the debrief rely on); game-over checks run every tick, so
+   * without this a turn in which LCR dipped to 70 at tick 2 and recovered to 105 by its end scored
+   * as "lowest LCR 105". Absent on snapshots written before the field existed.
+   */
+  extrema?: Record<string, { min: number; max: number }>
 }
 
 /** Threshold semantics: `direction: 'below'` means lower values are worse (breach when value < breach). */

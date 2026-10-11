@@ -7,7 +7,13 @@ export type ScoreComponent =
   | {
       kind: 'metric'
       metric: string
-      aggregate: 'final' | 'min' | 'max' | 'avg' | 'turnsBelow' | 'turnsAbove'
+      /**
+       * `min`/`max`/`avg`/`final` read the turn-end value of each turn. `intraMin`/`intraMax` read
+       * the lowest/highest value reached *within* any turn (ticks and decisions included) — the
+       * same resolution game-over rules see.
+       */
+      aggregate:
+        'final' | 'min' | 'max' | 'avg' | 'turnsBelow' | 'turnsAbove' | 'intraMin' | 'intraMax'
       threshold?: number
       curve: Curve
       weight: number

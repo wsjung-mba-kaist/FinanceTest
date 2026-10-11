@@ -64,8 +64,16 @@ export function snapshotMetrics<S extends InstitutionState>(
   }
   return produce(state, (d) => {
     const idx = d.metricsHistory.findIndex((m) => m.turnIndex === d.turnIndex)
-    if (idx >= 0) d.metricsHistory[idx] = snap
-    else d.metricsHistory.push(snap)
+    // Fold this sample into the turn's running extrema (first sample of the turn starts them).
+    const prev = idx >= 0 ? d.metricsHistory[idx]!.extrema : undefined
+    const extrema: NonNullable<MetricSnapshot['extrema']> = {}
+    for (const [key, v] of Object.entries(values)) {
+      const p = prev?.[key]
+      extrema[key] = p ? { min: Math.min(p.min, v), max: Math.max(p.max, v) } : { min: v, max: v }
+    }
+    const withExtrema = { ...snap, extrema }
+    if (idx >= 0) d.metricsHistory[idx] = withExtrema
+    else d.metricsHistory.push(withExtrema)
     const sample = { turnIndex: d.turnIndex, tick: d.tick, values }
     const ti = d.tickHistory.findIndex((t) => t.turnIndex === d.turnIndex && t.tick === d.tick)
     if (ti >= 0) d.tickHistory[ti] = sample

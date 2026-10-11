@@ -27,7 +27,7 @@ export const ltcmScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'netExposureB',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [0.2, 80],
@@ -40,7 +40,7 @@ export const ltcmScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'marginCoverage',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [50, 35],
@@ -113,7 +113,7 @@ export const ltcmScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

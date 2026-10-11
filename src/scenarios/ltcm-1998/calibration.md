@@ -637,3 +637,7 @@ t5-neg-open ──equal/pro-rata──▶ t5-neg-pledge ──commitReplies(cons
 | 10년 온·오프더런 스프레드 | `market.custom.onOffRun10yBp` | 7 → **9** | Table A6(p.54) 미국 행 9, 6 Jul~14 Aug −0 | CGFS Chart 8의 원 계열, 또는 GovPX/CRSP 1998년 개별 국채 호가로 재구성. `docs/research/ltcm-1998.md`의 "스왑/온오프더런 스프레드 시계열"과 같은 건 |
 `ltcmCapitalB`의 9/18·9/21·9/22 값과 `ltcmLiquidityB` 전체는 `[VERIFY]`가 아니라 `[CAL]`이다 —
 1차 출처에 값이 없다는 것이 확인된 사실이고, 보간·설계 근거를 §3.1·§3.2에 적었다.
+
+## 채점 해상도
+
+지표 최저·최고(`intraMin`/`intraMax`)는 **턴 내 극값**(틱과 결정 적용 시점을 포함)을 읽는다 — 게임오버 규칙과 같은 해상도다. 엔진 v2(2026-10)에서 턴 종료값 기준(`min`/`max`)으로부터 전환했다; 역사·전문가 경로 점수는 그만큼 움직였고(대부분 0~3점 하락), 체크포인트는 변하지 않았다.

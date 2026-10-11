@@ -10,7 +10,7 @@ exports[`buildDebriefText > renders a reproducible plain-text report 1`] = `
 목요일 마감 잔고가 음수인 채로 금요일 아침을 맞았습니다.
 
 종합 점수: 33.0 (F)
-전문가 정합 40 · 힌트 감점 −0 · 시간 초과 0회
+전문가 정합 41 · 힌트 감점 −0 · 시간 초과 0회
 
 [차원별 점수]
   유동성 관리        14점 (가중치 30%)

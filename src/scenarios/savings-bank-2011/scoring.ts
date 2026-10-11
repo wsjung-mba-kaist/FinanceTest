@@ -35,7 +35,7 @@ export const sbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'usableReserves',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [1, 45],
@@ -70,7 +70,7 @@ export const sbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'market.govt3y',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [380, 100],
             [420, 60],
@@ -95,7 +95,7 @@ export const sbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -127,7 +127,7 @@ export const sbScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 92],

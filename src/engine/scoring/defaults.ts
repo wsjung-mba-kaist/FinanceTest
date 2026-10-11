@@ -12,7 +12,7 @@ const expertOnly: ScoreComponent[] = [{ kind: 'expert', weight: 1, label: 'ì „ë¬
 const confidenceRule: ScoreComponent = {
   kind: 'metric',
   metric: 'confidence',
-  aggregate: 'min',
+  aggregate: 'intraMin',
   curve: [
     [0, 0],
     [30, 30],
@@ -26,7 +26,7 @@ const confidenceRule: ScoreComponent = {
 const regulatorRule: ScoreComponent = {
   kind: 'metric',
   metric: 'regulatorLevel',
-  aggregate: 'max',
+  aggregate: 'intraMax',
   curve: [
     [0, 100],
     [1, 85],
@@ -52,7 +52,7 @@ const bank: Rules = {
     {
       kind: 'metric',
       metric: 'survivalDays',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [1, 40],
@@ -65,7 +65,7 @@ const bank: Rules = {
     {
       kind: 'metric',
       metric: 'lcr',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [40, 0],
         [80, 50],
@@ -81,7 +81,7 @@ const bank: Rules = {
     {
       kind: 'metric',
       metric: 'cet1Ratio',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [2, 0],
         [4.5, 30],
@@ -114,7 +114,7 @@ const securities: Rules = {
     {
       kind: 'metric',
       metric: 'liquidityRatio',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [50, 0],
         [100, 60],
@@ -130,7 +130,7 @@ const securities: Rules = {
     {
       kind: 'metric',
       metric: 'ncr',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [100, 50],
@@ -150,7 +150,7 @@ const pension: Rules = {
     {
       kind: 'metric',
       metric: 'collateralHeadroomBp',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [50, 40],
@@ -202,7 +202,7 @@ const primeBroker: Rules = {
     {
       kind: 'metric',
       metric: 'marginCoverage',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [100, 60],
@@ -222,7 +222,7 @@ const centralBank: Rules = {
     {
       kind: 'metric',
       metric: 'guidottiRatio',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [50, 40],
@@ -239,7 +239,7 @@ const centralBank: Rules = {
     {
       kind: 'metric',
       metric: 'distressedBanks',
-      aggregate: 'max',
+      aggregate: 'intraMax',
       curve: [
         [0, 100],
         [3, 70],
@@ -259,7 +259,7 @@ const assetManager: Rules = {
     {
       kind: 'metric',
       metric: 'cashBufferPct',
-      aggregate: 'min',
+      aggregate: 'intraMin',
       curve: [
         [0, 0],
         [3, 40],

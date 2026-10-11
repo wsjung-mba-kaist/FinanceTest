@@ -28,7 +28,7 @@ export const legoScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'liquidityRatio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [50, 0],
             [100, 60],
@@ -46,7 +46,7 @@ export const legoScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'ncr',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [100, 50],
@@ -93,7 +93,7 @@ export const legoScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -120,7 +120,7 @@ export const legoScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

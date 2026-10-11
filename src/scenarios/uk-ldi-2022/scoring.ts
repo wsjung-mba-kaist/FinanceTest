@@ -28,7 +28,7 @@ export const ldiScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'collateralHeadroomBp',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [50, 40],
@@ -58,7 +58,7 @@ export const ldiScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'hedgeRatio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [30, 0],
             [50, 40],
@@ -108,7 +108,7 @@ export const ldiScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -127,7 +127,7 @@ export const ldiScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 85],

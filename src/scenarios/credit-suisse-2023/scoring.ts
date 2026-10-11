@@ -38,7 +38,7 @@ export const csScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'csLiquidity',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [10, 45],
@@ -104,7 +104,7 @@ export const csScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [20, 35],

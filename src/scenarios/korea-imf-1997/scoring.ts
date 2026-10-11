@@ -35,7 +35,7 @@ export const imfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'usableReserves',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [39, 35],
@@ -85,7 +85,7 @@ export const imfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'fxSpot',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [1000, 100],
             [1500, 70],
@@ -103,7 +103,7 @@ export const imfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [20, 25],
@@ -143,7 +143,7 @@ export const imfScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

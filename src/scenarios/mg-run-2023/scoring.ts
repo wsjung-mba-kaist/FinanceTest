@@ -28,7 +28,7 @@ export const mgScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'cash',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [5, 40],
@@ -46,7 +46,7 @@ export const mgScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'cet1Ratio',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [4, 0],
             [6, 50],
@@ -80,7 +80,7 @@ export const mgScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -120,7 +120,7 @@ export const mgScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 90],

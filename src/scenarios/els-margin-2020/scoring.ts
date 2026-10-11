@@ -33,7 +33,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'marginCallPending',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1500, 85],
@@ -47,7 +47,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'fxLiquid',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [400, 35],
@@ -66,7 +66,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'ncr',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [100, 0],
             [400, 40],
@@ -121,7 +121,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'hedgeDelta',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [0.08, 30],
@@ -139,7 +139,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'confidence',
-          aggregate: 'min',
+          aggregate: 'intraMin',
           curve: [
             [0, 0],
             [30, 30],
@@ -166,7 +166,7 @@ export const elsScoring: ScoringSpec = {
         {
           kind: 'metric',
           metric: 'regulatorLevel',
-          aggregate: 'max',
+          aggregate: 'intraMax',
           curve: [
             [0, 100],
             [1, 88],
