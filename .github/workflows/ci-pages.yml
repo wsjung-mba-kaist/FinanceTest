@@ -10,8 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# One group per ref: a newer push to the *same* branch or PR supersedes its own older run. The
+# group used to be the single word `pages` for the whole workflow, so any push on any PR cancelled
+# every other PR's running checks — and the deploy of main.
 concurrency:
-  group: pages
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,6 +43,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: check
     runs-on: ubuntu-latest
+    # Deploys are serialised, never cancelled: a half-finished Pages deploy is worse than a late one.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
