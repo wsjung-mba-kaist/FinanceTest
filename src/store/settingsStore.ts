@@ -35,6 +35,19 @@ export function resolveTheme(theme: SettingsState['theme']): 'light' | 'dark' {
 }
 
 /**
+ * The settings `applySettingsToDocument` reads. Declared here, next to the function, so the
+ * subscriber in `Providers` re-applies on exactly these and a key added below cannot be
+ * forgotten in a dependency list somewhere else.
+ */
+export const DOCUMENT_SETTING_KEYS = [
+  'theme',
+  'fontScale',
+  'density',
+  'reducedMotion',
+  'useSystemFont',
+] as const satisfies readonly (keyof SettingsState)[]
+
+/**
  * Applies theme/font/motion settings to the document root.
  * The resolved theme is always stamped (never removed) so the dark palette can be
  * declared once under `[data-theme='dark']`.
