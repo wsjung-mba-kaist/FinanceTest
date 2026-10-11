@@ -178,7 +178,7 @@ function Panel({
 }
 
 export default function DebriefPage() {
-  const { scenarioId } = useParams()
+  const { scenarioId, runId } = useParams()
   const navigate = useNavigate()
   const loc = useLocation()
   const printing = usePrintMode()
@@ -219,15 +219,19 @@ export default function DebriefPage() {
     }
   }, [gState, gRun, gScenario, gHistory, scenarioId])
 
-  const scenario = live ? gScenario : def
+  // The run the URL asks for wins over whatever the store still holds: a link from the progress
+  // page to an older attempt must not show the run that was just played.
+  const liveShown = live && (!runId || live.run.runId === runId) ? live : undefined
+  const scenario = liveShown ? gScenario : def
 
   const rebuilt = useMemo<DebriefData | undefined>(() => {
-    if (live || !scenario) return undefined
-    const latest = attempts?.[0]
-    return latest ? rebuildFromAttempt(scenario, latest) : undefined
-  }, [live, scenario, attempts])
+    if (liveShown || !scenario) return undefined
+    const chosen = runId ? attempts?.find((a) => a.runId === runId) : attempts?.[0]
+    return chosen ? rebuildFromAttempt(scenario, chosen) : undefined
+  }, [liveShown, scenario, attempts, runId])
 
-  const data = live ?? rebuilt
+  const data = liveShown ?? rebuilt
+  const runNotFound = Boolean(runId) && !data && !attempts?.some((a) => a.runId === runId)
 
   // Record the live run once (idempotent: skip if already in the attempt list).
   useEffect(() => {
@@ -248,7 +252,7 @@ export default function DebriefPage() {
     !!summary &&
     summary.status === 'available' &&
     !!scenario &&
-    !live &&
+    !liveShown &&
     (!attempts || attempts.length === 0)
 
   const report = useMemo(
@@ -372,6 +376,14 @@ export default function DebriefPage() {
         <Link to={`/scenarios/${scenarioId}`}>브리핑에서 시작하기</Link>
       </EmptyState>
     )
+  if (runNotFound) {
+    return (
+      <EmptyState headingLevel={1} title="이 기록을 찾을 수 없습니다">
+        링크가 가리키는 플레이 기록이 저장되어 있지 않습니다 (최근 10회만 보관합니다).{' '}
+        <Link to="/progress">진행 현황에서 고르기</Link>
+      </EmptyState>
+    )
+  }
   if (!data || !report) {
     return (
       <EmptyState headingLevel={1} title="디브리핑할 기록이 없습니다">

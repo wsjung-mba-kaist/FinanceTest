@@ -245,7 +245,7 @@ function PlayScreen({
   const onDebrief = () => {
     const attempts = useProgressStore.getState().getScenario(scenario.meta.id).attempts
     if (!attempts.some((a) => a.runId === run.runId)) finish()
-    navigate(`/debrief/${scenario.meta.id}`)
+    navigate(`/debrief/${scenario.meta.id}/${run.runId}`)
   }
   const onAbandon = () => {
     setAbandonOpen(false)

@@ -126,7 +126,14 @@ export const router = createHashRouter([
         errorElement: <RouteErrorBody />,
       },
       { path: 'play/:scenarioId', element: <PlayPage />, errorElement: <RouteErrorBody /> },
-      { path: 'debrief/:scenarioId', element: <DebriefPage />, errorElement: <RouteErrorBody /> },
+      // `:runId?` names one saved attempt. A debrief is a pure function of (scenario version, seed,
+      // decisions), so the link has to carry which run — without it every «디브리핑» link on the
+      // progress page opened the latest attempt, whichever row was clicked.
+      {
+        path: 'debrief/:scenarioId/:runId?',
+        element: <DebriefPage />,
+        errorElement: <RouteErrorBody />,
+      },
       { path: 'knowledge', element: <KnowledgeIndexPage />, errorElement: <RouteErrorBody /> },
       {
         path: 'knowledge/frameworks/:frameworkId',

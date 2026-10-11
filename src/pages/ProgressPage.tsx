@@ -192,7 +192,7 @@ export default function ProgressPage() {
                       </td>
                       <td className="num px-3 py-2 text-muted">{shortDate(attempt.completedAt)}</td>
                       <td className="px-3 py-2">
-                        <Link to={`/debrief/${scenarioId}`}>디브리핑</Link>
+                        <Link to={`/debrief/${scenarioId}/${attempt.runId}`}>디브리핑</Link>
                       </td>
                     </tr>
                   )
