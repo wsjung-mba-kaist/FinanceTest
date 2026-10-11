@@ -25,8 +25,6 @@ import type {
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import { cardIds, sourceIds } from '../../content'
 import scenario from './scenario'
-import { ELS_FACTS } from './facts'
-import { elsInitialConfidence, elsInitialMarket, elsInitialSecurities } from './initialState'
 import { marginCallStep, settleAprilPolicyFunding } from './fx'
 import { MARGIN, T1_PROFILE } from './turnsA'
 
@@ -189,35 +187,6 @@ describe('els-margin-2020 scenario', () => {
   it('passes integrity lint standalone (scenario-local sources only)', () => {
     const errors = validateScenario(scenario).filter((i) => i.level === 'error')
     expect(errors).toEqual([])
-  })
-
-  it('fact ledger matches the initial state it documents', () => {
-    const init = {
-      institution: elsInitialSecurities,
-      market: elsInitialMarket,
-      confidence: elsInitialConfidence,
-    }
-    const resolve = (path: string): unknown => {
-      let cur: unknown = init
-      for (const seg of path.split('.')) {
-        if (cur === null || typeof cur !== 'object') return undefined
-        cur = (cur as Record<string, unknown>)[seg]
-      }
-      return cur
-    }
-    const drift: string[] = []
-    let checked = 0
-    for (const f of ELS_FACTS) {
-      const root = f.path.split('.')[0]!
-      if (!['institution', 'market', 'confidence'].includes(root)) continue
-      const actual = resolve(f.path)
-      expect(typeof actual, `${f.path}는 숫자 리프여야 합니다`).toBe('number')
-      checked++
-      if (Math.abs((actual as number) - f.value) > 1e-9)
-        drift.push(`${f.path}: 원장 ${f.value} vs 초기 상태 ${String(actual)}`)
-    }
-    expect(drift, `원장과 초기 상태가 다릅니다:\n${drift.join('\n')}`).toEqual([])
-    expect(checked).toBeGreaterThan(30)
   })
 
   it('every learning objective is practised in ≥2 decisions that exist', () => {

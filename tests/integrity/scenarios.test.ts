@@ -15,6 +15,20 @@ const cases: [id: string, def: ScenarioDefinition<InstitutionState>][] = [
   ...registry.map((d): [string, ScenarioDefinition<InstitutionState>] => [d.meta.id, d]),
 ]
 
+/**
+ * Warning ceilings — a ratchet, not a rule. Warnings used to go to stderr and nobody counted
+ * them, so a new one was indistinguishable from the 132 already there (94 of which were one rule
+ * reporting itself twice). Each scenario is held at today's count; lower a number when you clear a
+ * warning, and a new warning fails the suite with the rule that raised it. Unlisted = 0.
+ */
+const WARNING_CEILING: Record<string, number> = {
+  'svb-2023': 11,
+  'lehman-2008': 5,
+  'archegos-2021': 1,
+  'legoland-2022': 1,
+  'mg-run-2023': 1,
+}
+
 describe('scenario integrity', () => {
   it.skipIf(registry.length === 0)('every registered scenario loaded with a unique id', () => {
     const ids = registry.map((d) => d.meta.id)
@@ -37,6 +51,15 @@ describe('scenario integrity', () => {
           `[integrity] ${id}: card/source ids were not checked against the content module`,
         )
       expect(errors, `\n${formatIssues(errors)}`).toEqual([])
+      const ceiling = WARNING_CEILING[id] ?? 0
+      expect(
+        warnings.length,
+        `${id}: 경고 ${warnings.length}건 > 상한 ${ceiling}건\n${formatIssues(warnings)}`,
+      ).toBeLessThanOrEqual(ceiling)
+      expect(
+        warnings.length,
+        `${id}: 경고 ${warnings.length}건 < 상한 ${ceiling}건 — 상한을 ${warnings.length}으로 내려 적어 두세요`,
+      ).toBe(ceiling)
     })
 
     it('declares consistent meta and covers every decision in the historical path', () => {

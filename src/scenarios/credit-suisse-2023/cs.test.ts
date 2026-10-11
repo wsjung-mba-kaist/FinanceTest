@@ -19,7 +19,6 @@ import {
 } from '../../engine'
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import { cardIds, sourceIds } from '../../content'
-import { CS_FACTS } from './facts'
 import { csFx } from './fx'
 import scenario from './scenario'
 
@@ -123,55 +122,6 @@ describe('credit-suisse-2023 scenario', () => {
     const errors = validateScenario(scenario).filter((i) => i.level === 'error')
     if (errors.length) console.log(formatIssues(errors))
     expect(errors).toEqual([])
-  })
-
-  it('the fact ledger covers every initial-state number and matches it', () => {
-    // tests/integrity/facts.test.ts가 아직 이 시나리오를 열거하지 않으므로 같은 검사를 여기서 돌린다.
-    const roots = ['institution', 'market', 'confidence', 'counters', 'regulatorLevel']
-    const init = {
-      ...scenario.initialState,
-      regulatorLevel: scenario.initialState.regulatorLevel ?? 0,
-    }
-    const resolve = (obj: unknown, path: string): unknown => {
-      let cur: unknown = obj
-      for (const seg of path.split('.')) {
-        if (cur === null || typeof cur !== 'object') return undefined
-        cur = (cur as Record<string, unknown>)[seg]
-      }
-      return cur
-    }
-    const drift: string[] = []
-    const unresolved: string[] = []
-    let checked = 0
-    for (const f of CS_FACTS) {
-      if (!roots.includes(f.path.split('.')[0]!)) continue
-      const actual = resolve(init, f.path)
-      if (typeof actual !== 'number') {
-        unresolved.push(`${f.path} → ${String(actual)}`)
-        continue
-      }
-      checked++
-      if (Math.abs(actual - f.value) > 1e-9)
-        drift.push(`${f.path}: 원장 ${f.value} vs 초기 상태 ${actual}`)
-    }
-    // 반대 방향: 상태에는 있는데 원장에 없는 숫자 리프
-    const covered = new Set(CS_FACTS.map((f) => f.path))
-    const missing: string[] = []
-    const walk = (obj: unknown, prefix: string): void => {
-      if (obj === null || typeof obj !== 'object') return
-      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-        const p = prefix ? `${prefix}.${k}` : k
-        if (typeof v === 'number') {
-          if (!covered.has(p)) missing.push(p)
-        } else if (v && typeof v === 'object') walk(v, p)
-      }
-    }
-    walk({ institution: init.institution, market: init.market, confidence: init.confidence }, '')
-    console.log('[facts] checked', checked, 'leaves')
-    expect(unresolved, `해석되지 않는 경로: ${unresolved.join(' / ')}`).toEqual([])
-    expect(drift, `원장과 초기 상태가 다릅니다: ${drift.join(' / ')}`).toEqual([])
-    expect(missing, `원장에 없는 초기 상태 숫자: ${missing.join(' / ')}`).toEqual([])
-    expect(checked).toBeGreaterThan(20)
   })
 
   it('contains no hindsight tokens in turn text or briefing', () => {

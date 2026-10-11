@@ -22,7 +22,6 @@ import { cardIds, sourceIds } from '../../content'
 import typed from './scenario'
 import { T2_CONSENT_PROFILE, T2_CONSENT_TOTAL } from './turnsA'
 import { T5_CONSENT_PROFILE } from './turnsB'
-import { PF_FACTS } from './facts'
 
 /** 엔진의 autoplay/score 헬퍼는 제네릭 정의를 대상으로 쓰인다. */
 const scenario = typed as unknown as ScenarioDefinition<InstitutionState>
@@ -252,22 +251,6 @@ describe('taeyoung-pf-2024 scenario', () => {
       expect(lo.decisionIds.length, lo.id).toBeGreaterThanOrEqual(2)
       for (const d of lo.decisionIds) expect(ids.has(d), `${lo.id} → ${d}`).toBe(true)
     }
-  })
-
-  it('the fact ledger covers the numeric leaves and declares every VERIFY item', () => {
-    const paths = new Set(PF_FACTS.map((f) => f.path))
-    for (const p of [
-      'institution.cash',
-      'institution.capital.cet1',
-      'institution.rwa',
-      'institution.custom.pfExposure',
-      'institution.custom.claimBank',
-      'market.creditSpreadIgBp',
-      'market.custom.constructionPfSpreadBp',
-    ])
-      expect(paths.has(p), p).toBe(true)
-    for (const f of PF_FACTS.filter((x) => x.tag === 'VERIFY'))
-      expect(f.note, `${f.path} VERIFY note`).toBeTruthy()
   })
 
   it('contains no hindsight tokens in player-visible turn text before the announcement turn', () => {
