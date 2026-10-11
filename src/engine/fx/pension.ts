@@ -69,11 +69,13 @@ export const pensionFx = {
         const need = p.amount ?? ldi.marginCallOutstanding
         if (need <= 0) return
         let paid = 0
+        /** Part of `paid` that came out of the pool's own collateral cash. */
+        let fromPool = 0
         const disc = p.discount ?? 0
         switch (p.source) {
           case 'cash': {
             paid = Math.min(need, s.assets.cash + ldi.collateral.cash)
-            const fromPool = Math.min(paid, ldi.collateral.cash)
+            fromPool = Math.min(paid, ldi.collateral.cash)
             ldi.collateral.cash -= fromPool
             s.assets.cash -= paid - fromPool
             break
@@ -108,7 +110,12 @@ export const pensionFx = {
           }
         }
         ldi.marginCallOutstanding = Math.max(0, ldi.marginCallOutstanding - paid)
-        ldi.equity += paid
+        // `equity` is the pool's NAV = collateral + derivative MTM. `yieldShock` already charged
+        // the MTM loss to NAV when it raised the call, so posting the pool's *own* collateral
+        // settles that liability and leaves NAV unchanged; only money that enters the pool from
+        // outside (scheme cash, sale proceeds, the sponsor) is new NAV. It used to add the whole
+        // payment, so a call met from pool cash inflated NAV and understated leverage.
+        ldi.equity += paid - fromPool
         ctx.log(
           `마진콜 충당 ${paid.toFixed(1)} (${p.source}${disc ? `, 할인 ${(disc * 100).toFixed(0)}%` : ''}), 잔여 ${ldi.marginCallOutstanding.toFixed(1)}`,
         )

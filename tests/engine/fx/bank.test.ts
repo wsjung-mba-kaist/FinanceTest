@@ -114,3 +114,126 @@ describe('bankFx.sellSecurities', () => {
     expect(twice.institution).toEqual(once.institution)
   })
 })
+
+describe('bankFx funding and capital', () => {
+  it('drawFacility is clamped to capacity and moves it into advances and cash', () => {
+    const s0 = fresh()
+    const s1 = apply(s0, bankFx.drawFacility({ amount: 999, source: 'FHLB', rateBp: 520 }))
+    const cap = s0.institution.wholesale.cbFacilityCapacity
+    expect(s1.institution.wholesale.cbFacilityCapacity).toBe(0)
+    expect(s1.institution.wholesale.cbAdvances).toBe(s0.institution.wholesale.cbAdvances + cap)
+    expect(s1.institution.cash).toBe(s0.institution.cash + cap)
+    expect(s1.counters.fundingDrawn).toBe(cap)
+    expect(s1.counters.fundingCostBp).toBe(520)
+  })
+
+  it('pledged collateral arrives same-day or next turn, and settlePendingCapacity moves it', () => {
+    const s0 = fresh()
+    const s1 = apply(s0, bankFx.pledgeCollateral({ immediate: 5, pending: 7 }))
+    expect(s1.institution.wholesale.cbFacilityCapacity).toBe(
+      s0.institution.wholesale.cbFacilityCapacity + 5,
+    )
+    expect(s1.institution.wholesale.cbFacilityPending).toBe(7)
+    const s2 = apply(s1, bankFx.settlePendingCapacity())
+    expect(s2.institution.wholesale.cbFacilityCapacity).toBe(
+      s0.institution.wholesale.cbFacilityCapacity + 12,
+    )
+    expect(s2.institution.wholesale.cbFacilityPending).toBe(0)
+  })
+
+  it('a backstopped raise adds the amount to CET1, cash and exposure and dampens the run', () => {
+    const s0 = fresh()
+    const s1 = apply(
+      s0,
+      bankFx.raiseEquity({ amount: 2, backstopPct: 100, discount: 0.1, marketCap: 10 }),
+    )
+    expect(s1.institution.capital.cet1).toBe(s0.institution.capital.cet1 + 2)
+    expect(s1.institution.cash).toBe(s0.institution.cash + 2)
+    expect(s1.institution.leverageExposure).toBe(s0.institution.leverageExposure + 2)
+    expect(s1.counters.dilution).toBeCloseTo(2 / (10 * 0.9 + 2), 9)
+    expect(s1.flags.raise_closed).toBe(true)
+    expect(s1.counters.dampener).toBeCloseTo(0.7, 9)
+  })
+
+  it('an unbackstopped raise into low confidence fails: no capital, amplifier ×2, CI −25', () => {
+    const s0 = produce(fresh(), (d) => {
+      d.confidence.index = 40
+    })
+    const s1 = apply(
+      s0,
+      bankFx.raiseEquity({ amount: 2, backstopPct: 0, discount: 0.1, marketCap: 10 }),
+    )
+    expect(s1.institution.capital.cet1).toBe(s0.institution.capital.cet1)
+    expect(s1.institution.cash).toBe(s0.institution.cash)
+    expect(s1.flags.raise_failed).toBe(true)
+    expect(s1.counters.amplifier).toBe(2)
+    expect(s1.confidence.index).toBe(15)
+  })
+})
+
+describe('bankFx run-off and market moves', () => {
+  it('runoffStep pays the outflow from cash and books it in both counters', () => {
+    const s0 = fresh()
+    const deposits = (b: BankState) => b.deposits.reduce((a, s) => a + s.balance, 0)
+    const s1 = apply(s0, bankFx.runoffStep({}))
+    const out = deposits(s0.institution) - deposits(s1.institution)
+    expect(out).toBeGreaterThan(0)
+    expect(s0.institution.cash - s1.institution.cash).toBeCloseTo(out, 9)
+    expect(s1.counters.lastOutflow).toBeCloseTo(out, 9)
+    expect(s1.counters.cumulativeOutflow).toBeCloseTo(out, 9)
+    expect(s1.counters.startDeposits).toBeCloseTo(deposits(s0.institution), 9)
+    // A one-period amplifier is spent by the step; the dampener persists.
+    const amped = apply(s0, bankFx.addAmplifier(2))
+    expect(amped.counters.amplifier).toBe(2)
+    const after = apply(amped, bankFx.runoffStep({}))
+    expect(after.counters.amplifier).toBe(1)
+    expect(deposits(amped.institution) - deposits(after.institution)).toBeGreaterThan(out)
+  })
+
+  it('a shortfall is recorded when the outflow exceeds cash — facilities are not drawn by themselves', () => {
+    const s0 = produce(fresh(), (d) => {
+      d.institution.cash = 1
+      d.confidence.index = 10
+    })
+    const s1 = apply(s0, bankFx.runoffStep({}))
+    expect(s1.institution.cash).toBeLessThan(0)
+    expect(s1.counters.settlementShortfall).toBeCloseTo(-s1.institution.cash, 9)
+    expect(s1.institution.wholesale.cbFacilityCapacity).toBe(
+      s0.institution.wholesale.cbFacilityCapacity,
+    )
+  })
+
+  it('rateShock marks both books by −D·Δy·MV', () => {
+    const s0 = fresh()
+    const s1 = apply(s0, bankFx.rateShock({ deltaBp: 50 }))
+    for (const book of ['afs', 'htm'] as const) {
+      const b0 = s0.institution.securities[book]
+      expect(s1.institution.securities[book].marketValue).toBeCloseTo(
+        b0.marketValue * (1 - b0.modDuration * 0.005),
+        9,
+      )
+      expect(s1.institution.securities[book].bookValue).toBe(b0.bookValue)
+    }
+  })
+
+  it('insuredSweep conserves total deposits while moving a share to the insured segment', () => {
+    const s0 = fresh()
+    const s1 = apply(s0, bankFx.insuredSweep({ share: 0.2 }))
+    const total = (b: BankState) => b.deposits.reduce((a, s) => a + s.balance, 0)
+    expect(total(s1.institution)).toBeCloseTo(total(s0.institution), 9)
+    const uninsured0 = s0.institution.deposits
+      .filter((s) => !s.insured)
+      .reduce((a, s) => a + s.balance, 0)
+    const insured = (b: BankState) => b.deposits.find((s) => s.insured)!.balance
+    expect(insured(s1.institution)).toBeCloseTo(insured(s0.institution) + uninsured0 * 0.2, 9)
+  })
+
+  it('setDampener multiplies and floors at 0.3; addAmplifier multiplies the chosen channel', () => {
+    const s0 = fresh()
+    const d1 = apply(apply(s0, bankFx.setDampener(0.5)), bankFx.setDampener(0.1))
+    expect(d1.counters.dampener).toBe(0.3)
+    const net = apply(s0, bankFx.addAmplifier(1.5, 'SNS', { networked: true }))
+    expect(net.counters.networkAmplifier).toBe(1.5)
+    expect(net.counters.amplifier).toBeUndefined()
+  })
+})
