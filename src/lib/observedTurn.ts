@@ -1,5 +1,5 @@
 import { replay, type GameState, type Mode, type ScenarioDefinition } from '../engine'
-import { tickCount } from '../engine/core/lookup'
+import { tickCount } from '../engine'
 
 const cache = new WeakMap<GameState, WeakMap<ScenarioDefinition, Map<string, GameState>>>()
 

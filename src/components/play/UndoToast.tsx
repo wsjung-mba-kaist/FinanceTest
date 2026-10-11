@@ -1,4 +1,4 @@
-import { useUndoWindow } from '../../lib/useUndoWindow'
+import { useUndoWindow } from '../../store/hooks/useUndoWindow'
 import type { UndoableChoice } from '../../store/gameStore'
 import { Button } from '../ui'
 import { Icon } from '../ui/Icon'

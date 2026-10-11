@@ -1,7 +1,7 @@
 import type { GameEvent, GameState, Mode, ScenarioDefinition } from '../engine'
 import { getTurnView } from '../engine'
 import { observedTurnState } from './observedTurn'
-import type { RunInfo } from '../store/gameStore'
+import type { RunInfo } from '../persistence/schema'
 import { MODE_LABELS } from './labels'
 import { stripInlineMarkdown } from './text'
 

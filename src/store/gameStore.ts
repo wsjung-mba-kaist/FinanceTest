@@ -14,7 +14,10 @@ import {
   type ScenarioDefinition,
   type ScoreReport,
 } from '../engine'
-import type { InProgressSave } from '../persistence/schema'
+import type { InProgressSave, RunInfo } from '../persistence/schema'
+
+/** Re-exported for callers that reach the run through the store. */
+export type { RunInfo }
 import { useProgressStore } from './progressStore'
 import { useSettingsStore } from './settingsStore'
 
@@ -48,22 +51,6 @@ function baseTickMsFor(mode: Mode): number {
 
 function initialClock(mode: Mode): ClockState {
   return { running: false, speed: 1, baseTickMs: baseTickMsFor(mode) }
-}
-
-export interface RunInfo {
-  runId: string
-  mode: Mode
-  seed: number
-  /**
-   * 0 = canonical (engine draws no RNG), 0.5 / 1 = live volatility. Optional and additive:
-   * runs recorded before L2 have no field and read back as 0.
-   */
-  variance?: number
-  rewinds: number
-  hintPenalty: number
-  hintsRevealed: Record<string, number>
-  startedAt: string
-  forkedFrom?: { runId: string; turnIndex: number }
 }
 
 /** Undo window opened by `choose()`; 5s normally, 8s when an `irreversible` option was picked. */

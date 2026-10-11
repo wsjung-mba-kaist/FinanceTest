@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from '../../lib/useMediaQuery'
-import { useTickProgress, type ProgressStore } from '../../lib/useSimulationClock'
+import { useTickProgress, type ProgressStore } from '../../store/hooks/useSimulationClock'
 import { Icon } from '../ui/Icon'
 import { ScenarioClock } from './ScenarioClock'
 

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { GameState, Mode, ScenarioDefinition, TurnView } from '../../engine'
-import type { RunInfo } from '../../store/gameStore'
+import type { RunInfo } from '../../persistence/schema'
 
 /** Read-only play snapshot shared by the feed, decision panel, dashboard and drawer. */
 export interface PlayContextValue {

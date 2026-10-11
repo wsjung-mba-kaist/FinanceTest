@@ -11,8 +11,7 @@ import type {
   Turn,
   TurnView,
 } from '../../engine'
-import { getTurnView } from '../../engine'
-import { informationReleased } from '../../engine/core/information'
+import { getTurnView, informationReleased } from '../../engine'
 import { observedTurnState } from '../../lib/observedTurn'
 import { firstSentence, splitOptionLabel, truncateKo } from '../../lib/text'
 import type { SettingsState } from '../../persistence/schema'

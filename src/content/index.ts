@@ -1,5 +1,5 @@
 import type { GameState, InstitutionType } from '../engine/types'
-import { buildConditionContext, evaluate } from '../engine/core/conditions'
+import { buildConditionContext, evaluate } from '../engine'
 import { GLOSSARY } from './glossary'
 import { loadCards, loadFrameworks } from './loader'
 import { READING_LIST } from './readingList'

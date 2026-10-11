@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useUndoWindow } from '@/lib/useUndoWindow'
+import { useUndoWindow } from '@/store/hooks/useUndoWindow'
 import type { ScenarioDefinition } from '@/engine'
 import { useGameStore, UNDO_MS } from '@/store/gameStore'
 import { miniBank } from '../fixtures/miniBank'

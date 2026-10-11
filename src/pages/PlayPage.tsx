@@ -30,7 +30,7 @@ import { RestrictedKnowledgeContext } from '../components/knowledge/knowledgeAcc
 import { HelpProvider } from '../components/help'
 import { focusZone, useKeyboardShortcuts, type Zone } from '../lib/keyboard'
 import { useAnnouncer } from '../lib/useAnnouncer'
-import { useSimulationClock } from '../lib/useSimulationClock'
+import { useSimulationClock } from '../store/hooks/useSimulationClock'
 import { useBreakpoint } from '../lib/useMediaQuery'
 import { loadScenario } from '../scenarios'
 import { useGameStore, type ClockSpeed, type RunInfo } from '../store/gameStore'

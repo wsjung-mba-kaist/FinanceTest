@@ -1,5 +1,5 @@
 import type { BankFundingPlan, FundingTime, GameState, ScenarioDefinition } from '../engine'
-import { tickCount } from '../engine/core/lookup'
+import { tickCount } from '../engine'
 import { projectRunoff, runStateFromCi } from '../metrics/runoff'
 
 export interface FundingBucket {

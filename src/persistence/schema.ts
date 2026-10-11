@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Mode } from '../engine/types'
 
 export const STORAGE_VERSION = 1
 
@@ -156,4 +157,24 @@ export function emptyProgress(now: string): ProgressState {
     learning: { cardsViewed: [], termsViewed: [] },
     meta: { createdAt: now, lastOpenedAt: now },
   }
+}
+
+/**
+ * Metadata of the run being played, as the store holds it. Lives here (not in the store) because
+ * `lib/logExport` prints it and `lib` sits below `store` in the dependency order.
+ */
+export interface RunInfo {
+  runId: string
+  mode: Mode
+  seed: number
+  /**
+   * 0 = canonical (engine draws no RNG), 0.5 / 1 = live volatility. Optional and additive:
+   * runs recorded before L2 have no field and read back as 0.
+   */
+  variance?: number
+  rewinds: number
+  hintPenalty: number
+  hintsRevealed: Record<string, number>
+  startedAt: string
+  forkedFrom?: { runId: string; turnIndex: number }
 }

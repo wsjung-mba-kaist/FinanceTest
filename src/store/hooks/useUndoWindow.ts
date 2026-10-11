@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { UndoableChoice } from '../store/gameStore'
+import type { UndoableChoice } from '../gameStore'
 
 export interface UndoWindow {
   active: boolean

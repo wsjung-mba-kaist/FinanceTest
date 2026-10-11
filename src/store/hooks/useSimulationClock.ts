@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { getTurnView, tickCount, type GameState, type ScenarioDefinition } from '../engine'
-import { useGameStore, type ClockSpeed } from '../store/gameStore'
+import { getTurnView, tickCount, type GameState, type ScenarioDefinition } from '../../engine'
+import { useGameStore, type ClockSpeed } from '../gameStore'
 
 /** Real-time resolution of the accumulator. The engine never sees any of this. */
 export const CLOCK_STEP_MS = 100
