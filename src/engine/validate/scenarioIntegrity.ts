@@ -13,8 +13,9 @@ import { validateFundingPlan } from './fundingPlan'
 import { validateInformation } from './information'
 import { createGame } from '../core/createGame'
 import { validateDialogue } from '../core/dialogue'
-import { getNumberPath } from '../core/paths'
+import { getNumberPath, listNumericPaths } from '../core/paths'
 import { allDecisions, tickCount } from '../core/lookup'
+import { DEFAULT_THRESHOLDS } from '../../metrics/thresholds'
 
 export interface IntegrityIssue {
   level: 'error' | 'warning'
@@ -28,7 +29,11 @@ export interface IntegrityOptions {
   cardIds?: Set<string>
   /** Known shared-source ids (merged with scenario.meta.sources). */
   sourceIds?: Set<string>
-  /** Known metric keys for this institution type (if omitted, metric keys are not checked). */
+  /**
+   * Known metric keys for this institution type. When omitted they are read off the T0 snapshot
+   * the linter builds anyway — nobody in the suite ever passed them, so `metric-key` and
+   * `kpi-metric` had never run against a real scenario.
+   */
   metricKeys?: Set<string>
 }
 
@@ -93,6 +98,23 @@ export function validateScenario<S extends InstitutionState>(
     )
   }
 
+  const metricKeys =
+    opts.metricKeys ??
+    (initial ? new Set(Object.keys(initial.metricsHistory[0]?.metrics ?? {})) : undefined)
+
+  // --- initial state figures are finite numbers. `createGame` clones with `structuredClone`,
+  // which keeps `Infinity`/`NaN` as they are (the JSON round trip used to turn them into `null`
+  // and the error surfaced turns later as "알 수 없는 경로"). An authored non-finite figure has no
+  // source, no as-of date and no unit: it is a scenario error, reported here where it was written.
+  for (const root of ['institution', 'market', 'confidence', 'counters'] as const) {
+    const obj = sc.initialState[root]
+    for (const p of listNumericPaths(obj, root)) {
+      const v = getNumberPath({ [root]: obj }, p)
+      if (v !== undefined && !Number.isFinite(v))
+        err('initial-finite', `initialState.${p}`, `초기값이 유한하지 않습니다 (${v})`)
+    }
+  }
+
   const checkEffects = (effects: Effect[] | undefined, where: string) => {
     for (const e of effects ?? []) {
       if (e.kind === 'op') {
@@ -106,7 +128,7 @@ export function validateScenario<S extends InstitutionState>(
   }
   const checkCondition = (cond: Condition | undefined, where: string) => {
     walkConditions(cond, (c) => {
-      if ('metric' in c && opts.metricKeys && !opts.metricKeys.has(c.metric)) {
+      if ('metric' in c && metricKeys && !metricKeys.has(c.metric)) {
         err('metric-key', where, `알 수 없는 지표 키: ${c.metric}`)
       }
       if ('path' in c && initial && getNumberPath(initial, c.path) === undefined) {
@@ -292,6 +314,17 @@ export function validateScenario<S extends InstitutionState>(
           `deadlineTick ${d.deadlineTick}은 마지막 틱이라 자동 확정이 일어나지 않습니다 (≤ ${ticks - 2} 권장)`,
         )
     }
+    // The deadline sweep (a `deadlineTick`, or an interrupt's arrival tick) commits exactly one
+    // option — the default. With `select.min ≥ 2` that commit fails `select_count`, the engine
+    // only logs it, the decision stays unresolved and the turn can never advance: a live deadlock
+    // one authored line away. No scenario has it today; this keeps it that way.
+    const sweeps = d.deadlineTick !== undefined || ('interrupt' in d && d.interrupt === true)
+    if (sweeps && sel.min !== 1)
+      err(
+        'deadline-select',
+        dw,
+        `마감 자동 확정은 옵션 1개(defaultOptionId)만 넣으므로 select.min은 1이어야 합니다 (${sel.min})`,
+      )
     if (d.scoreWeight !== undefined && !(d.scoreWeight >= 0))
       err('score-weight', dw, `scoreWeight ${d.scoreWeight}는 0 이상이어야 합니다`)
     for (const dim of d.dimensions ?? []) {
@@ -419,6 +452,32 @@ export function validateScenario<S extends InstitutionState>(
   // --- scoring
   const wsum = SCORE_DIMENSIONS.reduce((a, d) => a + (sc.scoring.weights[d] ?? 0), 0)
   if (Math.abs(wsum - 100) > 0.01) err('weights-sum', 'scoring.weights', `가중치 합 ${wsum} ≠ 100`)
+  for (const [dim, rule] of Object.entries(sc.scoring.rules)) {
+    const rw = `scoring.rules(${dim})`
+    // `[]` is truthy, so an empty component list does not fall back to the defaults: the
+    // dimension scores a flat 50 whatever happened. Either author components or omit the key.
+    if (rule && rule.components.length === 0)
+      err('components-empty', rw, '컴포넌트가 비어 있습니다 (기본 규칙을 쓰려면 키를 생략하세요)')
+    for (const c of rule?.components ?? []) {
+      if (c.kind === 'metric' && metricKeys && !metricKeys.has(c.metric))
+        err('scoring-metric', rw, `알 수 없는 지표 키: ${c.metric}`)
+      if (c.kind === 'metric' && (c.aggregate === 'turnsBelow' || c.aggregate === 'turnsAbove'))
+        if (c.threshold === undefined)
+          err('scoring-threshold', rw, `${c.aggregate}에는 threshold가 필요합니다 (${c.metric})`)
+    }
+  }
+  // A default threshold in currency units cannot be right for every scenario: `facilityHeadroom`
+  // warns at 10 — $10B in one scenario, 10조원 in the next, 10억원 in a third. A scenario that
+  // shows a ccy KPI with a defaulted band must set its own.
+  for (const k of sc.kpis) {
+    if (k.unit !== 'ccy') continue
+    if (DEFAULT_THRESHOLDS[k.metric] && !sc.thresholds?.[k.metric])
+      warn(
+        'threshold-ccy-default',
+        `kpis(${k.metric})`,
+        '통화 단위 지표가 기본 임계값을 쓰고 있습니다 — 시나리오 단위에 맞는 thresholds를 지정하세요',
+      )
+  }
 
   // --- paths
   const decisionsAll = allDecisions(sc)
@@ -470,13 +529,20 @@ export function validateScenario<S extends InstitutionState>(
   // --- briefing / kpis
   checkRefs(sc.briefing.cardRefs, undefined, 'briefing.cardRefs')
   if (sc.kpis.length === 0) warn('kpis', 'kpis', 'KPI가 정의되지 않았습니다')
-  if (opts.metricKeys)
+  if (metricKeys)
     for (const k of sc.kpis)
-      if (!opts.metricKeys.has(k.metric))
-        err('kpi-metric', `kpis(${k.metric})`, '알 수 없는 지표 키')
+      if (!metricKeys.has(k.metric)) err('kpi-metric', `kpis(${k.metric})`, '알 수 없는 지표 키')
   for (const c of sc.checkpoints ?? []) {
-    if (!sc.turns.some((x) => x.id === c.turnId))
-      err('checkpoint-turn', `checkpoints(${c.label})`, `턴 ${c.turnId} 없음`)
+    const cw = `checkpoints(${c.label})`
+    if (!sc.turns.some((x) => x.id === c.turnId)) err('checkpoint-turn', cw, `턴 ${c.turnId} 없음`)
+    // A checkpoint that names nothing the engine produces passes vacuously — it reads NaN and the
+    // tolerance check never fires. The historical path then "reproduces" a figure nobody measured.
+    if (c.metric !== undefined && metricKeys && !metricKeys.has(c.metric))
+      err('checkpoint-metric', cw, `알 수 없는 지표 키: ${c.metric}`)
+    if (c.path !== undefined && initial && getNumberPath(initial, c.path) === undefined)
+      err('checkpoint-path', cw, `체크포인트 경로가 초기 상태에서 숫자로 해석되지 않음: ${c.path}`)
+    if (c.metric === undefined && c.counter === undefined && c.path === undefined)
+      err('checkpoint-target', cw, 'metric, counter, path 중 하나가 필요합니다')
   }
   // scenario-level trap requirement
   const anyTrap = decisionsAll.some(
