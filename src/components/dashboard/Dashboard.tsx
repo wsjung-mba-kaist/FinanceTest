@@ -8,7 +8,11 @@ import { Icon } from '../ui/Icon'
 import { KpiTile } from './KpiTile'
 import { buildKpiRows, sortedKpis } from './kpiRows'
 import { MarketStrip } from './MarketStrip'
-import { TimeSeriesChart } from './TimeSeriesChart'
+import { Suspense } from 'react'
+import { lazyNamed } from '../ui/lazyNamed'
+
+// recharts (≈100 KB gzip) arrives with the dashboard tab, not with the play screen's first paint.
+const TimeSeriesChart = lazyNamed(() => import('./TimeSeriesChart'), 'TimeSeriesChart')
 import { StatusBoard } from '../play/StatusBoard'
 
 /**
@@ -65,9 +69,7 @@ export function Dashboard({ preview }: { preview: PreviewState | null }) {
             <Icon name={showAll ? 'chevron-down' : 'chevron-right'} size={14} />
             전체 지표
             <span className="num text-muted">({rest.length})</span>
-            <span className="ml-auto text-sm text-muted">
-              {showAll ? '접기' : '더 보기'}
-            </span>
+            <span className="ml-auto text-sm text-muted">{showAll ? '접기' : '더 보기'}</span>
           </button>
           {showAll && (
             <div className="mt-2 rounded-md border border-border bg-surface">
@@ -92,12 +94,20 @@ export function Dashboard({ preview }: { preview: PreviewState | null }) {
         </button>
       </p>
 
-      <TimeSeriesChart
-        kpis={kpis}
-        history={state.metricsHistory}
-        units={scenario.units}
-        thresholds={thresholds}
-      />
+      <Suspense
+        fallback={
+          <p className="text-sm text-muted" role="status">
+            차트를 불러오는 중…
+          </p>
+        }
+      >
+        <TimeSeriesChart
+          kpis={kpis}
+          history={state.metricsHistory}
+          units={scenario.units}
+          thresholds={thresholds}
+        />
+      </Suspense>
       {/*
         Moved off the situation column: ~460px of slow-changing reference was pushing 최근 결과 —
         the outcome of the decision just made — below the fold every turn.

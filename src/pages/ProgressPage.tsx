@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ProgressMap } from '../components/progress/ProgressMap'
+import { Suspense } from 'react'
+import { lazyNamed } from '../components/ui/lazyNamed'
+
+const ProgressMap = lazyNamed(() => import('../components/progress/ProgressMap'), 'ProgressMap')
 import { Badge, Card, EmptyState } from '../components/ui'
 import { buttonClass } from '../components/ui/buttonStyles'
 import { formatNumber } from '../lib/format'
@@ -68,7 +71,15 @@ export default function ProgressPage() {
           런은 0.8 가중. 레벨: 미평가 → 기초(50 미만) → 숙련(50~75, 시나리오 2개 이상) → 전문(75
           이상, 시나리오 3개 이상, 전문가 모드 1회 포함).
         </p>
-        <ProgressMap mastery={mastery} />
+        <Suspense
+          fallback={
+            <p className="text-sm text-muted" role="status">
+              차트를 불러오는 중…
+            </p>
+          }
+        >
+          <ProgressMap mastery={mastery} />
+        </Suspense>
       </section>
 
       <section

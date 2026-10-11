@@ -94,6 +94,8 @@ describe('HelpSheet', () => {
     await user.click(screen.getByRole('button', { name: '지표 설명 열기' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('tab', { name: '지표 설명', selected: true })).toBeTruthy()
+    // The tab body is a lazy chunk: wait for the first heading, then the rest is synchronous.
+    await within(dialog).findAllByRole('heading', { name: scenario.kpis[0]!.label })
     for (const spec of scenario.kpis) {
       expect(
         // 특례 없이 저작된 라벨 그대로. 한때 여기에 두 지표의 예외가 있었는데, 그것은
@@ -111,7 +113,7 @@ describe('HelpSheet', () => {
     await user.click(screen.getByRole('button', { name: '지표 설명 열기' }))
     const dialog = await screen.findByRole('dialog')
     // svb-2023은 누적 예금 유출(cumulativeOutflow) 등 임계값 없는 지표를 노출한다.
-    expect(within(dialog).getAllByText('기준 없음').length).toBeGreaterThan(0)
+    expect((await within(dialog).findAllByText('기준 없음')).length).toBeGreaterThan(0)
   })
 
   it('시나리오 없는 맥락에서는 검색·규정·용어 세 탭만 보여 준다', async () => {
@@ -136,7 +138,7 @@ describe('HelpSheet', () => {
     )
     await user.keyboard('?')
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('지식 베이스 검색'), 'LCR')
+    await user.type(await within(dialog).findByLabelText('지식 베이스 검색'), 'LCR')
     const links = await within(dialog).findAllByRole('link', { name: /유동성커버리지비율/ })
     expect(links.length).toBeGreaterThan(0)
     // 라이브 리전과 눈에 보이는 개수 줄이 함께 개수를 알린다.

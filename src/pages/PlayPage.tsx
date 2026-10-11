@@ -436,7 +436,10 @@ function PlayView({
   return (
     <RestrictedKnowledgeContext.Provider value={mode === 'expert'}>
       <PlayContext.Provider value={ctx}>
-        <HelpProvider context={{ page: 'play', scenario, state, view, mode }} shortcuts={false}>
+        <HelpProvider
+          context={{ page: 'play', scenario, state, view, mode, hintsRevealed: run.hintsRevealed }}
+          shortcuts={false}
+        >
           <PlayScreen scenario={scenario} state={state} run={run} view={view} />
         </HelpProvider>
       </PlayContext.Provider>

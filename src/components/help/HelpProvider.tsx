@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isEditableTarget } from '../../lib/keyboard'
 import { useBreakpoint } from '../../lib/useMediaQuery'
-import { useGameStore } from '../../store/gameStore'
 import { HelpApiContext, type HelpApi, type HelpContextValue, type HelpTarget } from './helpContext'
 import { HelpSheet } from './HelpSheet'
 import { tabsFor } from './helpMeta'
@@ -33,8 +32,6 @@ export function HelpProvider({
     tab: tabsFor(context)[0] ?? 'search',
   }))
   const mobile = useBreakpoint() === 'mobile'
-  const mode = useGameStore((s) => s.run?.mode)
-  const hintsRevealed = useGameStore((s) => s.run?.hintsRevealed)
 
   const openHelp = useCallback(
     (next?: HelpTarget) => {
@@ -45,8 +42,11 @@ export function HelpProvider({
   )
   const closeHelp = useCallback(() => setOpen(false), [])
 
+  // Read off the context, not the game store: the shell mounts this provider on every non-play
+  // route, and a store import here pulled the engine into the first chunk of the home screen.
   const badge = useMemo(() => {
-    if (context.page !== 'play' || mode === 'expert') return 0
+    if (context.page !== 'play' || context.mode === 'expert') return 0
+    const hintsRevealed = context.hintsRevealed
     const levels = new Map<string, Set<number>>()
     for (const h of context.view.hints) {
       const key = h.decisionId ?? `turn:${context.state.turnIndex}`
@@ -60,7 +60,7 @@ export function HelpProvider({
       for (const l of set) if (l > revealed) n += 1
     }
     return n
-  }, [context, mode, hintsRevealed])
+  }, [context])
 
   const api = useMemo<HelpApi>(
     () => ({ open: openHelp, close: closeHelp, isOpen: open, badge }),

@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Tabs } from '../ui'
+import { lazyNamed } from '../ui/lazyNamed'
 import { SideSheet } from '../ui/SideSheet'
-import { GlossaryScopeProvider } from '../knowledge/Markdown'
-import { CardsHelp } from './CardsHelp'
-import { DecisionHelp } from './DecisionHelp'
-import { GlossaryHelp } from './GlossaryHelp'
+import { GlossaryScopeProvider } from '../knowledge/glossaryScope'
 import type { HelpContextValue, HelpTab, HelpTarget } from './helpContext'
 import { TAB_LABEL, tabsFor } from './helpMeta'
-import { KnowledgeSearch } from './KnowledgeSearch'
-import { KpiHelp } from './KpiHelp'
-import { SourcesHelp } from './SourcesHelp'
+
+// Each tab is its own chunk: the sheet exists on every route, but a tab's body (and the content
+// and markdown renderer under it) is downloaded the first time that tab is opened.
+const CardsHelp = lazyNamed(() => import('./CardsHelp'), 'CardsHelp')
+const DecisionHelp = lazyNamed(() => import('./DecisionHelp'), 'DecisionHelp')
+const GlossaryHelp = lazyNamed(() => import('./GlossaryHelp'), 'GlossaryHelp')
+const KnowledgeSearch = lazyNamed(() => import('./KnowledgeSearch'), 'KnowledgeSearch')
+const KpiHelp = lazyNamed(() => import('./KpiHelp'), 'KpiHelp')
+const SourcesHelp = lazyNamed(() => import('./SourcesHelp'), 'SourcesHelp')
 
 function titleFor(context: HelpContextValue): string {
   if (context.page === 'play' || context.page === 'briefing' || context.page === 'debrief')
@@ -60,7 +64,15 @@ export function HelpSheet({
       <Tabs tabs={tabs} value={tab} onChange={select} ariaLabel="도움 탭" />
       <div className="p-3" role="tabpanel" aria-label={TAB_LABEL[tab]}>
         <GlossaryScopeProvider>
-          <HelpBody context={context} tab={tab} target={target} onClose={onClose} />
+          <Suspense
+            fallback={
+              <p className="text-sm text-muted" role="status">
+                불러오는 중…
+              </p>
+            }
+          >
+            <HelpBody context={context} tab={tab} target={target} onClose={onClose} />
+          </Suspense>
         </GlossaryScopeProvider>
       </div>
     </SideSheet>

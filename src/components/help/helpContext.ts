@@ -16,7 +16,15 @@ export interface HelpTarget {
 export type HelpContextValue =
   | { page: 'catalog' | 'knowledge' | 'progress' | 'settings' | 'other' }
   | { page: 'briefing' | 'debrief'; scenario: ScenarioDefinition; state?: GameState; mode?: Mode }
-  | { page: 'play'; scenario: ScenarioDefinition; state: GameState; view: TurnView; mode?: Mode }
+  | {
+      page: 'play'
+      scenario: ScenarioDefinition
+      state: GameState
+      view: TurnView
+      mode?: Mode
+      /** Hint levels already revealed per decision (for the badge); supplied by the play page. */
+      hintsRevealed?: Record<string, number>
+    }
 
 export interface HelpApi {
   open: (target?: HelpTarget) => void

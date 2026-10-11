@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { DebriefTimeline } from '../components/debrief/DebriefTimeline'
 import { KpiComparisonTable } from '../components/debrief/KpiComparisonTable'
 import { LessonList } from '../components/debrief/LessonList'
 import { MistakeList } from '../components/debrief/MistakeList'
 import { OnePageSummary } from '../components/debrief/OnePageSummary'
 import { PathComparison } from '../components/debrief/PathComparison'
 import { Quiz } from '../components/debrief/Quiz'
-import { ScoreRadar } from '../components/debrief/ScoreRadar'
+import { lazyNamed } from '../components/ui/lazyNamed'
+
+// Both charts carry recharts; the one-page summary paints before they arrive.
+const DebriefTimeline = lazyNamed(
+  () => import('../components/debrief/DebriefTimeline'),
+  'DebriefTimeline',
+)
+const ScoreRadar = lazyNamed(() => import('../components/debrief/ScoreRadar'), 'ScoreRadar')
 import { SourcesList } from '../components/debrief/SourcesList'
 import { Citation } from '../components/knowledge/Citation'
 import { Markdown } from '../components/knowledge/Markdown'
@@ -545,26 +551,34 @@ export default function DebriefPage() {
               computing={!paths.done}
             />
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <Card className="p-3">
-                <DebriefTimeline
-                  scenario={scenario}
-                  state={state}
-                  historical={paths.historical}
-                  expert={paths.expert}
-                  onMarkerClick={scrollToTurn}
-                  forceTable={printing}
-                />
-                {!paths.done && (
-                  <p className="mt-1 text-sm text-muted" role="status">
-                    역사·전문가 경로를 계산 중…
-                  </p>
-                )}
-              </Card>
-              <Card className="p-3">
-                <ScoreRadar report={report} forceTable={printing} />
-              </Card>
-            </div>
+            <Suspense
+              fallback={
+                <p className="mt-4 text-sm text-muted" role="status">
+                  차트를 불러오는 중…
+                </p>
+              }
+            >
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <Card className="p-3">
+                  <DebriefTimeline
+                    scenario={scenario}
+                    state={state}
+                    historical={paths.historical}
+                    expert={paths.expert}
+                    onMarkerClick={scrollToTurn}
+                    forceTable={printing}
+                  />
+                  {!paths.done && (
+                    <p className="mt-1 text-sm text-muted" role="status">
+                      역사·전문가 경로를 계산 중…
+                    </p>
+                  )}
+                </Card>
+                <Card className="p-3">
+                  <ScoreRadar report={report} forceTable={printing} />
+                </Card>
+              </div>
+            </Suspense>
 
             <h3 className="mt-4 text-md font-semibold">결정별 경로 비교</h3>
             <p className="mb-2 text-sm text-muted">

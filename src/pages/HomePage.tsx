@@ -9,7 +9,7 @@ import { buttonClass } from '../components/ui/buttonStyles'
 import { gridPlan } from '../lib/grid'
 import { roleFamilyOf, type RoleFamily } from '../content/roleFrames'
 import type { Competency, Difficulty, Region, ScenarioSummary } from '../engine/types'
-import { ENGINE_VERSION } from '../engine'
+import { ENGINE_VERSION } from '../engine/version'
 import { saveIsStale, type InProgressSave } from '../persistence/schema'
 import {
   CATALOG_STATUS_LABELS,

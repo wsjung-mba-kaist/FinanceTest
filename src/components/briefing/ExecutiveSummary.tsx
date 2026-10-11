@@ -9,7 +9,7 @@ import {
   shortDate,
   turnProgressLabel,
 } from '../../lib/labels'
-import { ENGINE_VERSION } from '../../engine'
+import { ENGINE_VERSION } from '../../engine/version'
 import { saveIsStale, type InProgressSave } from '../../persistence/schema'
 import { useGameStore } from '../../store/gameStore'
 import { useProgressStore } from '../../store/progressStore'
