@@ -17,12 +17,6 @@ import { observedTurnState } from '../../lib/observedTurn'
 import { firstSentence, splitOptionLabel, truncateKo } from '../../lib/text'
 import type { SettingsState } from '../../persistence/schema'
 
-export const MODE_LABELS: Record<Mode, string> = {
-  guided: '안내',
-  standard: '표준',
-  expert: '전문가',
-}
-
 export const REGULATOR_LABELS: Record<number, string> = {
   0: 'R0 정상',
   1: 'R1 강화 모니터링',

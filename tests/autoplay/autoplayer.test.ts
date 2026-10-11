@@ -85,10 +85,6 @@ function checkpointFailure(
 }
 
 describe('autoplayer', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   describe.each(cases)('%s', (id, def) => {
     it.each(runs)(
       '%s completes without NaN/Infinity, with `ended` set and a score in [0,100]',

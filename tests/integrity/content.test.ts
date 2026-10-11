@@ -8,10 +8,6 @@ const content = await loadContentSafe()
 const TERM_LINK = /\]\(term:([^)\s]+)\)/g
 
 describe('knowledge content integrity', () => {
-  it.skipIf(content !== undefined)('content module is not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   describe.skipIf(content === undefined)('cards', () => {
     it('every card has a unique id, a non-empty body and sources that resolve', () => {
       const { CARDS, SOURCES } = content!

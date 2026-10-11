@@ -6,7 +6,8 @@ import { Badge, Button, CountPill, type Tone } from '../ui'
 import { Icon } from '../ui/Icon'
 import { ClockControl, type ClockState } from './ClockControl'
 import { usePlay } from './playContext'
-import { MODE_LABELS, REGULATOR_LABELS } from './playHelpers'
+import { MODE_LABELS } from '../../lib/labels'
+import { REGULATOR_LABELS } from './playHelpers'
 
 function RunStateChip({ ci, compact }: { ci: number; compact: boolean }) {
   const run = runStateFromCi(ci)

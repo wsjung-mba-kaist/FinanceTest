@@ -42,10 +42,6 @@ describe('firstParagraph', () => {
 })
 
 describe('ScenarioSummary.cardRefs', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   // The summary carries a copy of `briefing.cardRefs` so the knowledge base can answer
   // "이 프레임워크가 쓰인 시나리오" without loading every scenario module; this guards the copy
   // against drifting from the real briefing content.
@@ -71,10 +67,6 @@ describe('ScenarioSummary.cardRefs', () => {
 })
 
 describe('deriveBriefingSummary', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   for (const scenario of registry) {
     describe(scenario.meta.id, () => {
       const baseline = baselineSnapshot(scenario)

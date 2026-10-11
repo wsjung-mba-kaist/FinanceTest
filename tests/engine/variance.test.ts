@@ -29,10 +29,6 @@ const cases: [id: string, def: ScenarioDefinition<InstitutionState>][] = [
 ]
 
 describe('live-play volatility (variance 1)', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   describe.each(cases)('%s', (_id, def) => {
     it('finishes cleanly on every seed, with a score in [0,100] and no NaN', () => {
       const problems: string[] = []

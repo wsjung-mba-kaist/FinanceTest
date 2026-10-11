@@ -29,10 +29,6 @@ describe('firstSentence', () => {
 })
 
 describe('debrief summary derivations', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   for (const scenario of registry) {
     describe(scenario.meta.id, () => {
       const historicalRun = autoplay(scenario, 'historical', { seed: 1 })

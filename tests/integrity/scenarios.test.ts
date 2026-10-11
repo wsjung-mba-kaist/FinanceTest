@@ -16,10 +16,6 @@ const cases: [id: string, def: ScenarioDefinition<InstitutionState>][] = [
 ]
 
 describe('scenario integrity', () => {
-  it.skipIf(registry.length > 0)('registry scenarios are not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   it.skipIf(registry.length === 0)('every registered scenario loaded with a unique id', () => {
     const ids = registry.map((d) => d.meta.id)
     expect(new Set(ids).size).toBe(ids.length)

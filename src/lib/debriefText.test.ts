@@ -7,10 +7,6 @@ const registry = await loadAvailableScenariosSafe()
 const svb = registry.find((s) => s.meta.id === 'svb-2023')
 
 describe('buildDebriefText', () => {
-  it.skipIf(Boolean(svb))('svb-2023 is not available yet (skipped)', (ctx) => {
-    ctx.skip()
-  })
-
   it.skipIf(!svb)('renders a reproducible plain-text report', () => {
     const scenario = svb!
     const player = autoplay(scenario, 'historical', { seed: 1 }).state
