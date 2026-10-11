@@ -13,11 +13,12 @@ const CLOSED: UndoWindow = { active: false, remainingMs: 0, secondsLeft: 0, tota
 /**
  * Countdown for the 실행 취소 toast. The window length (5s, 8s for an `irreversible`
  * option) is decided by the store when the decision is committed; this hook only ticks
- * it down and calls `onExpire` once.
+ * it down and calls `onExpire(until)` once — with the window's own `until`, so the store can
+ * close exactly that window and not one opened by a later decision in the meantime.
  */
 export function useUndoWindow(
   undoable: UndoableChoice | undefined,
-  onExpire: () => void,
+  onExpire: (until: number) => void,
   totalMs = 5_000,
 ): UndoWindow {
   const until = undoable?.until ?? 0
@@ -34,7 +35,7 @@ export function useUndoWindow(
 
   useEffect(() => {
     if (!until || remainingMs > 0) return
-    onExpire()
+    onExpire(until)
     // onExpire is called once per window; it is intentionally not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [until, remainingMs > 0])

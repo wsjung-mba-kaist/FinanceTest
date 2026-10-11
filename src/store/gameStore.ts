@@ -116,7 +116,12 @@ interface GameStore {
   /** Clears one decision's in-progress dialogue (or every one). */
   dialogueReset: (decisionId?: string) => void
   undoChoice: () => boolean
-  clearUndo: () => void
+  /**
+   * Closes the undo window — only the one that ends at `until` when given. The toast's expiry
+   * fires from an effect, so a new `choose()` can land between the window running out and the
+   * effect running; an unconditional clear then shut the *new* window a few ms after it opened.
+   */
+  clearUndo: (until?: number) => void
   /** Plays one sub-turn tick. False when the turn has no tick left (or the run ended). */
   tickAdvance: () => boolean
   pause: () => void
@@ -246,12 +251,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
         hintPenalty: pending ? penalty : undefined,
       })
       // Expert mode commits for good; other modes keep a short window to take it back.
+      // A commit the *clock* made (the response budget ran out and the default was taken) gets
+      // no window either: the budget is spent, so undoing it re-mounted the decision with zero
+      // budget and it timed out again at once — the toast offered an undo that undid nothing.
       const decision = scenario.turns[state.turnIndex]?.decisions.find((d) => d.id === decisionId)
       const irreversible = optionIds.some(
         (id) => decision?.options.find((o) => o.id === id)?.irreversible,
       )
       const undoable =
-        run.mode === 'expert'
+        run.mode === 'expert' || meta.timedOut
           ? undefined
           : {
               prevState: state,
@@ -345,7 +353,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     persistInProgress(get())
     return true
   },
-  clearUndo: () => set({ undoable: undefined }),
+  clearUndo: (until) =>
+    set((s) =>
+      s.undoable && (until === undefined || s.undoable.until === until)
+        ? { undoable: undefined }
+        : s,
+    ),
   next: () => {
     const { scenario, state, history, clock } = get()
     if (!scenario || !state) return false

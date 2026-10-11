@@ -182,6 +182,16 @@ describe('live simulation clock', () => {
     await user.click(screen.getByRole('button', { name: /결정 확정/ }))
     await waitFor(() => expect(useGameStore.getState().state?.decisions).toHaveLength(2))
 
+    // The undo window is a grace period: the clock waits for it and says so, instead of cutting
+    // the «5초» toast short with a tick. The player lets it close here.
+    expect(useGameStore.getState().undoable).toBeDefined()
+    expect(
+      (await screen.findAllByText('실행 취소 가능 — 시계가 잠시 멈췄습니다')).length,
+    ).toBeGreaterThan(0)
+    act(() => {
+      useGameStore.getState().clearUndo()
+    })
+
     // A 300 ms tick keeps the test honest about the interval without making it slow.
     act(() => {
       useGameStore.setState({ clock: { running: true, speed: 1, baseTickMs: 300 } })

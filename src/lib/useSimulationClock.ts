@@ -47,10 +47,18 @@ function holdReasonFor(
   state: GameState,
   scenario: ScenarioDefinition,
   playedReelId: string | undefined,
-  opts: ClockOptions & { mode: 'guided' | 'standard' | 'expert'; hidden: boolean },
+  opts: ClockOptions & {
+    mode: 'guided' | 'standard' | 'expert'
+    hidden: boolean
+    undoOpen: boolean
+  },
 ): string | undefined {
   if (state.phase === 'ended') return '시나리오가 종료되었습니다'
   if (opts.introPending) return '턴 시작 대기 — 시계가 멈췄습니다'
+  // A tick cannot keep an undo window alive (undoing would also undo the tick), so the window
+  // used to be cut short by the clock: at ×4 the toast said «5초» and vanished after two. The
+  // window is a grace period of a few seconds — the clock waits for it rather than lying about it.
+  if (opts.undoOpen) return '실행 취소 가능 — 시계가 잠시 멈췄습니다'
   if (state.openInterrupts.length > 0) return '전화 응답 대기 — 시계가 멈췄습니다'
   const reel = state.lastReel
   // A turn-start reel is retired without being played (the situation panel already shows it).
@@ -137,6 +145,7 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
   const mode = useGameStore((s) => s.run?.mode ?? 'standard')
   const clock = useGameStore((s) => s.clock)
   const playedReelId = useGameStore((s) => s.playedReelId)
+  const undoOpen = useGameStore((s) => s.undoable !== undefined)
   const tickAdvance = useGameStore((s) => s.tickAdvance)
   const pause = useGameStore((s) => s.pause)
   const resume = useGameStore((s) => s.resume)
@@ -173,10 +182,21 @@ export function useSimulationClock(opts: ClockOptions = {}): SimulationClock {
       ...opts,
       mode,
       hidden,
+      undoOpen,
     })
     // `opts` is a fresh object each render; its two flags are the only parts that matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, scenario, playedReelId, mode, hidden, enabled, opts.helpOpen, opts.introPending])
+  }, [
+    state,
+    scenario,
+    playedReelId,
+    mode,
+    hidden,
+    undoOpen,
+    enabled,
+    opts.helpOpen,
+    opts.introPending,
+  ])
 
   const running = enabled && clock.running && holdReason === undefined
 
