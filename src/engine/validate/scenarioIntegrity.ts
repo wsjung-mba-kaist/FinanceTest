@@ -317,14 +317,12 @@ export function validateScenario<S extends InstitutionState>(
     }
     const ids = new Set<string>()
     let historical = 0
-    let trap = 0
     for (const o of d.options) {
       const ow = `${dw}.options(${o.id})`
       if (ids.has(o.id)) err('unique-ids', ow, `옵션 id 중복 ${o.id}`)
       ids.add(o.id)
       checkOption(o, ow)
       if (o.historical) historical++
-      if (o.trap) trap++
     }
     optionIdsByDecision.set(d.id, ids)
     for (const g of d.exclusive ?? []) {
@@ -347,14 +345,10 @@ export function validateScenario<S extends InstitutionState>(
         )
       }
     }
-    // A dialogue can put the trap in a reply rather than an option — the mistake is just as real,
-    // so it counts. Without this the rule nags a decision that already teaches a trap.
-    const dialogueTraps = (d.steps ?? []).reduce(
-      (n, st) => n + st.replies.filter((r) => r.trap).length,
-      0,
-    )
-    if (trap + dialogueTraps === 0)
-      warn('min-one-trap', dw, '함정 옵션이 없습니다 (시나리오 전체에 ≥1 필요)')
+    // `min-one-trap` is a *scenario-level* rule and is checked once at the end of `validateScenario`
+    // (options and dialogue replies alike). It used to also warn here on every decision without a
+    // trap — 94 of the suite's 132 warnings, each saying "시나리오 전체에 ≥1 필요" about a single
+    // decision — which buried the warnings that were about something.
     if (d.timeLimitSec && !d.defaultOptionId)
       warn('timeout-default', dw, '타이머가 있는 결정에 defaultOptionId가 없습니다')
   }
