@@ -2,8 +2,14 @@ import type { GameState, InstitutionState, ScenarioDefinition } from '../types'
 import { seedToState } from './rng'
 import { startTurn } from './startTurn'
 
+/**
+ * `structuredClone`, not `JSON.parse(JSON.stringify())`: the JSON round trip turns `Infinity` and
+ * `NaN` into `null` and drops `undefined` keys, so an authored non-finite figure became a silent
+ * `null` that `getNumberPath` then read as "unknown path". A non-finite initial value is a
+ * scenario error, and the integrity linter reports it as one; the clone must not hide it.
+ */
 function clone<T>(v: T): T {
-  return JSON.parse(JSON.stringify(v)) as T
+  return structuredClone(v)
 }
 
 /**

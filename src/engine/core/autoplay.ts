@@ -104,8 +104,13 @@ function pickForPolicy<S extends InstitutionState>(
   if (policy === 'worst') {
     return { ids: respectExclusive([...byRating].reverse(), sel.min) }
   }
-  // random
-  const shuffled = [...available].sort(() => rng() - 0.5)
+  // random — Fisher–Yates. `sort(() => rng() - 0.5)` is an inconsistent comparator: the result
+  // depends on the sort algorithm, is not uniform, and the spec does not even promise it ends.
+  const shuffled = [...available]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const k = Math.floor(rng() * (i + 1))
+    ;[shuffled[i], shuffled[k]] = [shuffled[k]!, shuffled[i]!]
+  }
   const count = sel.min + Math.floor(rng() * (sel.max - sel.min + 1))
   return { ids: respectExclusive(shuffled, Math.max(sel.min, count)) }
 }

@@ -55,7 +55,12 @@ export function jitterTick(
   if (variance === 0 || j <= 0 || ticks <= 1)
     return clamp(Math.round(base), 0, Math.max(0, ticks - 1))
   const offset = Math.floor(rng() * (2 * j + 1)) - j
-  return clamp(Math.round(base + offset * variance), 0, ticks - 1)
+  // Round the scaled offset half *away from zero*, not with `Math.round` (which rounds .5 up):
+  // at variance 0.5 an offset of −1 became −0.5 → 0 while +1 became +0.5 → +1, so events and
+  // calls could only ever arrive late. Noise must not push an outcome one way.
+  const scaled = offset * variance
+  const delta = Math.sign(scaled) * Math.round(Math.abs(scaled))
+  return clamp(Math.round(base) + delta, 0, ticks - 1)
 }
 
 function draftRng<S extends InstitutionState>(draft: Draft<GameState<S>>): () => number {
