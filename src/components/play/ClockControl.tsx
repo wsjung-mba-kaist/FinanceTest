@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useReducedMotion } from '../../lib/useMediaQuery'
 import { useTickProgress, type ProgressStore } from '../../store/hooks/useSimulationClock'
 import { Icon } from '../ui/Icon'
+import { useMenuKeys } from '../ui/useMenuKeys'
 import { ScenarioClock } from './ScenarioClock'
 
 export type ClockSpeed = 1 | 2 | 4
@@ -82,6 +83,7 @@ function SpeedMenu({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuKeys = useMenuKeys(ref, open, () => setOpen(false))
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
@@ -117,6 +119,7 @@ function SpeedMenu({
           role="menu"
           aria-label="시계 속도"
           className="absolute right-0 top-full z-30 mt-1 w-32 rounded-md border border-border bg-surface p-1 shadow-lg"
+          onKeyDown={menuKeys}
         >
           {SPEEDS.map((s) => (
             <button

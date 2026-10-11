@@ -141,11 +141,14 @@ export function CountPill({
 }) {
   if (count <= 0) return null
   return (
+    // Not `aria-label`: ARIA forbids naming a generic `<span>`, and most assistive technology
+    // ignores the attempt — the reader heard «12» and nothing else. Visually hidden text is read.
     <span
       className={`num inline-flex min-w-[1.5em] justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-accent-fg ${className}`}
-      aria-label={`${label} ${count}건`}
     >
+      <span className="sr-only">{label} </span>
       {count}
+      <span className="sr-only">건</span>
     </span>
   )
 }

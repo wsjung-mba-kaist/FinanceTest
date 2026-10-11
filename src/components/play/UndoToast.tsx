@@ -1,3 +1,4 @@
+import { useBreakpoint } from '../../lib/useMediaQuery'
 import { useUndoWindow } from '../../store/hooks/useUndoWindow'
 import type { UndoableChoice } from '../../store/gameStore'
 import { Button } from '../ui'
@@ -20,13 +21,16 @@ export function UndoToast({
   onExpire: () => void
 }) {
   const win = useUndoWindow(undoable, onExpire)
+  // On a phone the bottom edge is the tab bar: a toast parked there covered the «결정» tab for the
+  // length of the window. It sits under the status bar there (same `12` the bar is tall).
+  const phone = useBreakpoint() === 'mobile'
   if (!win.active) return null
   return (
     <div
       role="status"
       aria-live="polite"
       data-noprint
-      className="fixed bottom-4 left-1/2 z-40 flex max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-lg border border-border-strong bg-surface px-3 py-2 shadow-xl"
+      className={`fixed left-1/2 z-40 flex max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-lg border border-border-strong bg-surface px-3 py-2 shadow-xl ${phone ? 'top-14' : 'bottom-4'}`}
     >
       <Icon name="check" size={16} className="text-positive" />
       <span className="min-w-0 truncate text-base">{label}</span>

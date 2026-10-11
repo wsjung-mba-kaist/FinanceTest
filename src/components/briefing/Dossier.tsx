@@ -11,6 +11,7 @@ import { Markdown } from '../knowledge/Markdown'
 import { Badge, Card, StatusBadge } from '../ui'
 import { Icon } from '../ui/Icon'
 import { gridClass } from '../../lib/grid'
+import { scrollBehavior } from '../../lib/useMediaQuery'
 
 /**
  * The full dossier. Every section is collapsed by default on every breakpoint — the executive
@@ -226,7 +227,9 @@ export function Dossier({ scenario }: { scenario: ScenarioDefinition }) {
       markViewed(sid)
       return new Set(s).add(sid)
     })
-    document.getElementById(`sec-${sid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document
+      .getElementById(`sec-${sid}`)
+      ?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
   }
 
   return (

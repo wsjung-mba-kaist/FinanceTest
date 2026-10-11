@@ -23,8 +23,7 @@ function RollingMetric({
   // Chosen from the endpoints, never from the rolling value: deriving it from a number that is
   // mid-animation would re-scale the unit while the figure counts, which is the exact flicker the
   // fixed scale exists to remove.
-  const scale =
-    delta.unit === 'ccy' ? scaleFor([delta.before, delta.after], units) : undefined
+  const scale = delta.unit === 'ccy' ? scaleFor([delta.before, delta.after], units) : undefined
   return (
     <li className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span className="text-base text-muted">{delta.label}</span>
@@ -51,15 +50,22 @@ function MarketRow({
 }) {
   const value = useRollingNumber(item.after, { durationMs: 600, enabled: animate })
   const down = item.after < item.before
+  const flat = item.after === item.before
   const scale = item.unit === 'ccy' ? scaleFor([item.before, item.after], units) : undefined
+  // A market figure carries no threshold, so whether a move is good or bad is not known here
+  // (a falling stock and a falling CDS spread are opposite news). It used to paint «down» red
+  // and «up» green regardless. The direction is said in a glyph and a word; colour stays for state.
   return (
     <li className="flex items-baseline gap-2">
       <span className="text-base text-muted">{item.label}</span>
       <span className="num ml-auto text-base">
         {formatAt(item.before, item.unit, units, { scale })} →{' '}
-        <span className={down ? 'text-critical' : 'text-positive'}>
-          {formatAt(value, item.unit, units, { scale })}
-        </span>
+        <span>{formatAt(value, item.unit, units, { scale })}</span>
+        {!flat && (
+          <span className="ml-1 text-xs text-muted">
+            <span aria-hidden="true">{down ? '▼' : '▲'}</span> {down ? '하락' : '상승'}
+          </span>
+        )}
       </span>
     </li>
   )

@@ -100,6 +100,7 @@ export function KpiTile({
   if (compact) {
     return (
       <div
+        role="group"
         className="flex items-center gap-2 border-b border-border px-2 py-1.5 last:border-b-0"
         aria-label={aria}
       >
@@ -143,7 +144,7 @@ export function KpiTile({
         <HelpButton onClick={openHelp} label={spec.label} />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-2" aria-label={aria}>
+      <div role="group" className="mt-1 flex flex-wrap items-baseline gap-x-2" aria-label={aria}>
         <span className="num-lg">{value}</span>
         {deltaText && <DeltaText text={deltaText} dir={dir} crossed={crossed} />}
       </div>

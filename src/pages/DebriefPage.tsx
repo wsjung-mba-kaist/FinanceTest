@@ -34,6 +34,7 @@ import { useScenarioDef } from '../lib/useScenario'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { HelpProvider } from '../components/help'
+import { scrollBehavior } from '../lib/useMediaQuery'
 
 type TabId = 'paths' | 'mistakes' | 'lessons' | 'quiz' | 'sources'
 
@@ -416,7 +417,7 @@ export default function DebriefPage() {
     window.setTimeout(() => {
       const el = document.getElementById(decisionAnchorId(rec.decisionId))
       if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
       el.focus({ preventScroll: true })
     }, 0)
   }

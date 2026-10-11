@@ -351,10 +351,13 @@ export function PlayLayout({
                 (t.id === 'decide' ? (
                   // 결정 shows a dot, not a number: "there is something waiting" is the whole
                   // message, and a count would invite counting instead of deciding.
-                  <span
-                    className="inline-block h-2 w-2 rounded-full bg-accent"
-                    aria-label={`${badge}건 대기`}
-                  />
+                  <>
+                    <span
+                      className="inline-block h-2 w-2 rounded-full bg-accent"
+                      aria-hidden="true"
+                    />
+                    <span className="sr-only">{badge}건 대기</span>
+                  </>
                 ) : (
                   <CountPill count={badge} label="읽지 않은 소식" />
                 ))}

@@ -4,6 +4,7 @@ import { RUN_STATE_LABELS, runStateFromCi } from '../../metrics/runoff'
 import { useHelp } from '../help/helpContext'
 import { Badge, Button, CountPill, type Tone } from '../ui'
 import { Icon } from '../ui/Icon'
+import { useMenuKeys } from '../ui/useMenuKeys'
 import { ClockControl, type ClockState } from './ClockControl'
 import { usePlay } from './playContext'
 import { useProgressStore } from '../../store/progressStore'
@@ -71,6 +72,7 @@ export function StatusBar({
     }
   }, [menuOpen])
 
+  const menuKeys = useMenuKeys(menuRef, menuOpen, () => setMenuOpen(false))
   const ended = state.phase === 'ended'
   // A save that fails mid-run used to surface only on the progress page — forty minutes later.
   const saveResult = useProgressStore((p) => p.lastSaveResult)
@@ -147,6 +149,7 @@ export function StatusBar({
               role="menu"
               aria-label="플레이 메뉴"
               className="absolute right-0 top-full z-30 mt-1 w-64 rounded-md border border-border bg-surface p-1 shadow-lg"
+              onKeyDown={menuKeys}
             >
               {canRewind && (
                 <>

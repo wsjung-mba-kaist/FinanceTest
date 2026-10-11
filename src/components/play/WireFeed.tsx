@@ -115,7 +115,8 @@ export function WireFeed({ onUnreadChange }: { onUnreadChange?: (n: number) => v
     if (announcedTurn.current !== state.turnIndex) {
       announcedTurn.current = state.turnIndex
       announcedCount.current = current.length
-      setAnnounce(current.length > 0 ? `T+${state.turnIndex} 새 소식 ${current.length}건` : '')
+      // The turn change itself is announced once, by the situation panel («T+n 새 소식 N건»);
+      // this region speaks only for items that arrive mid-turn.
       // Previous turns' entries count as read once the turn has passed.
       setReadIds((prev) => {
         const next = new Set(prev)

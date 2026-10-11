@@ -30,6 +30,22 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
  * would move the two-column layout to 1280 and leave an 80px band where the situation room is a
  * single column on a screen that could hold two. See docs/ui-conventions.md §16-3.
  */
+/**
+ * `scrollIntoView({ behavior: 'smooth' })` is not covered by the stylesheet's
+ * `scroll-behavior: auto !important` under reduced motion — the option wins over the CSS. Callers
+ * that scroll programmatically pick the behaviour from here.
+ */
+export function scrollBehavior(): ScrollBehavior {
+  if (typeof document === 'undefined') return 'auto'
+  if (document.documentElement.getAttribute('data-reduced-motion') === 'true') return 'auto'
+  if (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+    return 'auto'
+  return 'smooth'
+}
+
 export function useBreakpoint(): Breakpoint {
   const desktop = useMediaQuery('(min-width: 1200px)')
   const tablet = useMediaQuery('(min-width: 900px)')

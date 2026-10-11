@@ -103,7 +103,9 @@ export function OptionRow({
         <button
           type="button"
           aria-expanded={expanded}
-          aria-controls={`opt-${option.id}-detail`}
+          // The detail panel is not in the DOM while collapsed; an `aria-controls` that points at
+          // nothing is the pattern the `Tabs` primitive's own comment warns about.
+          aria-controls={expanded ? `opt-${option.id}-detail` : undefined}
           className="inline-flex min-h-tap-compact items-center gap-1 rounded-sm px-1 text-sm text-muted hover:bg-surface-2 hover:text-text"
           onClick={onToggleExpand}
         >

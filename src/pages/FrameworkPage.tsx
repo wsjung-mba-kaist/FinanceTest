@@ -8,6 +8,7 @@ import { scenariosUsingCards } from '../lib/catalog'
 import { ROLE_SHORT } from '../lib/labels'
 import { uniqueSlugs } from '../lib/slug'
 import { getScenarioSummary } from '../scenarios'
+import { scrollBehavior } from '../lib/useMediaQuery'
 
 /**
  * `## ` headings of the markdown source, parsed from the text (never from the DOM).
@@ -70,7 +71,7 @@ export default function FrameworkPage() {
    */
   useEffect(() => {
     if (!hash || body === undefined) return
-    document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document.getElementById(hash)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
   }, [hash, body])
 
   const usedBy = useMemo(() => {
