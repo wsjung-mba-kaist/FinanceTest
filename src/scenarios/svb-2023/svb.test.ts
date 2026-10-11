@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { autoplay, computeScore, validateScenario } from '../../engine'
+import {
+  advanceTurn,
+  applyDecision,
+  autoplay,
+  computeScore,
+  createGame,
+  fastForwardTicks,
+  validateScenario,
+} from '../../engine'
 import { formatIssues } from '../../engine/validate/scenarioIntegrity'
 import scenario from './scenario'
 
@@ -85,6 +93,41 @@ describe('svb-2023 scenario', () => {
     )
     const hist = computeScore(autoplay(scenario, 'historical', { seed: 1 }).state, scenario)
     expect(score.total).toBeGreaterThan(hist.total)
+  })
+
+  it('t3-c (HTM 매각) taints the book without inflating the unrealized loss', () => {
+    // T0~T2는 역사 선택으로 진행하고 T3에서 함정 옵션 t3-c를 고른다.
+    let s = createGame(scenario, 1, { variance: 0 })
+    for (let t = 0; t < 3; t++) {
+      s = fastForwardTicks(s, scenario)
+      for (const d of scenario.turns[t]!.decisions) {
+        if (s.decisions.some((r) => r.decisionId === d.id)) continue
+        const hist = d.options.find((o) => o.historical) ?? d.options[0]!
+        s = applyDecision(s, scenario, d.id, [hist.id])
+      }
+      s = advanceTurn(s, scenario)
+    }
+    const d3 = scenario.turns[3]!.decisions.find((d) => d.options.some((o) => o.id === 't3-c'))!
+    const before = s.institution
+    const totalBefore =
+      before.securities.afs.bookValue -
+      before.securities.afs.marketValue +
+      (before.securities.htm.bookValue - before.securities.htm.marketValue)
+    s = applyDecision(s, scenario, d3.id, ['t3-c'])
+    const b = s.institution
+    const m = s.metricsHistory.at(-1)!.metrics
+    // 재분류 뒤 HTM은 비어 있고, 미실현손실 KPI는 병합된 AFS의 시가 차이와 같다.
+    expect(b.securities.htm.bookValue).toBe(0)
+    expect(b.securities.htm.marketValue).toBe(0)
+    expect(m.unrealizedLoss!.value).toBeCloseTo(
+      b.securities.afs.bookValue - b.securities.afs.marketValue,
+      6,
+    )
+    // 매각분의 손실은 실현되어 빠졌으니 총 미실현손실은 매각 전보다 작아야 한다 — 잔여 HTM
+    // 시가 전체(≈50)가 손실로 둔갑하던 산술에서는 세 배로 뛰었다.
+    expect(m.unrealizedLoss!.value).toBeLessThan(totalBefore)
+    expect(m.unrealizedLoss!.value).toBeGreaterThan(0)
+    expect(s.counters.htmTaintLoss).toBeGreaterThan(0)
   })
 
   it('worst and random policies complete without NaN', () => {

@@ -57,12 +57,23 @@ export const bankFx = {
         )
         if (p.book === 'htm' && !b.htmTainted) {
           b.htmTainted = true
-          // Tainting: remaining HTM reclassified at market value; the mark hits equity (AOCI → economic TCE).
-          const remainingLoss = b.securities.htm.bookValue - b.securities.htm.marketValue
-          b.securities.htm.bookValue = b.securities.htm.marketValue
-          b.securities.afs.marketValue += b.securities.htm.marketValue
-          b.securities.afs.bookValue += b.securities.htm.marketValue
-          b.securities.htm.marketValue = 0
+          // Tainting: the remaining HTM book is reclassified to AFS. A reclassification moves the
+          // *carrying amount* (ASC 320-10-35-10): book value goes to AFS book value, market value to
+          // AFS market value, so the unrealized loss stays visible as an AFS mark (AOCI). It used to
+          // add the market value to both AFS columns and leave HTM's book value behind — which
+          // erased the loss from AFS and, because HTM then read "book value − 0", reported the whole
+          // remaining HTM *market value* as a loss (SVB t3-c: 미실현손실 17 → 50, TCE −2.7% → −22%).
+          const { afs, htm } = b.securities
+          const remainingLoss = htm.bookValue - htm.marketValue
+          const mergedMv = afs.marketValue + htm.marketValue
+          // The merged book's duration is the market-value-weighted blend, not AFS's alone.
+          if (mergedMv > 0)
+            afs.modDuration =
+              (afs.modDuration * afs.marketValue + htm.modDuration * htm.marketValue) / mergedMv
+          afs.bookValue += htm.bookValue
+          afs.marketValue += htm.marketValue
+          htm.bookValue = 0
+          htm.marketValue = 0
           // conservative: the merged book takes the lower HQLA level of the two
           const rank = { L1: 0, L2A: 1, L2B: 2, none: 3 } as const
           const htmLevel = b.securities.htm.hqlaLevel ?? 'none'
